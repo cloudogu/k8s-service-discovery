@@ -18,7 +18,10 @@ package controllers
 
 import (
 	"context"
-
+	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,9 +48,56 @@ type ServiceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	service := &corev1.Service{}
+	err := r.Get(ctx, req.NamespacedName, service)
+	if err != nil {
+		logger.Info(fmt.Sprintf("failed to get service: %s", err))
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	logger.Info("found", "service", service)
+
+	if len(service.Spec.Ports) == 0 {
+		logger.Info("found no ports for", "service", service.Name)
+		return ctrl.Result{}, nil
+	}
+
+	ingressClassName := "nginx-ecosystem"
+	pathType := networking.PathTypePrefix
+	ingress := &networking.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      service.Name,
+			Namespace: service.Namespace,
+			Labels:    nil,
+		},
+	}
+
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, ingress, func() error {
+		ingress.Spec = networking.IngressSpec{
+			IngressClassName: &ingressClassName,
+			Rules: []networking.IngressRule{{
+				IngressRuleValue: networking.IngressRuleValue{
+					HTTP: &networking.HTTPIngressRuleValue{
+						Paths: []networking.HTTPIngressPath{{Path: "/" + service.GetName(),
+							PathType: &pathType,
+							Backend: networking.IngressBackend{
+								Service: &networking.IngressServiceBackend{
+									Name: service.GetName(),
+									Port: networking.ServiceBackendPort{
+										Number: service.Spec.Ports[0].Port,
+									},
+								}}}}}}}}}
+		err = ctrl.SetControllerReference(service, ingress, r.Scheme)
+		if err != nil {
+			return fmt.Errorf("failed to set controller reference for ingress: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create ingress object: %w", err)
+	}
+	logger.Info("created or updated ingress object", "result", result)
 
 	return ctrl.Result{}, nil
 }
@@ -56,6 +106,6 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
-		// For().
+		For(&corev1.Service{}).
 		Complete(r)
 }
