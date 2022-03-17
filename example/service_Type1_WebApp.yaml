@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: nexus
   annotations:
-    service-discovery.cloudogu.com/services: '[{"port":"8082", "location":"/nexus", "pass": "/nexus"}]'
+    service-discovery.cloudogu.com/ces-services: '[{"name":"nexus-min", "port":8082, "location":"/nexus", "pass": "/nexus"}]'
 spec:
   selector:
     app: nexus

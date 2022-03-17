@@ -23,6 +23,7 @@ import (
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -32,6 +33,13 @@ import (
 type ServiceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+}
+
+type CesService struct {
+	Name     string `json:"name"`
+	Port     int    `json:"port"`
+	Location string `json:"location"`
+	Pass     string `json:"pass"`
 }
 
 //+kubebuilder:rbac:groups=cloudogu.com,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -63,41 +71,56 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	ingressClassName := "nginx-ecosystem"
-	pathType := networking.PathTypePrefix
-	ingress := &networking.Ingress{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      service.Name,
-			Namespace: service.Namespace,
-			Labels:    nil,
-		},
+	cesServicesAnnotation, ok := service.Annotations["service-discovery.cloudogu.com/ces-services"]
+	if !ok {
+		logger.Info("found no services annotation for", "service", service.Name)
+		return ctrl.Result{}, nil
 	}
 
-	result, err := ctrl.CreateOrUpdate(ctx, r.Client, ingress, func() error {
-		ingress.Spec = networking.IngressSpec{
-			IngressClassName: &ingressClassName,
-			Rules: []networking.IngressRule{{
-				IngressRuleValue: networking.IngressRuleValue{
-					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{{Path: "/" + service.GetName(),
-							PathType: &pathType,
-							Backend: networking.IngressBackend{
-								Service: &networking.IngressServiceBackend{
-									Name: service.GetName(),
-									Port: networking.ServiceBackendPort{
-										Number: service.Spec.Ports[0].Port,
-									},
-								}}}}}}}}}
-		err = ctrl.SetControllerReference(service, ingress, r.Scheme)
-		if err != nil {
-			return fmt.Errorf("failed to set controller reference for ingress: %w", err)
-		}
-		return nil
-	})
+	var cesServices []CesService
+	err = json.Unmarshal([]byte(cesServicesAnnotation), &cesServices)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create ingress object: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to unmarshal ces services: %w", err)
 	}
-	logger.Info("created or updated ingress object", "result", result)
+
+	for _, cesService := range cesServices {
+		ingressClassName := "nginx-ecosystem"
+		pathType := networking.PathTypePrefix
+		ingress := &networking.Ingress{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      cesService.Name,
+				Namespace: service.Namespace,
+				Labels:    nil,
+			},
+		}
+
+		result, err := ctrl.CreateOrUpdate(ctx, r.Client, ingress, func() error {
+			ingress.Spec = networking.IngressSpec{
+				IngressClassName: &ingressClassName,
+				Rules: []networking.IngressRule{{
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{Path: cesService.Location,
+								PathType: &pathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: service.GetName(),
+										Port: networking.ServiceBackendPort{
+											Number: int32(cesService.Port),
+										},
+									}}}}}}}}}
+			ingress.ObjectMeta.Annotations = map[string]string{"nginx.ingress.kubernetes.io/rewrite-target": cesService.Pass}
+			err = ctrl.SetControllerReference(service, ingress, r.Scheme)
+			if err != nil {
+				return fmt.Errorf("failed to set controller reference for ingress: %w", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to create ingress object: %w", err)
+		}
+		logger.Info("created or updated ingress object", "result", result)
+	}
 
 	return ctrl.Result{}, nil
 }

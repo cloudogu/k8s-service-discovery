@@ -3,14 +3,16 @@ kind: Service
 metadata:
   name: nexus
   annotations:
-    service-discovery.cloudogu.com/services: '[{"port":"8082", "location":"/nexus", "pass": "/nexus"}, {"port":"8082", "location": "v2", "pass": "nexus/repository/docker-registry/v2/"}]'
+    service-discovery.cloudogu.com/ces-services: '[{"name":"nexus", "port":8082, "location":"/nexus", "pass": "/nexus"}, {"name":"nexus-docker-registry", "port":8082, "location": "/v2", "pass": "/nexus/repository/docker-registry/v2/"}]'
 spec:
   selector:
     app: nexus
   ports:
-    - protocol: TCP
+    - name: "8082"
+      protocol: TCP
       port: 8082
       targetPort: 8082
-    - protocol: TCP
+    - name: "8081"
+      protocol: TCP
       port: 8081
       targetPort: 8081
