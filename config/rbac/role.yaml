@@ -1,12 +1,23 @@
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
-  - cloudogu.com
+  - "networking.k8s.io"
+  resources:
+  - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
   resources:
   - services
   verbs:
@@ -18,13 +29,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cloudogu.com
+  - ""
   resources:
   - services/finalizers
   verbs:
   - update
 - apiGroups:
-  - cloudogu.com
+  - ""
   resources:
   - services/status
   verbs:

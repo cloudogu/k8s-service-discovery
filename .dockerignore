@@ -1,4 +1,10 @@
-# More info: https://docs.docker.com/engine/reference/builder/#dockerignore-file
-# Ignore build and test binaries.
-bin/
-testbin/
+# Deny all
+*/**
+
+# Allow only resources
+!go.*
+!controllers/**/*
+!build/**/*
+!hack/**/*.go
+!Makefile
+!.git/**/*

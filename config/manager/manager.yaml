@@ -9,7 +9,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
   labels:
     control-plane: controller-manager
 spec:
@@ -32,6 +31,11 @@ spec:
         args:
         - --leader-elect
         image: controller:latest
+        env:
+          - name: WATCH_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

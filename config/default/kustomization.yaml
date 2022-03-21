@@ -1,6 +1,3 @@
-# Adds namespace to all resources.
-namespace: k8s-service-discovery-system
-
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
@@ -13,7 +10,6 @@ namePrefix: k8s-service-discovery-
 #  someName: someValue
 
 bases:
-- ../crd
 - ../rbac
 - ../manager
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
@@ -44,7 +40,6 @@ patchesStrategicMerge:
 #- webhookcainjection_patch.yaml
 
 # the following config is for teaching kustomize how to do var substitution
-vars:
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER' prefix.
 #- name: CERTIFICATE_NAMESPACE # namespace of the certificate CR
 #  objref:
