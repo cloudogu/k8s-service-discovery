@@ -2,8 +2,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nexus
+  namespace: my-test-namespace
   annotations:
-    service-discovery.cloudogu.com/ces-services: '[{"name":"nexus-min", "port":8082, "location":"/nexus", "pass": "/nexus"}]'
+    k8s-dogu-operator.cloudogu.com/ces-services: '[{"name":"nexus", "port":8082, "location":"/nexus", "pass": "/nexus"}]'
 spec:
   selector:
     app: nexus

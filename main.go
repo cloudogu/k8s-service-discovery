@@ -16,8 +16,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cloudogu/k8s-service-discovery/controllers"
 	"os"
+
+	"github.com/cloudogu/k8s-service-discovery/controllers"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -32,6 +33,10 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+const (
+	IngressClassName = "k8s-ecosystem-ces-service"
+)
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -43,6 +48,8 @@ func init() {
 }
 
 func main() {
+	setupLog.Info("Starting k8s-service-discovery...")
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -79,10 +86,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	//create initial ingress class
+	ingressClassCreator, err := controllers.NewIngressClassCreator(mgr.GetClient(), IngressClassName)
+	if err != nil {
+		setupLog.Error(err, "failed to create ingress class creator")
+		os.Exit(1)
+	}
+
+	err = mgr.Add(ingressClassCreator)
+	if err != nil {
+		setupLog.Error(err, "failed to add ingress class creator as dependency")
+		os.Exit(1)
+	}
+
+	ingressCreator := controllers.NewIngressGenerator(mgr.GetClient(), mgr.GetScheme(), watchNamespace, IngressClassName)
+	reconciler := &controllers.ServiceReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		IngressCreator: ingressCreator,
+	}
+	if err = (reconciler).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}

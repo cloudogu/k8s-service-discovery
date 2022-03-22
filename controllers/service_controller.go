@@ -3,9 +3,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -13,48 +12,41 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// ServiceReconciler reconciles a Service object
-type ServiceReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
-}
+// CesServiceAnnotation can be appended to services with information of ces services.
+const CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
 
-type CesService struct {
-	Name     string `json:"name"`
-	Port     int    `json:"port"`
-	Location string `json:"location"`
-	Pass     string `json:"pass"`
+// ServiceReconciler reconciles a Service object.
+type ServiceReconciler struct {
+	client.Client  `json:"client_._client"`
+	Scheme         *runtime.Scheme  `json:"scheme"`
+	IngressCreator IngressGenerator `json:"ingress_creator"`
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
-// todo add actual comment for the service discovery
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
+// The ServiceReconciler is responsible to generate ingress objects for respective services containing the ces service
+// discovery annotation.
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	service := &corev1.Service{}
-	err := r.Get(ctx, req.NamespacedName, service)
+	service, err := r.getService(ctx, req)
 	if err != nil {
-		logger.Info(fmt.Sprintf("failed to get service: %s", err))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if len(service.Spec.Ports) == 0 {
-		logger.Info("found no ports for", "service", service.Name)
+	logger.Info(fmt.Sprintf("found service [%s]", service.Name))
+
+	if !hasServicePorts(service) {
+		logger.Info(fmt.Sprintf("service [%s] has no ports -> skipping ingress creation", service.Name))
 		return ctrl.Result{}, nil
 	}
 
-	cesServicesAnnotation, ok := service.Annotations["k8s-dogu-operator.cloudogu.com/ces-services"]
+	cesServicesAnnotation, ok := service.Annotations[CesServiceAnnotation]
 	if !ok {
-		logger.Info("found no services annotation for", "service", service.Name)
+		logger.Info(fmt.Sprintf("found no [%s] annotation for [%s] -> creating no ingress resource", CesServiceAnnotation, service.Name))
 		return ctrl.Result{}, nil
 	}
-
-	logger.Info("found ces service annotated service", "", service)
 
 	var cesServices []CesService
 	err = json.Unmarshal([]byte(cesServicesAnnotation), &cesServices)
@@ -63,42 +55,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, cesService := range cesServices {
-		ingressClassName := "nginx-ecosystem"
-		pathType := networking.PathTypePrefix
-		ingress := &networking.Ingress{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      cesService.Name,
-				Namespace: service.Namespace,
-				Labels:    nil,
-			},
-		}
-
-		result, err := ctrl.CreateOrUpdate(ctx, r.Client, ingress, func() error {
-			ingress.Spec = networking.IngressSpec{
-				IngressClassName: &ingressClassName,
-				Rules: []networking.IngressRule{{
-					IngressRuleValue: networking.IngressRuleValue{
-						HTTP: &networking.HTTPIngressRuleValue{
-							Paths: []networking.HTTPIngressPath{{Path: cesService.Location,
-								PathType: &pathType,
-								Backend: networking.IngressBackend{
-									Service: &networking.IngressServiceBackend{
-										Name: service.GetName(),
-										Port: networking.ServiceBackendPort{
-											Number: int32(cesService.Port),
-										},
-									}}}}}}}}}
-			ingress.ObjectMeta.Annotations = map[string]string{"nginx.ingress.kubernetes.io/rewrite-target": cesService.Pass}
-			err = ctrl.SetControllerReference(service, ingress, r.Scheme)
-			if err != nil {
-				return fmt.Errorf("failed to set controller reference for ingress: %w", err)
-			}
-			return nil
-		})
+		err := r.IngressCreator.CreateCesServiceIngress(ctx, cesService, service)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create ingress object: %w", err)
+			return ctrl.Result{}, err
 		}
-		logger.Info("created or updated ingress object", "result", result)
 	}
 
 	return ctrl.Result{}, nil
@@ -110,4 +70,18 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&corev1.Service{}).
 		Complete(r)
+}
+
+func (r *ServiceReconciler) getService(ctx context.Context, req ctrl.Request) (*corev1.Service, error) {
+	service := &corev1.Service{}
+	err := r.Get(ctx, req.NamespacedName, service)
+	if err != nil {
+		return &corev1.Service{}, fmt.Errorf("failed to get service: %w", err)
+	}
+
+	return service, nil
+}
+
+func hasServicePorts(service *corev1.Service) bool {
+	return len(service.Spec.Ports) >= 1
 }
