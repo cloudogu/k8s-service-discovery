@@ -99,7 +99,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ingressCreator := controllers.NewIngressGenerator(mgr.GetClient(), mgr.GetScheme(), watchNamespace, IngressClassName)
+	ingressCreator := controllers.NewIngressGenerator(mgr.GetClient(), watchNamespace, IngressClassName)
 	reconciler := &controllers.ServiceReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),

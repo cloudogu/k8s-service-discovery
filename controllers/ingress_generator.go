@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,8 +32,6 @@ type CesService struct {
 type IngressGenerator struct {
 	// Client used to communicate with k8s.
 	Client client.Client `json:"client"`
-	// Currently registered schemes.
-	Scheme *runtime.Scheme `json:"scheme"`
 	// Namespace defines the target namespace for the ingress objects.
 	Namespace string `json:"namespace"`
 	// IngressClassName defines the ingress class for the ces services.
@@ -42,10 +39,9 @@ type IngressGenerator struct {
 }
 
 // NewIngressGenerator create a new ingress generator.
-func NewIngressGenerator(client client.Client, scheme *runtime.Scheme, namespace string, ingressClassName string) IngressGenerator {
+func NewIngressGenerator(client client.Client, namespace string, ingressClassName string) IngressGenerator {
 	return IngressGenerator{
 		Client:           client,
-		Scheme:           scheme,
 		Namespace:        namespace,
 		IngressClassName: ingressClassName,
 	}
@@ -61,7 +57,6 @@ func (g IngressGenerator) CreateCesServiceIngress(ctx context.Context, cesServic
 		ObjectMeta: v1.ObjectMeta{
 			Name:      cesService.Name,
 			Namespace: g.Namespace,
-			Labels:    nil,
 		},
 	}
 
@@ -81,9 +76,9 @@ func (g IngressGenerator) CreateCesServiceIngress(ctx context.Context, cesServic
 									},
 								}}}}}}}}}
 
-		ingress.ObjectMeta.Annotations = map[string]string{IngressRewriteTargetAnnotation: cesService.Pass}
+		ingress.Annotations[IngressRewriteTargetAnnotation] = cesService.Pass
 
-		err := ctrl.SetControllerReference(service, ingress, g.Scheme)
+		err := ctrl.SetControllerReference(service, ingress, g.Client.Scheme())
 		if err != nil {
 			return fmt.Errorf("failed to set controller reference for ingress: %w", err)
 		}
