@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	timeout  = time.Second * 10
-	interval = time.Second * 1
+	timeoutInterval = time.Second * 10
+	pollingInterval = time.Second * 1
 )
 
 //go:embed testdata/service_no_annotations.yaml
@@ -70,7 +70,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Eventually(func() bool {
 				err := k8sClient.List(ctx, expectedIngress)
 				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
 
 			Expect(len(expectedIngress.Items)).Should(Equal(0))
 		})
@@ -90,7 +90,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 				}
 
 				return len(expectedIngress.Items) == 1
-			}, timeout, interval).Should(BeTrue())
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
 
 			Expect(expectedIngress.Items[0].Namespace).Should(Equal(myNamespace))
 			Expect(expectedIngress.Items[0].Name).Should(Equal("nexus"))
@@ -99,7 +99,9 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(*expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
-			Expect(expectedIngress.Items[0].Annotations[controllers.IngressRewriteTargetAnnotation]).Should(Equal("/nexus"))
+
+			_, ok := expectedIngress.Items[0].Annotations[controllers.IngressRewriteTargetAnnotation]
+			Expect(ok).Should(BeFalse())
 		})
 
 		It("Should create ingress object for multiple ces services", func() {
@@ -117,7 +119,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 				}
 
 				return len(expectedIngress.Items) == 2
-			}, timeout, interval).Should(BeTrue())
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
 
 			Expect(expectedIngress.Items[0].Namespace).Should(Equal(myNamespace))
 			Expect(expectedIngress.Items[0].Name).Should(Equal("nexus"))
@@ -126,7 +128,9 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(*expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
-			Expect(expectedIngress.Items[0].Annotations[controllers.IngressRewriteTargetAnnotation]).Should(Equal("/nexus"))
+
+			_, ok := expectedIngress.Items[0].Annotations[controllers.IngressRewriteTargetAnnotation]
+			Expect(ok).Should(BeFalse())
 
 			Expect(expectedIngress.Items[1].Namespace).Should(Equal(myNamespace))
 			Expect(expectedIngress.Items[1].Name).Should(Equal("nexus-docker-registry"))
@@ -158,7 +162,7 @@ var _ = Describe("Ingress class should be created automatically", func() {
 				}
 
 				return expectedIngressClass != nil
-			}, timeout, interval).Should(BeTrue())
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
 		})
 	})
 })
@@ -182,7 +186,7 @@ func cleanup() {
 		}
 
 		return true
-	}, timeout, interval).Should(BeTrue())
+	}, timeoutInterval, pollingInterval).Should(BeTrue())
 
 	By("Cleanup all services")
 	servicesList := &corev1.ServiceList{}
@@ -200,5 +204,5 @@ func cleanup() {
 		}
 
 		return true
-	}, timeout, interval).Should(BeTrue())
+	}, timeoutInterval, pollingInterval).Should(BeTrue())
 }

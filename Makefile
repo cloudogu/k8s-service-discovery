@@ -2,7 +2,7 @@
 ARTIFACT_ID=k8s-service-discovery
 VERSION=0.1.0
 
-GOTAG?=1.18.0
+GOTAG?=1.17.0
 MAKEFILES_VERSION=5.0.0
 
 # Image URL to use all building/pushing image targets
@@ -12,6 +12,7 @@ IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 ENVTEST_K8S_VERSION = 1.23
 K8S_INTEGRATION_TEST_DIR=${TARGET_DIR}/k8s-integration-test
 K8S_RESOURCE_YAML=${TARGET_DIR}/${ARTIFACT_ID}_${VERSION}.yaml
+DEFAULT_NAMESPACE?="$(shell kubectl config view | grep namespace | head -n 1 | sed "s/^.*namespace: //g")"
 
 # make sure to create a statically linked binary otherwise it may quit with
 # "exec user process caused: no such file or directory"
@@ -97,7 +98,7 @@ controller-release: ## Interactively starts the release workflow.
 .PHONY: docker-build
 docker-build: ${SRC} ## Builds the docker image of the k8s-ces-setup `cloudogu/k8s-ces-setup:version`.
 	@echo "Building docker image of dogu..."
-	docker build . -t ${IMAGE}
+	DOCKER_BUILDKIT=1 docker build . -t ${IMAGE}
 
 ${K8S_CLUSTER_ROOT}/image.tar: check-k8s-cluster-root-env-var
 	# Saves the `cloudogu/k8s-ces-setup:version` image into a file into the K8s root path to be available on all nodes.
@@ -138,7 +139,7 @@ k8s-generate: ${K8S_RESOURCE_YAML} ## Create required k8s resources in ./dist/..
 
 .PHONY: k8s-apply
 k8s-apply: k8s-generate ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cat ${K8S_RESOURCE_YAML} | kubectl apply -f -
+	cat ${K8S_RESOURCE_YAML} | sed "s/{{ .Namespace }}/${DEFAULT_NAMESPACE}/" | kubectl apply -f -
 
 .PHONY: k8s-delete
 k8s-delete: k8s-generate ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

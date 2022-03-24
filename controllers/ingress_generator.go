@@ -55,8 +55,9 @@ func (g IngressGenerator) CreateCesServiceIngress(ctx context.Context, cesServic
 	pathType := networking.PathTypePrefix
 	ingress := &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      cesService.Name,
-			Namespace: g.Namespace,
+			Name:        cesService.Name,
+			Namespace:   g.Namespace,
+			Annotations: map[string]string{},
 		},
 	}
 
@@ -76,7 +77,9 @@ func (g IngressGenerator) CreateCesServiceIngress(ctx context.Context, cesServic
 									},
 								}}}}}}}}}
 
-		ingress.Annotations[IngressRewriteTargetAnnotation] = cesService.Pass
+		if cesService.Pass != cesService.Location {
+			ingress.Annotations[IngressRewriteTargetAnnotation] = cesService.Pass
+		}
 
 		err := ctrl.SetControllerReference(service, ingress, g.Client.Scheme())
 		if err != nil {
