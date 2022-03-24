@@ -66,7 +66,7 @@ node('docker') {
             stageStaticAnalysisSonarQube()
         }
 
-        def k3d = new K3d(this, "${WORKSPACE}/k3d", env.PATH)
+        K3d k3d = new K3d(this, "${WORKSPACE}/k3d", env.PATH)
 
         try {
             stage('Set up k3d cluster') {
@@ -75,13 +75,13 @@ node('docker') {
 
             def imageName
             stage('Build & Push Image') {
-                def makefile = new Makefile(this)
+                Makefile makefile = new Makefile(this)
                 String setupVersion = makefile.getVersion()
                 imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", setupVersion)
             }
 
-            def sourceDeploymentYaml="k8s/k8s-ces-setup.yaml"
-            def sourceDeploymentYamlWithNamespace = sh(returnStdout: true, script: "cat ${K8S_RESOURCE_YAML} | sed \"s/{{ .Namespace }}/default/\"").trim()
+            String sourceDeploymentYaml="k8s/k8s-ces-setup.yaml"
+            def sourceDeploymentYamlWithNamespace = sh(returnStdout: true, script: "cat ${sourceDeploymentYaml} | sed \"s/{{ .Namespace }}/default/\"").trim()
             stage('Deploy Setup') {
                 k3d.kubectl("apply -f ${sourceDeploymentYamlWithNamespace}")
             }
@@ -110,7 +110,7 @@ void gitWithCredentials(String command) {
 
 void stageLintK8SResources() {
     String kubevalImage = "cytopia/kubeval:0.13"
-    def makefile = new Makefile(this)
+    Makefile makefile = new Makefile(this)
     String controllerVersion = makefile.getVersion()
 
     docker
@@ -183,9 +183,9 @@ void stageAutomaticRelease() {
         }
 
         stage('Add Github-Release') {
-            def makefile = new Makefile(this)
+            Makefile makefile = new Makefile(this)
             String controllerVersion = makefile.getVersion()
-            def targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
+            GString targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
             releaseId = github.createReleaseWithChangelog(releaseVersion, changelog, productionReleaseBranch)
             github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}")
             github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}.sha256sum")
