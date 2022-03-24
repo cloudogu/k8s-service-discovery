@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/dogu-build-lib@v1.4.1', 'github.com/cloudogu/ces-build-lib@v1.48.0'])
+@Library(['github.com/cloudogu/dogu-build-lib@v1.6.0', 'github.com/cloudogu/ces-build-lib@1.51.0'])
 import com.cloudogu.ces.cesbuildlib.*
 import com.cloudogu.ces.dogubuildlib.*
 
@@ -69,25 +69,36 @@ node('docker') {
         K3d k3d = new K3d(this, "${WORKSPACE}/k3d", env.PATH)
 
         try {
+            Makefile makefile = new Makefile(this)
+            String controllerVersion = makefile.getVersion()
+
             stage('Set up k3d cluster') {
                 k3d.startK3d()
             }
 
             def imageName
             stage('Build & Push Image') {
-                Makefile makefile = new Makefile(this)
-                String setupVersion = makefile.getVersion()
-                imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", setupVersion)
+                imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
             }
 
-            String sourceDeploymentYaml="k8s/k8s-ces-setup.yaml"
-            def sourceDeploymentYamlWithNamespace = sh(returnStdout: true, script: "cat ${sourceDeploymentYaml} | sed \"s/{{ .Namespace }}/default/\"").trim()
-            stage('Deploy Setup') {
+            GString sourceDeploymentYaml="target/${repositoryName}_${controllerVersion}.yaml"
+            GString sourceDeploymentYamlWithNamespace="target/${repositoryName}_${controllerVersion}_namespaced.yaml"
+
+            stage('Update development resources') {
+                sh "cat ${sourceDeploymentYaml} | sed \"s/{{ .Namespace }}/default/\" > ${sourceDeploymentYamlWithNamespace}"
+                docker.image('mikefarah/yq:4.22.1')
+                        .mountJenkinsUser()
+                        .inside("--volume ${WORKSPACE}:/workdir -w /workdir") {
+                            sh "yq -i '(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.name == \"manager\")).image=\"${imageName}\"' ${sourceDeploymentYamlWithNamespace}"
+                        }
+            }
+
+            stage('Deploy Manager') {
                 k3d.kubectl("apply -f ${sourceDeploymentYamlWithNamespace}")
             }
 
-            stage('Restore development resources') {
-                sh "git restore ${sourceDeploymentYaml}"
+            stage('Wait for Ready Rollout') {
+                k3d.kubectl("--namespace default wait --for=condition=Ready pods --all")
             }
 
             stageAutomaticRelease()

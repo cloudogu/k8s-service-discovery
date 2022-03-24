@@ -29,8 +29,16 @@ RUN make compile-generic
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
+LABEL maintainer="hello@cloudogu.com" \
+      NAME="k8s-service-discovery" \
+      VERSION="0.1.0"
+
 WORKDIR /
+
 COPY --from=builder /workspace/target/k8s-service-discovery /manager
+
+# the linter has a problem with the valid colon-syntax
+# dockerfile_lint - ignore
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
