@@ -33,6 +33,7 @@ node('docker') {
         stage('SonarQube') {
             stageStaticAnalysisSonarQube()
         }
+    }
 }
 
 void gitWithCredentials(String command) {
