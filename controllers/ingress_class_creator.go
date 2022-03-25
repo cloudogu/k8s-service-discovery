@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// IngressClassCreator is responsible to create a cluster wide ingress class in the cluster.
 type IngressClassCreator struct {
 	Client    client.Client `json:"client"`
 	ClassName string        `json:"class_name"`

@@ -2,7 +2,7 @@
 ARTIFACT_ID=k8s-service-discovery
 VERSION=0.1.0
 
-GOTAG?=1.17.0
+GOTAG?=1.17.7
 MAKEFILES_VERSION=5.0.0
 
 # Image URL to use all building/pushing image targets

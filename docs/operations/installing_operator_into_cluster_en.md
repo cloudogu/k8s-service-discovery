@@ -18,5 +18,3 @@ sed "s/{{ .namespace }}/${TARGET_NAMESPACE}/" ${K8S_RESOURCE_YAML} | kubectl --n
 ```
 
 The operator should now be successfully started in the cluster.
-
-Translated with www.DeepL.com/Translator (free version)
