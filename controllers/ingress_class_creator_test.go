@@ -26,9 +26,8 @@ func getScheme() *runtime.Scheme {
 
 func TestNewIngressClassCreator(t *testing.T) {
 	clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-	creator, err := controllers.NewIngressClassCreator(clientMock, "my-ingress-class")
+	creator := controllers.NewIngressClassCreator(clientMock, "my-ingress-class")
 
-	require.NoError(t, err)
 	require.NotNil(t, creator)
 }
 
@@ -38,11 +37,10 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		// given
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, err := controllers.NewIngressClassCreator(clientMock, "my-ingress-class")
-		require.NoError(t, err)
+		creator := controllers.NewIngressClassCreator(clientMock, "my-ingress-class")
 
 		// when
-		err = creator.CreateIngressClass(ctrl.Log.WithName("test"))
+		err := creator.CreateIngressClass(ctrl.Log.WithName("test"))
 
 		// then
 		require.NoError(t, err)
@@ -62,11 +60,10 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 			},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(ingressClass).Build()
-		creator, err := controllers.NewIngressClassCreator(clientMock, "my-ingress-class")
-		require.NoError(t, err)
+		creator := controllers.NewIngressClassCreator(clientMock, "my-ingress-class")
 
 		// when
-		err = creator.CreateIngressClass(ctrl.Log.WithName("test"))
+		err := creator.CreateIngressClass(ctrl.Log.WithName("test"))
 
 		// then
 		require.NoError(t, err)

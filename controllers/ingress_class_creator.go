@@ -23,11 +23,11 @@ type IngressClassCreator struct {
 }
 
 // NewIngressClassCreator creates a new ingress class creator.
-func NewIngressClassCreator(client client.Client, className string) (IngressClassCreator, error) {
+func NewIngressClassCreator(client client.Client, className string) IngressClassCreator {
 	return IngressClassCreator{
 		Client:    client,
 		ClassName: className,
-	}, nil
+	}
 }
 
 // CreateIngressClass check whether the ingress class for the generator exists. If not it will be created.
