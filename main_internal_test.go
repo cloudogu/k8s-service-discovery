@@ -93,7 +93,20 @@ func Test_startManager(t *testing.T) {
 		"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
 	}
 
-	t.Run("Test without any environment variables", func(t *testing.T) {
+	t.Run("Error on missing namespace environment variable", func(t *testing.T) {
+		// given
+		getNewMockManager(nil, defaultMockDefinitions)
+
+		// when
+		err := startManager()
+
+		// then
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to read namespace to watch from environment variable")
+	})
+
+	t.Setenv(namespaceEnvVar, "mynamespace")
+	t.Run("Test without logger environment variables", func(t *testing.T) {
 		// given
 		k8sManager := getNewMockManager(nil, defaultMockDefinitions)
 
@@ -105,9 +118,8 @@ func Test_startManager(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, k8sManager)
 	})
 
-	t.Run("Test with environment variables", func(t *testing.T) {
+	t.Run("Test with logger environment variables", func(t *testing.T) {
 		// given
-		t.Setenv(namespaceEnvVar, "mynamespace")
 		t.Setenv(logModeEnvVar, "true")
 		k8sManager := getNewMockManager(nil, defaultMockDefinitions)
 
@@ -119,7 +131,7 @@ func Test_startManager(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, k8sManager)
 	})
 
-	t.Run("Test with invalid environment variable", func(t *testing.T) {
+	t.Run("Test with invalid logger environment variable", func(t *testing.T) {
 		// given
 		t.Setenv(logModeEnvVar, "invalidValue")
 		getNewMockManager(nil, defaultMockDefinitions)
@@ -134,7 +146,7 @@ func Test_startManager(t *testing.T) {
 
 	expectedError := fmt.Errorf("this is my expected error")
 
-	t.Run("Test with invalid environment variable", func(t *testing.T) {
+	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given
 		getNewMockManager(expectedError, defaultMockDefinitions)
 

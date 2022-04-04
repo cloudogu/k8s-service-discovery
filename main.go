@@ -33,14 +33,14 @@ var (
 	metricsAddr          string
 	enableLeaderElection bool
 	probeAddr            string
-	// namespaceEnvVar is the constant for env variable WATCH_NAMESPACE
-	// which specifies the Namespace to the service discovery operator operates in.
-	// An empty value means the operator is running with cluster scope.
+	// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
+	// namespace that should be watched by the service discovery. It is a required variable and an empty value will
+	// produce an appropriate error message.
 	namespaceEnvVar = "WATCH_NAMESPACE"
 	// logModeEnvVar is the constant for env variable ZAP_DEVELOPMENT_MODE
 	// which specifies the development mode for zap options. Valid values are
-	// true or false. In development mode the logger produces stacktraces on warnings and no smapling.
-	// In regular mode (default) the logger produces stacktraces on errors and sampling
+	// true or false. In development mode the logger produces a stacktrace on warnings and no sampling.
+	// In regular mode (default) the logger produces a stacktrace on errors and sampling
 	logModeEnvVar = "ZAP_DEVELOPMENT_MODE"
 )
 
@@ -78,7 +78,7 @@ func startManager() error {
 	}
 
 	if err := startK8sManager(k8sManager); err != nil {
-		return fmt.Errorf("failed to configure service discovery manager: %w", err)
+		return fmt.Errorf("failed to start service discovery manager: %w", err)
 	}
 
 	return nil
@@ -143,10 +143,11 @@ func getK8sManagerOptions() (manager.Options, error) {
 	}
 
 	watchNamespace, found := os.LookupEnv(namespaceEnvVar)
-	if found {
-		setupLog.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
-		options.Namespace = watchNamespace
+	if !found {
+		return manager.Options{}, fmt.Errorf("failed to read namespace to watch from environment variable [%s], please set the variable and try again", namespaceEnvVar)
 	}
+	options.Namespace = watchNamespace
+	setupLog.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
 
 	return options, nil
 }
@@ -163,7 +164,6 @@ func startK8sManager(k8sManager manager.Manager) error {
 }
 
 func createIngressClassComponent(k8sManager manager.Manager) error {
-	//create initial ingress class
 	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
