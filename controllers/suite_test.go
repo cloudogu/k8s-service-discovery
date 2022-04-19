@@ -76,9 +76,9 @@ var _ = BeforeSuite(func() {
 
 	ingressCreator := controllers.NewIngressGenerator(k8sManager.GetClient(), myNamespace, myIngressClassName)
 	reconciler := &controllers.ServiceReconciler{
-		Client:         k8sManager.GetClient(),
-		Scheme:         k8sManager.GetScheme(),
-		IngressCreator: ingressCreator,
+		Client:           k8sManager.GetClient(),
+		Scheme:           k8sManager.GetScheme(),
+		IngressGenerator: ingressCreator,
 	}
 	err = reconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())

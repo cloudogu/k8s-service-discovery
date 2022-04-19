@@ -3,7 +3,8 @@
 ## Lokale Deploy
 
 1. Die Umgebungsvariable KUBECONFIG muss eine valide Konfig für das Zielcluster verfügen.
-1. Führen Sie `make run` aus, um den Service Discovery-Operator lokal auszuführen
+1. Exportieren sie die Umgebungsvariable `WATCH_NAMESPACE`: `export WATCH_NAMESPACE=ecosystem`. 
+1. Führen Sie `make run` aus, um den Service Discovery-Operator lokal auszuführen.
 
 ## Makefile-Targets
 

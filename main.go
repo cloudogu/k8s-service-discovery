@@ -69,7 +69,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
 
-	if err := createIngressClassComponent(k8sManager); err != nil {
+	if err := handleIngressClassCreation(k8sManager); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func startK8sManager(k8sManager manager.Manager) error {
 	return nil
 }
 
-func createIngressClassComponent(k8sManager manager.Manager) error {
+func handleIngressClassCreation(k8sManager manager.Manager) error {
 	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
@@ -174,12 +174,12 @@ func createIngressClassComponent(k8sManager manager.Manager) error {
 }
 
 func configureReconciler(k8sManager manager.Manager, namespace string) error {
-	ingressCreator := controllers.NewIngressGenerator(k8sManager.GetClient(), namespace, IngressClassName)
+	ingressGenerator := controllers.NewIngressGenerator(k8sManager.GetClient(), namespace, IngressClassName)
 
 	reconciler := &controllers.ServiceReconciler{
-		Client:         k8sManager.GetClient(),
-		Scheme:         k8sManager.GetScheme(),
-		IngressCreator: ingressCreator,
+		Client:           k8sManager.GetClient(),
+		Scheme:           k8sManager.GetScheme(),
+		IngressGenerator: ingressGenerator,
 	}
 
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {

@@ -17,9 +17,9 @@ const CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
 
 // ServiceReconciler reconciles a Service object.
 type ServiceReconciler struct {
-	client.Client  `json:"client_._client"`
-	Scheme         *runtime.Scheme  `json:"scheme"`
-	IngressCreator IngressGenerator `json:"ingress_creator"`
+	client.Client    `json:"client_._client"`
+	Scheme           *runtime.Scheme  `json:"scheme"`
+	IngressGenerator IngressGenerator `json:"ingress_creator"`
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -55,7 +55,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, cesService := range cesServices {
-		err := r.IngressCreator.CreateCesServiceIngress(ctx, cesService, service)
+		err := r.IngressGenerator.CreateCesServiceIngress(ctx, cesService, service)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
