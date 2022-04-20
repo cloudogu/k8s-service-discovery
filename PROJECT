@@ -1,0 +1,11 @@
+domain: cloudogu.com
+layout:
+- go.kubebuilder.io/v3
+projectName: k8s-service-discovery
+repo: github.com/cloudogu/k8s-service-discovery
+resources:
+- controller: true
+  domain: cloudogu.com
+  kind: Service
+  version: v1
+version: "3"

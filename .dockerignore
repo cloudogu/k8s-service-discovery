@@ -1,0 +1,10 @@
+# Deny all
+*/**
+
+# Allow only resources
+!go.*
+!controllers/**/*
+!build/**/*
+!hack/**/*.go
+!Makefile
+!.git/**/*
