@@ -5,7 +5,7 @@ VERSION=0.1.0
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 
 GOTAG?=1.17.7
-MAKEFILES_VERSION=5.0.0
+MAKEFILES_VERSION=5.1.0
 
 include build/make/variables.mk
 include build/make/self-update.mk
