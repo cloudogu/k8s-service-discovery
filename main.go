@@ -69,7 +69,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
 
-	if err := handleIngressClassCreation(k8sManager); err != nil {
+	if err = handleIngressClassCreation(k8sManager); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
@@ -77,11 +77,15 @@ func startManager() error {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err := configureManager(k8sManager, options.Namespace); err != nil {
+	if err = handleSslUpdates(k8sManager, options.Namespace); err != nil {
+		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
+	}
+
+	if err = configureManager(k8sManager, options.Namespace); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
-	if err := startK8sManager(k8sManager); err != nil {
+	if err = startK8sManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to start service discovery manager: %w", err)
 	}
 
@@ -182,6 +186,16 @@ func handleWarpMenuCreation(k8sManager manager.Manager, namespace string) error 
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
 		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
+	}
+
+	return nil
+}
+
+func handleSslUpdates(k8sManager manager.Manager, namespace string) error {
+	sslUpdater := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace)
+
+	if err := k8sManager.Add(sslUpdater); err != nil {
+		return fmt.Errorf("failed to add ssl certificate updater as runnable to the manager: %w", err)
 	}
 
 	return nil
