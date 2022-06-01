@@ -60,14 +60,17 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg regist
 
 	warpChannel := make(chan *coreosclient.Response)
 	go reg.Watch(serverCertificatePath, true, warpChannel)
-	for range warpChannel {
-		err := scu.handleSslChange(ctx)
-		if err != nil {
-			return err
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-warpChannel:
+			err := scu.handleSslChange(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
-	return nil
 }
 
 func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
