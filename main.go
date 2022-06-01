@@ -192,9 +192,12 @@ func handleWarpMenuCreation(k8sManager manager.Manager, namespace string) error 
 }
 
 func handleSslUpdates(k8sManager manager.Manager, namespace string) error {
-	sslUpdater := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace)
+	sslUpdater, err := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace)
+	if err != nil {
+		return fmt.Errorf("failed to create new ssl certificate updater: %w", err)
+	}
 
-	if err := k8sManager.Add(sslUpdater); err != nil {
+	if err = k8sManager.Add(sslUpdater); err != nil {
 		return fmt.Errorf("failed to add ssl certificate updater as runnable to the manager: %w", err)
 	}
 
