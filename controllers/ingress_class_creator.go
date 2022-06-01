@@ -48,7 +48,7 @@ func (icc IngressClassCreator) CreateIngressClass(logger logr.Logger) error {
 			Name: icc.ClassName,
 		},
 		Spec: networking.IngressClassSpec{
-			Controller: "k8s.io/ingress-nginx",
+			Controller: "k8s.io/nginx-ingress",
 		},
 	}
 

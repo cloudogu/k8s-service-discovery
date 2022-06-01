@@ -13,8 +13,10 @@ data:
       - path: /dogu
         type: dogus
         tag: warp
-      - path: /config/nginx/externalsssssssss
+      - path: /config/nginx/externals
         type: externals
+      - path: /config/_global/disabled_warpmenu_support_entries
+        type: disabled_support_entries
     target: /var/www/html/warp/menu.json
     order:
       Development Apps: 100

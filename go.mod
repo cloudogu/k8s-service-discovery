@@ -3,7 +3,7 @@ module github.com/cloudogu/k8s-service-discovery
 go 1.17
 
 require (
-	github.com/cloudogu/cesapp-lib v0.0.0-20220531123943-5588ca2b40da
+	github.com/cloudogu/cesapp-lib v0.0.0-20220601121439-08fb7d1213c0
 	github.com/coreos/etcd v3.3.27+incompatible
 	github.com/go-logr/logr v1.2.0
 	github.com/onsi/ginkgo v1.16.5

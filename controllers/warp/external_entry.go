@@ -2,6 +2,7 @@ package warp
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
 
 	"github.com/pkg/errors"
@@ -32,7 +33,7 @@ func readAndUnmarshalExternal(registry registry.WatchConfigurationContext, key s
 func readExternalAsBytes(registry registry.WatchConfigurationContext, key string) ([]byte, error) {
 	resp, err := registry.Get(key)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read key %s from etcd", key)
+		return nil, fmt.Errorf("failed to read key %s from etcd: %w", key, err)
 	}
 
 	return []byte(resp), nil
@@ -42,7 +43,7 @@ func unmarshalExternal(externalBytes []byte) (EntryWithCategory, error) {
 	externalEntry := externalEntry{}
 	err := json.Unmarshal(externalBytes, &externalEntry)
 	if err != nil {
-		return EntryWithCategory{}, errors.Wrap(err, "failed to unmarshall external")
+		return EntryWithCategory{}, fmt.Errorf("failed to unmarshall external: %w", err)
 	}
 
 	return mapExternalEntry(externalEntry)

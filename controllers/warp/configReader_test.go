@@ -2,17 +2,18 @@ package warp
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry/mocks"
+	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestConfigReader_readSupport(t *testing.T) {
 	reader := &ConfigReader{
-		configuration: &Configuration{Support: []SupportSource{}},
+		configuration: &config.Configuration{Support: []config.SupportSource{}},
 		registry:      nil,
 	}
 
-	supportSources := []SupportSource{{Identifier: "aboutCloudoguToken", External: false, Href: "/local/href"}, {Identifier: "myCloudogu", External: true, Href: "https://ecosystem.cloudogu.com/"}, {Identifier: "docsCloudoguComUrl", External: true, Href: "https://docs.cloudogu.com/"}}
+	supportSources := []config.SupportSource{{Identifier: "aboutCloudoguToken", External: false, Href: "/local/href"}, {Identifier: "myCloudogu", External: true, Href: "https://ecosystem.cloudogu.com/"}, {Identifier: "docsCloudoguComUrl", External: true, Href: "https://docs.cloudogu.com/"}}
 
 	actual, err := reader.readSupport(supportSources, []string{"docsCloudoguComUrl"})
 
@@ -47,7 +48,7 @@ func TestConfigReader_getDisabledSupportIdentifiers(t *testing.T) {
 	mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
 
 	reader := &ConfigReader{
-		configuration: &Configuration{Support: []SupportSource{}},
+		configuration: &config.Configuration{Support: []config.SupportSource{}},
 		registry:      mockRegistry,
 	}
 
@@ -63,14 +64,14 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 	mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
 
 	reader := &ConfigReader{
-		configuration: &Configuration{Support: []SupportSource{}},
+		configuration: &config.Configuration{Support: []config.SupportSource{}},
 		registry:      mockRegistry,
 	}
 
-	testSources := []Source{{Path: "/path/to/etcd/key", Type: "externals", Tag: "tag"}}
-	testSupportSoureces := []SupportSource{{Identifier: "supportSrc", External: true, Href: "path/to/external"}}
+	testSources := []config.Source{{Path: "/path/to/etcd/key", Type: "externals", Tag: "tag"}}
+	testSupportSoureces := []config.SupportSource{{Identifier: "supportSrc", External: true, Href: "path/to/external"}}
 
-	actual, err := reader.readFromConfig(&Configuration{Sources: testSources, Support: testSupportSoureces})
+	actual, err := reader.readFromConfig(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 	assert.Empty(t, err)
 	assert.NotEmpty(t, actual)
