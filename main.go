@@ -73,6 +73,10 @@ func startManager() error {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
+	if err = handleWarpMenuCreation(k8sManager, options.Namespace); err != nil {
+		return fmt.Errorf("failed to create warp menu creator: %w", err)
+	}
+
 	if err := configureManager(k8sManager, options.Namespace); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
@@ -168,6 +172,16 @@ func handleIngressClassCreation(k8sManager manager.Manager) error {
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
 		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)
+	}
+
+	return nil
+}
+
+func handleWarpMenuCreation(k8sManager manager.Manager, namespace string) error {
+	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), namespace)
+
+	if err := k8sManager.Add(warpMenuCreator); err != nil {
+		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
 	}
 
 	return nil

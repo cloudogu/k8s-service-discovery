@@ -1,0 +1,19 @@
+sources:
+  - path: /dogu
+    type: dogus
+    tag: warp
+  - path: /config/nginx/externalsss
+    type: externals
+target: /var/www/html/warp/menu.json
+order:
+  Development Apps: 100
+support:
+  - identifier: docsCloudoguComUrl
+    external: true
+    href: https://docs.cloudogu.com/
+  - identifier: aboutCloudoguToken
+    external: false
+    href: /info/about
+  - identifier: myCloudogu
+    external: true
+    href: https://my.cloudogu.com/
