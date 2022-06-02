@@ -3,9 +3,10 @@ package warp
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
-	"log"
 
 	"sort"
 
@@ -16,10 +17,6 @@ import (
 type ConfigReader struct {
 	configuration *config.Configuration
 	registry      registry.WatchConfigurationContext
-}
-
-type DisabledSupportEntries struct {
-	name []string
 }
 
 const disableWarpSupportEntriesConfigurationKey = "/config/_global/disabled_warpmenu_support_entries"
@@ -116,7 +113,7 @@ func (reader *ConfigReader) readSupport(supportSources []config.SupportSource, d
 	for _, supportSource := range supportSources {
 		// supportSource -> EntryWithCategory
 		if !StringInSlice(supportSource.Identifier, disabledSupportEntries) {
-			entry := Entry{}
+			var entry Entry
 			if supportSource.External {
 				entry = Entry{Title: supportSource.Identifier, Href: supportSource.Href, Target: TARGET_EXTERNAL}
 			} else {
