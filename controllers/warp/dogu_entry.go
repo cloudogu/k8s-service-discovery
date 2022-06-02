@@ -2,6 +2,7 @@ package warp
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
 	coreosclient "github.com/coreos/etcd/client"
 	"strings"
@@ -42,13 +43,13 @@ func readDoguAsBytes(registry registry.WatchConfigurationContext, key string) ([
 		if isKeyNotFound(err) {
 			return nil, nil
 		}
-		return nil, errors.Wrapf(err, "failed to read key %s from etcd", key)
+		return nil, fmt.Errorf("failed to read key %s from etcd: %w", key, err)
 	}
 
 	version := resp
 	resp, err = registry.Get(key + "/" + version)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read version child from key %s", key)
+		return nil, fmt.Errorf("failed to read version child from key %s: %w", key, err)
 	}
 
 	return []byte(resp), nil
@@ -58,7 +59,7 @@ func unmarshalDogu(doguBytes []byte) (doguEntry, error) {
 	doguEntry := doguEntry{}
 	err := json.Unmarshal(doguBytes, &doguEntry)
 	if err != nil {
-		return doguEntry, errors.Wrap(err, "failed to unmarshall json from etcd")
+		return doguEntry, fmt.Errorf("failed to unmarshall json from etcd: %w", err)
 	}
 	return doguEntry, nil
 }

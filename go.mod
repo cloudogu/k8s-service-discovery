@@ -3,13 +3,12 @@ module github.com/cloudogu/k8s-service-discovery
 go 1.18
 
 require (
-	github.com/cloudogu/cesapp-lib v0.0.0-20220531123943-5588ca2b40da
+	github.com/cloudogu/cesapp-lib v0.0.0-20220601121439-08fb7d1213c0
 	github.com/coreos/etcd v3.3.27+incompatible
 	github.com/go-logr/logr v1.2.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
 	k8s.io/api v0.23.5
 	k8s.io/apimachinery v0.23.5
@@ -59,6 +58,7 @@ require (
 	github.com/prometheus/common v0.28.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.2.1-0.20190415111823-35313a95ee26 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
