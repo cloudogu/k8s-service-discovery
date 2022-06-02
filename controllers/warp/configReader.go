@@ -146,6 +146,10 @@ func (reader *ConfigReader) readFromConfig(configuration *config.Configuration) 
 
 	ctrl.Log.Info("read SupportEntries")
 	disabledSupportEntries, err := reader.getDisabledSupportIdentifiers()
+	if err != nil {
+		ctrl.Log.Info("failed to get disabled support identifiers:", err)
+	}
+
 	supportCategory, err := reader.readSupport(configuration.Support, disabledSupportEntries)
 	if err != nil {
 		ctrl.Log.Info("Error during support read:", err)
