@@ -1,6 +1,6 @@
 module github.com/cloudogu/k8s-service-discovery
 
-go 1.17
+go 1.18
 
 require (
 	github.com/cloudogu/cesapp-lib v0.0.0-20220531123943-5588ca2b40da
