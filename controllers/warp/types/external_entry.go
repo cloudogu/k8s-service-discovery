@@ -1,4 +1,4 @@
-package warp
+package types
 
 import (
 	"encoding/json"
@@ -21,7 +21,9 @@ type EntryWithCategory struct {
 	Category string
 }
 
-func readAndUnmarshalExternal(registry registry.WatchConfigurationContext, key string) (EntryWithCategory, error) {
+type ExternalConverter struct{}
+
+func (ec *ExternalConverter) ReadAndUnmarshalExternal(registry registry.WatchConfigurationContext, key string) (EntryWithCategory, error) {
 	externalBytes, err := readExternalAsBytes(registry, key)
 	if err != nil {
 		return EntryWithCategory{}, nil

@@ -1,6 +1,6 @@
-package warp
+package types
 
-// Category Category of multiple entries in the warp menu
+// Category categories multiple entries in the warp menu
 type Category struct {
 	Title   string
 	Order   int
@@ -29,13 +29,13 @@ func (c Categories) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
 }
 
-func (c *Categories) insertCategories(newCategories Categories) {
+func (c *Categories) InsertCategories(newCategories Categories) {
 	for _, newCategory := range newCategories {
-		c.insertCategory(newCategory)
+		c.InsertCategory(newCategory)
 	}
 }
 
-func (c *Categories) insertCategory(newCategory *Category) {
+func (c *Categories) InsertCategory(newCategory *Category) {
 	for _, category := range *c {
 		if category.Title == newCategory.Title {
 			category.Entries = append(category.Entries, newCategory.Entries...)

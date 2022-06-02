@@ -1,4 +1,4 @@
-package warp
+package types
 
 import "github.com/pkg/errors"
 
