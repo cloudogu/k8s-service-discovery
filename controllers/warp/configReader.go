@@ -7,7 +7,6 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"log"
-
 	"sort"
 
 	"github.com/pkg/errors"
@@ -21,19 +20,19 @@ type ConfigReader struct {
 	externalConverter ExternalConverter
 }
 
-// DoguConverter is used to read dogus from the registry and convert them to objects fitting in the warp menu
+// DoguConverter is used to Read dogus from the registry and convert them to objects fitting in the warp menu
 type DoguConverter interface {
 	ReadAndUnmarshalDogu(registry registry.WatchConfigurationContext, key string, tag string) (types.EntryWithCategory, error)
 }
 
-// ExternalConverter is used to read external links from the registry and convert them to objects fitting in the warp menu
+// ExternalConverter is used to Read external links from the registry and convert them to objects fitting in the warp menu
 type ExternalConverter interface {
 	ReadAndUnmarshalExternal(registry registry.WatchConfigurationContext, key string) (types.EntryWithCategory, error)
 }
 
 const disableWarpSupportEntriesConfigurationKey = "/config/_global/disabled_warpmenu_support_entries"
 
-func (reader *ConfigReader) readFromConfig(configuration *config.Configuration) (types.Categories, error) {
+func (reader *ConfigReader) Read(configuration *config.Configuration) (types.Categories, error) {
 	var data types.Categories
 
 	for _, source := range configuration.Sources {
@@ -44,15 +43,15 @@ func (reader *ConfigReader) readFromConfig(configuration *config.Configuration) 
 
 		categories, err := reader.readSource(source)
 		if err != nil {
-			log.Println("Error during read:", err)
+			log.Println("Error during Read:", err)
 		}
 		data.InsertCategories(categories)
 	}
 
-	log.Println("read SupportEntries")
+	log.Println("Read SupportEntries")
 	disabledSupportEntries, err := reader.getDisabledSupportIdentifiers()
 	if err != nil {
-		log.Println("Error during support read:", err)
+		log.Println("Error during support Read:", err)
 	}
 	supportCategory := reader.readSupport(configuration.Support, disabledSupportEntries)
 	data.InsertCategories(supportCategory)
@@ -70,10 +69,10 @@ func (reader *ConfigReader) readSource(source config.Source) (types.Categories, 
 }
 
 func (reader *ConfigReader) externalsReader(source config.Source) (types.Categories, error) {
-	log.Printf("read externals from %s for warp menu", source.Path)
+	log.Printf("Read externals from %s for warp menu", source.Path)
 	resp, err := reader.registry.GetChildrenPaths(source.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read root entry %s from etcd: %w", source.Path, err)
+		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)
 	}
 	externals := []types.EntryWithCategory{}
 	for _, child := range resp {
@@ -88,10 +87,10 @@ func (reader *ConfigReader) externalsReader(source config.Source) (types.Categor
 // dogusReader reads from etcd and converts the keys and values to a warp menu
 // conform structure
 func (reader *ConfigReader) dogusReader(source config.Source) (types.Categories, error) {
-	log.Printf("read dogus from %s for warp menu", source.Path)
+	log.Printf("Read dogus from %s for warp menu", source.Path)
 	resp, err := reader.registry.GetChildrenPaths(source.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read root entry %s from etcd: %w", source.Path, err)
+		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)
 	}
 	dogus := []types.EntryWithCategory{}
 	for _, path := range resp {
@@ -107,7 +106,7 @@ func (reader *ConfigReader) dogusReader(source config.Source) (types.Categories,
 func (reader *ConfigReader) getDisabledSupportIdentifiers() ([]string, error) {
 	disabledSupportEntries, err := reader.registry.Get(disableWarpSupportEntriesConfigurationKey)
 	if err != nil {
-		return []string{}, fmt.Errorf("failed to read configuration entry %s from etcd: %w", disableWarpSupportEntriesConfigurationKey, err)
+		return []string{}, fmt.Errorf("failed to Read configuration entry %s from etcd: %w", disableWarpSupportEntriesConfigurationKey, err)
 	}
 
 	var disabledEntries []string

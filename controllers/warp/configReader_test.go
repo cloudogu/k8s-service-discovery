@@ -91,7 +91,7 @@ func TestConfigReader_getDisabledSupportIdentifiers(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read configuration entry /config/_global/disabled_warpmenu_support_entries from etcd")
+		assert.Contains(t, err.Error(), "failed to Read configuration entry /config/_global/disabled_warpmenu_support_entries from etcd")
 		mock.AssertExpectationsForObjects(t, mockRegistry)
 	})
 
@@ -135,7 +135,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.readFromConfig(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -164,7 +164,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.readFromConfig(&config.Configuration{Sources: []config.Source{doguSource}, Support: testSupportSoureces})
+		actual, err := reader.Read(&config.Configuration{Sources: []config.Source{doguSource}, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -173,7 +173,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
-	t.Run("error during external read should not result in an error", func(t *testing.T) {
+	t.Run("error during external Read should not result in an error", func(t *testing.T) {
 		// given
 		mockExternalConverter := &mocks.ExternalConverter{}
 		mockExternalConverter.On("ReadAndUnmarshalExternal", mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
@@ -185,7 +185,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.readFromConfig(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -194,7 +194,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
-	t.Run("error during support read should not result in an error", func(t *testing.T) {
+	t.Run("error during support Read should not result in an error", func(t *testing.T) {
 		// given
 		mockRegistry := &cesmocks.WatchConfigurationContext{}
 		mockRegistry.On("GetChildrenPaths", "/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
@@ -209,7 +209,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.readFromConfig(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -233,7 +233,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.readFromConfig(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -250,7 +250,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			registry:      mockRegistry,
 		}
 		// when
-		_, err := reader.readFromConfig(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		_, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		require.NoError(t, err)
@@ -307,7 +307,7 @@ func TestConfigReader_dogusReader(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read root entry /dogu from etcd")
+		assert.Contains(t, err.Error(), "failed to Read root entry /dogu from etcd")
 		mock.AssertExpectationsForObjects(t, mockRegistry)
 	})
 }

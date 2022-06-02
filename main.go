@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/cesapp-lib/core"
+	"github.com/cloudogu/cesapp-lib/registry"
 	"os"
 	"strconv"
 
@@ -73,7 +75,12 @@ func startManager() error {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	if err = handleWarpMenuCreation(k8sManager, options.Namespace); err != nil {
+	registry, err := createEtcdRegistry(options.Namespace)
+	if err != nil {
+		return fmt.Errorf("failed to create registry: %w", err)
+	}
+
+	if err = handleWarpMenuCreation(k8sManager, registry, options.Namespace); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
@@ -86,6 +93,15 @@ func startManager() error {
 	}
 
 	return nil
+}
+
+func createEtcdRegistry(namespace string) (registry.Registry, error) {
+	r, err := registry.New(core.Registry{
+		Type:      "etcd",
+		Endpoints: []string{fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)},
+	})
+
+	return r, err
 }
 
 func configureManager(k8sManager manager.Manager, namespace string) error {
@@ -177,8 +193,8 @@ func handleIngressClassCreation(k8sManager manager.Manager) error {
 	return nil
 }
 
-func handleWarpMenuCreation(k8sManager manager.Manager, namespace string) error {
-	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), namespace)
+func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Registry, namespace string) error {
+	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), registry, namespace)
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
 		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
