@@ -74,7 +74,7 @@ func (reader *ConfigReader) externalsReader(source config.Source) (types.Categor
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)
 	}
-	externals := []types.EntryWithCategory{}
+	var externals []types.EntryWithCategory
 	for _, child := range resp {
 		external, err := reader.externalConverter.ReadAndUnmarshalExternal(reader.registry, child)
 		if err == nil {
@@ -92,7 +92,7 @@ func (reader *ConfigReader) dogusReader(source config.Source) (types.Categories,
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)
 	}
-	dogus := []types.EntryWithCategory{}
+	var dogus []types.EntryWithCategory
 	for _, path := range resp {
 		dogu, err := reader.doguConverter.ReadAndUnmarshalDogu(reader.registry, path, source.Tag)
 		if err == nil && dogu.Entry.Title != "" {
