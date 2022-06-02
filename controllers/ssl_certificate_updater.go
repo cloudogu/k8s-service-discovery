@@ -140,7 +140,6 @@ func (scu *sslCertificateUpdater) getSslSecret(ctx context.Context) (*v1.Secret,
 
 func (scu *sslCertificateUpdater) createSslSecret(ctx context.Context, cert string, key string) error {
 	sslSecret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certificateSecretName,
 			Namespace: scu.namespace,
