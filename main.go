@@ -4,22 +4,21 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"github.com/sirupsen/logrus"
 
 	"github.com/cloudogu/k8s-service-discovery/controllers"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
+	"github.com/bombsimon/logrusr/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -37,16 +36,13 @@ var (
 	// namespace that should be watched by the service discovery. It is a required variable and an empty value will
 	// produce an appropriate error message.
 	namespaceEnvVar = "WATCH_NAMESPACE"
-	// logModeEnvVar is the constant for env variable ZAP_DEVELOPMENT_MODE
-	// which specifies the development mode for zap options. Valid values are
-	// true or false. In development mode the logger produces a stacktrace on warnings and no sampling.
-	// In regular mode (default) the logger produces a stacktrace on errors and sampling
-	logModeEnvVar = "ZAP_DEVELOPMENT_MODE"
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	configureLogger()
 }
 
 func main() {
@@ -107,27 +103,12 @@ func configureManager(k8sManager manager.Manager, namespace string) error {
 	return nil
 }
 
-func configureLogger() error {
-	logMode := false
+func configureLogger() {
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.TextFormatter{})
+	logrusLog.SetLevel(logrus.DebugLevel)
 
-	logModeEnv, found := os.LookupEnv(logModeEnvVar)
-	if found {
-		parsedLogMode, err := strconv.ParseBool(logModeEnv)
-		if err != nil {
-			return fmt.Errorf("failed to parse %s; valid values are true or false: %w", logModeEnv, err)
-		}
-		logMode = parsedLogMode
-	}
-
-	opts := zap.Options{
-		Development: logMode,
-	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	return nil
+	ctrl.SetLogger(logrusr.New(logrusLog))
 }
 
 func getK8sManagerOptions() (manager.Options, error) {
@@ -136,10 +117,6 @@ func getK8sManagerOptions() (manager.Options, error) {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-
-	if err := configureLogger(); err != nil {
-		return manager.Options{}, fmt.Errorf("failed to configure logger: %w", err)
-	}
 
 	options := ctrl.Options{
 		Scheme:                 scheme,

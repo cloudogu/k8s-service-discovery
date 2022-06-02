@@ -3,7 +3,8 @@ package warp
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
@@ -50,7 +51,7 @@ func (reader *ConfigReader) createCategories(entries []EntryWithCategory) Catego
 // dogusReader reads from etcd and converts the keys and values to a warp menu
 // conform structure
 func (reader *ConfigReader) dogusReader(source config.Source) (Categories, error) {
-	log.Printf("read dogus from %s for warp menu", source.Path)
+	ctrl.Log.Info("read dogus from %s for warp menu", source.Path)
 	resp, err := reader.registry.GetChildrenPaths(source.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root entry %s from etcd: %w", source.Path, err)
@@ -67,7 +68,7 @@ func (reader *ConfigReader) dogusReader(source config.Source) (Categories, error
 }
 
 func (reader *ConfigReader) externalsReader(source config.Source) (Categories, error) {
-	log.Printf("read externals from %s for warp menu", source.Path)
+	ctrl.Log.Info("read externals from %s for warp menu", source.Path)
 	resp, err := reader.registry.GetChildrenPaths(source.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root entry %s from etcd: %w", source.Path, err)
@@ -138,19 +139,19 @@ func (reader *ConfigReader) readFromConfig(configuration *config.Configuration) 
 
 		categories, err := reader.readSource(source)
 		if err != nil {
-			log.Println("Error during read:", err)
+			ctrl.Log.Info("Error during read:", err)
 		}
 		data.insertCategories(categories)
 	}
 
-	log.Println("read SupportEntries")
+	ctrl.Log.Info("read SupportEntries")
 	disabledSupportEntries, err := reader.getDisabledSupportIdentifiers()
 	supportCategory, err := reader.readSupport(configuration.Support, disabledSupportEntries)
 	if err != nil {
-		log.Println("Error during support read:", err)
+		ctrl.Log.Info("Error during support read:", err)
 	}
 	if supportCategory.Len() == 0 {
-		log.Printf("support Category is empty, no support Category will be added to menu.json")
+		ctrl.Log.Info("support Category is empty, no support Category will be added to menu.json")
 		return data, nil
 	}
 

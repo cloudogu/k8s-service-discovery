@@ -3,13 +3,15 @@ package warp
 import (
 	"context"
 	"fmt"
+
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	coreosclient "github.com/coreos/etcd/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
-	"log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -21,7 +23,6 @@ type Watcher struct {
 	k8sClient       client.Client
 	configReader    *ConfigReader
 	namespace       string
-	doneChannel     <-chan struct{}
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
@@ -47,7 +48,6 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, namespace string) 
 		k8sClient:       k8sClient,
 		namespace:       namespace,
 		configReader:    reader,
-		doneChannel:     ctx.Done(),
 	}, nil
 }
 
@@ -61,34 +61,39 @@ func createEtcdRegistry(namespace string) (registry.Registry, error) {
 }
 
 // Run creates the warp menu and update the menu whenever a relevant etcd key was changed
-func (w *Watcher) Run() {
-	log.Println("start watcher for warp entries")
+func (w *Watcher) Run(ctx context.Context) {
 	warpChannel := make(chan *coreosclient.Response)
 
 	for _, source := range w.configuration.Sources {
 		go func(source config.Source) {
-			for {
-				w.execute()
-				w.registryToWatch.Watch(source.Path, true, warpChannel, w.doneChannel)
-			}
+			w.execute()
+
+			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start etcd watcher for source [%s]", source))
+			w.registryToWatch.Watch(ctx, source.Path, true, warpChannel)
+			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("stop etcd watcher for source [%s]", source))
 		}(source)
 	}
 
-	for range warpChannel {
-		w.execute()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-warpChannel:
+			w.execute()
+		}
 	}
 }
 
 func (w *Watcher) execute() {
 	categories, err := w.configReader.readFromConfig(w.configuration)
 	if err != nil {
-		log.Println("Error during read:", err)
+		ctrl.Log.Info("Error during read:", err)
 		return
 	}
-	log.Printf("all found Categories: %v", categories)
+	ctrl.Log.Info("all found Categories: %v", categories)
 	err = w.jsonWriter(categories)
 	if err != nil {
-		log.Printf("failed to write warp menu as json: %v", err)
+		ctrl.Log.Info("failed to write warp menu as json: %v", err)
 	}
 }
 
