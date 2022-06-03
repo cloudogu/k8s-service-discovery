@@ -18,8 +18,11 @@ type doguEntry struct {
 	Tags        []string
 }
 
+// DoguConverter converts dogus from the configuration to a warp menu category object
 type DoguConverter struct{}
 
+// ReadAndUnmarshalDogu reads the dogu from the configuration. If it has the specific tag (or no tag) it will be
+// converted to entry with a category for the warp menu
 func (dc *DoguConverter) ReadAndUnmarshalDogu(registry registry.WatchConfigurationContext, key string, tag string) (EntryWithCategory, error) {
 	doguBytes, err := readDoguAsBytes(registry, key)
 	if err != nil {
@@ -103,7 +106,8 @@ func containsString(slice []string, item string) bool {
 }
 
 func isKeyNotFound(err error) bool {
-	if cErr, ok := err.(coreosclient.Error); ok {
+	var cErr coreosclient.Error
+	if ok := errors.Is(err, cErr); ok {
 		return cErr.Code == coreosclient.ErrorCodeKeyNotFound
 	}
 	return false

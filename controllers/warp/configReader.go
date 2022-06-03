@@ -6,7 +6,7 @@ import (
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
-	"log"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sort"
 
 	"github.com/pkg/errors"
@@ -32,6 +32,7 @@ type ExternalConverter interface {
 
 const disableWarpSupportEntriesConfigurationKey = "/config/_global/disabled_warpmenu_support_entries"
 
+// Read reads sources specified in a configuration and build warp menu categories for them.
 func (reader *ConfigReader) Read(configuration *config.Configuration) (types.Categories, error) {
 	var data types.Categories
 
@@ -43,15 +44,15 @@ func (reader *ConfigReader) Read(configuration *config.Configuration) (types.Cat
 
 		categories, err := reader.readSource(source)
 		if err != nil {
-			log.Println("Error during Read:", err)
+			ctrl.Log.Info(fmt.Sprintf("Error during Read: %s", err.Error()))
 		}
 		data.InsertCategories(categories)
 	}
 
-	log.Println("Read SupportEntries")
+	ctrl.Log.Info("Read SupportEntries")
 	disabledSupportEntries, err := reader.getDisabledSupportIdentifiers()
 	if err != nil {
-		log.Println("Error during support Read:", err)
+		ctrl.Log.Info(fmt.Sprintf("Error during support Read: %s", err.Error()))
 	}
 	supportCategory := reader.readSupport(configuration.Support, disabledSupportEntries)
 	data.InsertCategories(supportCategory)
@@ -69,7 +70,7 @@ func (reader *ConfigReader) readSource(source config.Source) (types.Categories, 
 }
 
 func (reader *ConfigReader) externalsReader(source config.Source) (types.Categories, error) {
-	log.Printf("Read externals from %s for warp menu", source.Path)
+	ctrl.Log.Info(fmt.Sprintf("Read externals from %s for warp menu", source.Path))
 	resp, err := reader.registry.GetChildrenPaths(source.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)
@@ -87,7 +88,7 @@ func (reader *ConfigReader) externalsReader(source config.Source) (types.Categor
 // dogusReader reads from etcd and converts the keys and values to a warp menu
 // conform structure
 func (reader *ConfigReader) dogusReader(source config.Source) (types.Categories, error) {
-	log.Printf("Read dogus from %s for warp menu", source.Path)
+	ctrl.Log.Info(fmt.Sprintf("Read dogus from %s for warp menu", source.Path))
 	resp, err := reader.registry.GetChildrenPaths(source.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)

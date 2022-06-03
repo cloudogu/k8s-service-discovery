@@ -21,8 +21,10 @@ type EntryWithCategory struct {
 	Category string
 }
 
+// ExternalConverter is used to read external links from the configuration and convert them to a warp menu category object.
 type ExternalConverter struct{}
 
+// ReadAndUnmarshalExternal reads a specific external link from the configuration and converts it to an entry with a category.
 func (ec *ExternalConverter) ReadAndUnmarshalExternal(registry registry.WatchConfigurationContext, key string) (EntryWithCategory, error) {
 	externalBytes, err := readExternalAsBytes(registry, key)
 	if err != nil {

@@ -29,12 +29,14 @@ func (c Categories) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
 }
 
+// InsertCategories adds new categories to the slice.
 func (c *Categories) InsertCategories(newCategories Categories) {
 	for _, newCategory := range newCategories {
 		c.InsertCategory(newCategory)
 	}
 }
 
+// InsertCategory adds a new category to the slice. If the title are same the entries will be merged.
 func (c *Categories) InsertCategory(newCategory *Category) {
 	for _, category := range *c {
 		if category.Title == newCategory.Title {
