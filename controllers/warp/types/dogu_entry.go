@@ -1,4 +1,4 @@
-package warp
+package types
 
 import (
 	"encoding/json"
@@ -18,7 +18,12 @@ type doguEntry struct {
 	Tags        []string
 }
 
-func readAndUnmarshalDogu(registry registry.WatchConfigurationContext, key string, tag string) (EntryWithCategory, error) {
+// DoguConverter converts dogus from the configuration to a warp menu category object
+type DoguConverter struct{}
+
+// ReadAndUnmarshalDogu reads the dogu from the configuration. If it has the specific tag (or no tag) it will be
+// converted to entry with a category for the warp menu
+func (dc *DoguConverter) ReadAndUnmarshalDogu(registry registry.WatchConfigurationContext, key string, tag string) (EntryWithCategory, error) {
 	doguBytes, err := readDoguAsBytes(registry, key)
 	if err != nil {
 		return EntryWithCategory{}, err
@@ -37,22 +42,21 @@ func readAndUnmarshalDogu(registry registry.WatchConfigurationContext, key strin
 }
 
 func readDoguAsBytes(registry registry.WatchConfigurationContext, key string) ([]byte, error) {
-	resp, err := registry.Get(key + "/current")
+	version, err := registry.Get(key + "/current")
 	if err != nil {
 		// the dogu seems to be unregistered
 		if isKeyNotFound(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to read key %s from etcd: %w", key, err)
+		return nil, fmt.Errorf("failed to read key %s/current from etcd: %w", key, err)
 	}
 
-	version := resp
-	resp, err = registry.Get(key + "/" + version)
+	dogu, err := registry.Get(key + "/" + version)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read version child from key %s: %w", key, err)
+		return nil, fmt.Errorf("failed to read %s with version %s: %w", key, version, err)
 	}
 
-	return []byte(resp), nil
+	return []byte(dogu), nil
 }
 
 func unmarshalDogu(doguBytes []byte) (doguEntry, error) {
@@ -102,7 +106,8 @@ func containsString(slice []string, item string) bool {
 }
 
 func isKeyNotFound(err error) bool {
-	if cErr, ok := err.(coreosclient.Error); ok {
+	var cErr coreosclient.Error
+	if ok := errors.Is(err, cErr); ok {
 		return cErr.Code == coreosclient.ErrorCodeKeyNotFound
 	}
 	return false

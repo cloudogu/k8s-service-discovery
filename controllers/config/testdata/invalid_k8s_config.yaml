@@ -1,0 +1,36 @@
+#
+# The default configuration map for the warp menu.
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-ces-warp-config
+  namespace: test
+  labels:
+    app: cloudogu-ecosystem
+data:
+  warp: |
+    sources:
+      - path: /dogu
+        type: dogus
+        tag: warp
+      - path: /config/nginx/externals
+        type: externals
+      - path: /config/_global/disabled_warpmenu_support_entries
+        type: disabled_support_entries
+    target: /var/www/html/warp/menu.json
+    order:
+      Development Apps: 100
+    supp
+    
+    
+    ort:
+      - identifier: docsCloudoguComUrl
+        external: true
+        href: https://docs.cloudogu.com/
+      - identifier: aboutCloudoguToken
+        external: false
+        href: /info/about
+      - identifier: myCloudogu
+        external: true
+        href: https://my.cloudogu.com/

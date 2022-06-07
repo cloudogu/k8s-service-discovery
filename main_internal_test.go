@@ -91,10 +91,12 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("Error on missing namespace environment variable", func(t *testing.T) {
 		// given
+		err := os.Unsetenv("WATCH_NAMESPACE")
+		require.NoError(t, err)
 		getNewMockManager(nil, defaultMockDefinitions)
 
 		// when
-		err := startManager()
+		err = startManager()
 
 		// then
 		require.Error(t, err)

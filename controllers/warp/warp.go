@@ -6,9 +6,9 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	coreosclient "github.com/coreos/etcd/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -21,43 +21,36 @@ type Watcher struct {
 	configuration   *config.Configuration
 	registryToWatch registry.WatchConfigurationContext
 	k8sClient       client.Client
-	configReader    *ConfigReader
+	ConfigReader    Reader
 	namespace       string
 }
 
+// Reader is used to fetch warp categories with a configuration
+type Reader interface {
+	Read(configuration *config.Configuration) (types.Categories, error)
+}
+
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, namespace string) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.Registry, namespace string) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read configuration: %w", err)
-	}
-
-	cesRegistry, err := createEtcdRegistry(namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create etcd registry: %w", err)
+		return nil, fmt.Errorf("failed to Read configuration: %w", err)
 	}
 
 	reader := &ConfigReader{
-		registry:      cesRegistry.RootConfig(),
-		configuration: warpConfig,
+		registry:          registry.RootConfig(),
+		configuration:     warpConfig,
+		doguConverter:     &types.DoguConverter{},
+		externalConverter: &types.ExternalConverter{},
 	}
 
 	return &Watcher{
 		configuration:   warpConfig,
-		registryToWatch: cesRegistry.RootConfig(),
+		registryToWatch: registry.RootConfig(),
 		k8sClient:       k8sClient,
 		namespace:       namespace,
-		configReader:    reader,
+		ConfigReader:    reader,
 	}, nil
-}
-
-func createEtcdRegistry(namespace string) (registry.Registry, error) {
-	r, err := registry.New(core.Registry{
-		Type:      "etcd",
-		Endpoints: []string{fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)},
-	})
-
-	return r, err
 }
 
 // Run creates the warp menu and update the menu whenever a relevant etcd key was changed
@@ -67,7 +60,6 @@ func (w *Watcher) Run(ctx context.Context) {
 	for _, source := range w.configuration.Sources {
 		go func(source config.Source) {
 			w.execute()
-
 			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start etcd watcher for source [%s]", source))
 			w.registryToWatch.Watch(ctx, source.Path, true, warpChannel)
 			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("stop etcd watcher for source [%s]", source))
@@ -85,12 +77,12 @@ func (w *Watcher) Run(ctx context.Context) {
 }
 
 func (w *Watcher) execute() {
-	categories, err := w.configReader.readFromConfig(w.configuration)
+	categories, err := w.ConfigReader.Read(w.configuration)
 	if err != nil {
-		ctrl.Log.Info("Error during read:", err)
+		ctrl.Log.Info("Error during Read:", err)
 		return
 	}
-	ctrl.Log.Info("all found Categories: %v", categories)
+	ctrl.Log.Info(fmt.Sprintf("All found Categories: %v", categories))
 	err = w.jsonWriter(categories)
 	if err != nil {
 		ctrl.Log.Info("failed to write warp menu as json: %v", err)

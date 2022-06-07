@@ -1,0 +1,22 @@
+sources:
+  - pathdsf: /dogu
+    type: dogus
+    tag: warp
+  - patsdfh: /config/nginx/externals
+    type: externals
+  - path: /config/_global/disabled_warpmenu_support_entries
+    typsdfe: disabled_support_entries
+tardddddget: /var/www/html/warp/menu.json
+order:
+  Development Apps: 100
+suppyourares
+omethingelseort:
+  - identifier: docsCloudoguComUrl
+    external: true
+    href: https://docs.cloudogu.com/
+  - identifier: aboutCloudoguToken
+    external: false
+    href: /info/about
+  - identifier: myCloudogu
+    external: true
+    href: https://my.cloudogu.com/
