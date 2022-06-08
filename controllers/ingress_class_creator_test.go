@@ -56,7 +56,7 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 				Name: "myIngressClass",
 			},
 			Spec: networking.IngressClassSpec{
-				Controller: "k8s.io/ingress-nginx",
+				Controller: "k8s.io/nginx-ingress",
 			},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(ingressClass).Build()

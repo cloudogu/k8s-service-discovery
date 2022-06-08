@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-ces-menu-json
+  namespace: test
+data:
+  menu.json: '[]'
