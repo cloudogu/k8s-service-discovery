@@ -60,6 +60,7 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg regist
 
 	warpChannel := make(chan *coreosclient.Response)
 	go func() {
+		_ = scu.handleSslChange(ctx)
 		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
 		reg.Watch(ctx, serverCertificatePath, true, warpChannel)
 		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
