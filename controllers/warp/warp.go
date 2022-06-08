@@ -102,7 +102,7 @@ func (w *Watcher) jsonWriter(data interface{}) error {
 
 	configmap.Data["menu.json"] = string(jsonData)
 
-	err = w.k8sClient.Update(context.TODO(), configmap)
+	err = w.k8sClient.Update(context.Background(), configmap)
 	if err != nil {
 		return fmt.Errorf("failed to update menu json config map: %w", err)
 	}
