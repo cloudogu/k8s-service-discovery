@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
-	coreosclient "github.com/coreos/etcd/client"
+	"github.com/coreos/etcd/client"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -106,9 +106,8 @@ func containsString(slice []string, item string) bool {
 }
 
 func isKeyNotFound(err error) bool {
-	var cErr coreosclient.Error
-	if ok := errors.Is(err, cErr); ok {
-		return cErr.Code == coreosclient.ErrorCodeKeyNotFound
+	if cErr, ok := err.(client.Error); ok {
+		return cErr.Code == client.ErrorCodeKeyNotFound
 	}
 	return false
 }
