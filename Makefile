@@ -13,6 +13,7 @@ ADDITIONAL_CLEAN=dist-clean
 
 K8S_RESOURCE_DIR=${WORKDIR}/k8s
 K8S_WARP_CONFIG_RESOURCE_YAML=${K8S_RESOURCE_DIR}/k8s-ces-warp-config.yaml
+K8S_WARP_MENU_JSON_YAML=${K8S_RESOURCE_DIR}/k8s-ces-menu-json.yaml
 
 include build/make/variables.mk
 include build/make/self-update.mk
@@ -27,7 +28,7 @@ include build/make/digital-signature.mk
 
 K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
 PRE_COMPILE=generate vet
-K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config
+K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config generate-menu-json
 
 include build/make/k8s-controller.mk
 
@@ -52,5 +53,10 @@ setup-etcd-port-forward:
 generate-warp-config:
 	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
 	@cat $(K8S_WARP_CONFIG_RESOURCE_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
+
+.PHONY: generate-menu-json
+generate-menu-json:
+	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
+	@cat $(K8S_WARP_MENU_JSON_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
 
 
