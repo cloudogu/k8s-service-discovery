@@ -3,25 +3,25 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
-	"os"
-	"strconv"
 
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"github.com/sirupsen/logrus"
 
 	"github.com/cloudogu/k8s-service-discovery/controllers"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
+	"github.com/bombsimon/logrusr/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -39,16 +39,13 @@ var (
 	// namespace that should be watched by the service discovery. It is a required variable and an empty value will
 	// produce an appropriate error message.
 	namespaceEnvVar = "WATCH_NAMESPACE"
-	// logModeEnvVar is the constant for env variable ZAP_DEVELOPMENT_MODE
-	// which specifies the development mode for zap options. Valid values are
-	// true or false. In development mode the logger produces a stacktrace on warnings and no sampling.
-	// In regular mode (default) the logger produces a stacktrace on errors and sampling
-	logModeEnvVar = "ZAP_DEVELOPMENT_MODE"
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	configureLogger()
 }
 
 func main() {
@@ -71,24 +68,28 @@ func startManager() error {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
 
-	if err := handleIngressClassCreation(k8sManager); err != nil {
+	if err = handleIngressClassCreation(k8sManager); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	registry, err := createEtcdRegistry(options.Namespace)
+	reg, err := createEtcdRegistry(options.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
 
-	if err = handleWarpMenuCreation(k8sManager, registry, options.Namespace); err != nil {
+	if err = handleWarpMenuCreation(k8sManager, reg, options.Namespace); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err := configureManager(k8sManager, options.Namespace); err != nil {
+	if err = handleSslUpdates(k8sManager, options.Namespace); err != nil {
+		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
+	}
+
+	if err = configureManager(k8sManager, options.Namespace); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
-	if err := startK8sManager(k8sManager); err != nil {
+	if err = startK8sManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to start service discovery manager: %w", err)
 	}
 
@@ -119,27 +120,12 @@ func configureManager(k8sManager manager.Manager, namespace string) error {
 	return nil
 }
 
-func configureLogger() error {
-	logMode := false
+func configureLogger() {
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.TextFormatter{})
+	logrusLog.SetLevel(logrus.DebugLevel)
 
-	logModeEnv, found := os.LookupEnv(logModeEnvVar)
-	if found {
-		parsedLogMode, err := strconv.ParseBool(logModeEnv)
-		if err != nil {
-			return fmt.Errorf("failed to parse %s; valid values are true or false: %w", logModeEnv, err)
-		}
-		logMode = parsedLogMode
-	}
-
-	opts := zap.Options{
-		Development: logMode,
-	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	return nil
+	ctrl.SetLogger(logrusr.New(logrusLog))
 }
 
 func getK8sManagerOptions() (manager.Options, error) {
@@ -148,10 +134,6 @@ func getK8sManagerOptions() (manager.Options, error) {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-
-	if err := configureLogger(); err != nil {
-		return manager.Options{}, fmt.Errorf("failed to configure logger: %w", err)
-	}
 
 	options := ctrl.Options{
 		Scheme:                 scheme,
@@ -198,6 +180,19 @@ func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Regist
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
 		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
+	}
+
+	return nil
+}
+
+func handleSslUpdates(k8sManager manager.Manager, namespace string) error {
+	sslUpdater, err := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace)
+	if err != nil {
+		return fmt.Errorf("failed to create new ssl certificate updater: %w", err)
+	}
+
+	if err = k8sManager.Add(sslUpdater); err != nil {
+		return fmt.Errorf("failed to add ssl certificate updater as runnable to the manager: %w", err)
 	}
 
 	return nil

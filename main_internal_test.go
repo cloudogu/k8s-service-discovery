@@ -13,8 +13,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/go-logr/logr"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,9 +45,7 @@ func getNewMockManager(expectedErrorOnNewManager error, definitions map[string]m
 		}
 		return k8sManager, expectedErrorOnNewManager
 	}
-	ctrl.SetLogger = func(l logr.Logger) {
-		k8sManager.Mock.On("GetLogger").Return(l)
-	}
+	k8sManager.Mock.On("GetLogger").Return(ctrl.Log)
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	return k8sManager
@@ -108,43 +104,6 @@ func Test_startManager(t *testing.T) {
 	})
 
 	t.Setenv(namespaceEnvVar, "mynamespace")
-	t.Run("Test without logger environment variables", func(t *testing.T) {
-		// given
-		k8sManager := getNewMockManager(nil, defaultMockDefinitions)
-
-		// when
-		err := startManager()
-
-		// then
-		require.NoError(t, err)
-		mock.AssertExpectationsForObjects(t, k8sManager)
-	})
-
-	t.Run("Test with logger environment variables", func(t *testing.T) {
-		// given
-		t.Setenv(logModeEnvVar, "true")
-		k8sManager := getNewMockManager(nil, defaultMockDefinitions)
-
-		// when
-		err := startManager()
-
-		// then
-		require.NoError(t, err)
-		mock.AssertExpectationsForObjects(t, k8sManager)
-	})
-
-	t.Run("Test with invalid logger environment variable", func(t *testing.T) {
-		// given
-		t.Setenv(logModeEnvVar, "invalidValue")
-		getNewMockManager(nil, defaultMockDefinitions)
-
-		// when
-		err := startManager()
-
-		// then
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to parse invalidValue; valid values are true or false")
-	})
 
 	expectedError := fmt.Errorf("this is my expected error")
 

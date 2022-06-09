@@ -1,12 +1,13 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.2.0
+VERSION=0.3.0
 
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
-GOTAG?=1.17.7
+GOTAG?=1.18.1
 MAKEFILES_VERSION=6.0.1
+LINT_VERSION?=v1.46.2
 
 ADDITIONAL_CLEAN=dist-clean
 
@@ -57,5 +58,7 @@ generate-warp-config:
 generate-menu-json:
 	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
 	@cat $(K8S_WARP_MENU_JSON_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
+
+create-temporary-release-resources: $(K8S_PRE_GENERATE_TARGETS)
 
 

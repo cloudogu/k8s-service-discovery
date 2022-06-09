@@ -2,9 +2,10 @@ package types
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/json"
-	"testing"
 )
 
 func TestCategoryString(t *testing.T) {
@@ -44,11 +45,11 @@ func testMarshalJSON(t *testing.T, target Target, expected string) {
 
 func marshal(t *testing.T, target Target) string {
 	test := targetStruct{target}
-	json, err := json.Marshal(&test)
+	testJson, err := json.Marshal(&test)
 	if err != nil {
 		t.Errorf("failed to marshal test struct: %v", err)
 	}
-	return string(json)
+	return string(testJson)
 }
 
 type targetStruct struct {
