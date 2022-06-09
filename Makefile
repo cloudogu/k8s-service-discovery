@@ -59,4 +59,7 @@ generate-menu-json:
 	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
 	@cat $(K8S_WARP_MENU_JSON_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
 
+.PHONY: create-temporary-release-resources
+generate-release-resources: $(K8S_PRE_GENERATE_TARGETS)
+
 
