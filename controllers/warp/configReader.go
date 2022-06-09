@@ -3,11 +3,12 @@ package warp
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sort"
 
 	"github.com/pkg/errors"
 )

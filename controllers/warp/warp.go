@@ -85,7 +85,7 @@ func (w *Watcher) execute() {
 	ctrl.Log.Info(fmt.Sprintf("All found Categories: %v", categories))
 	err = w.jsonWriter(categories)
 	if err != nil {
-		ctrl.Log.Info("failed to write warp menu as json: %v", err)
+		ctrl.Log.Info(fmt.Sprintf("failed to write warp menu as json: %s", err.Error()))
 	}
 }
 
