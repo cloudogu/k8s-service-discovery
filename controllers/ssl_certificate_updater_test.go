@@ -32,34 +32,15 @@ func getScheme() *runtime.Scheme {
 }
 
 func Test_sslCertificateUpdater_Start(t *testing.T) {
-	t.Run("run start and send done to context", func(t *testing.T) { // given
+	t.Run("run start and send done to context", func(t *testing.T) {
+		// given
 		regMock := &mocks.Registry{}
 		watchContextMock := &mocks.WatchConfigurationContext{}
+		globalConfigMock := &mocks.ConfigurationContext{}
+		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
+		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("RootConfig").Return(watchContextMock, nil)
-		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Return()
-
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		namespace := "myTestNamespace"
-		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
-		}
-
-		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*50)
-
-		// when
-		err := sslUpdater.Start(ctx)
-		cancelFunc()
-
-		// then
-		require.NoError(t, err)
-	})
-
-	t.Run("run start and send done to context", func(t *testing.T) { // given
-		regMock := &mocks.Registry{}
-		watchContextMock := &mocks.WatchConfigurationContext{}
-		regMock.On("RootConfig").Return(watchContextMock, nil)
+		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Return()
 
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
