@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
-	github.com/cloudogu/cesapp-lib v0.0.0-20220602091030-2cc085a8c1b6
+	github.com/cloudogu/cesapp-lib v0.0.0-20220822135137-56cfcf0f97c7
 	github.com/coreos/etcd v3.3.27+incompatible
 	github.com/go-logr/logr v1.2.0
 	github.com/onsi/ginkgo v1.16.5

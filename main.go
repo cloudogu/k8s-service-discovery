@@ -3,19 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
 	"os"
 
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/cloudogu/k8s-service-discovery/controllers"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-	"github.com/bombsimon/logrusr/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +41,10 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
-	configureLogger()
+	if err := logging.ConfigureLogger(); err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -118,14 +117,6 @@ func configureManager(k8sManager manager.Manager, namespace string) error {
 	}
 
 	return nil
-}
-
-func configureLogger() {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.TextFormatter{})
-	logrusLog.SetLevel(logrus.DebugLevel)
-
-	ctrl.SetLogger(logrusr.New(logrusLog))
 }
 
 func getK8sManagerOptions() (manager.Options, error) {
