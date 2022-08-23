@@ -42,7 +42,7 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 
 	if err := logging.ConfigureLogger(); err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "unable configure logger")
 		os.Exit(1)
 	}
 }
