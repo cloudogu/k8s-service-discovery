@@ -1,15 +1,16 @@
 //go:build k8s_integration
 // +build k8s_integration
 
-package controllers_test
+package controllers
 
 import (
 	"context"
 	"fmt"
+	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
+	etcdclient "github.com/coreos/etcd/client"
 	"path/filepath"
 	"testing"
 
-	"github.com/cloudogu/k8s-service-discovery/controllers"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -69,23 +70,48 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	//create initial ingress class
-	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName)
+	myRegistry := &cesmocks.Registry{}
+	globalConfigMock := &cesmocks.ConfigurationContext{}
+	keyNotFoundErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
+	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
+	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
+
+	ingressCreator := NewIngressUpdater(k8sManager.GetClient(), myNamespace, myIngressClassName)
+	reconciler := &serviceReconciler{
+		client:   k8sManager.GetClient(),
+		registry: myRegistry,
+		updater:  ingressCreator,
+	}
+	err = reconciler.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	// create initial ingress class
+	ingressClassCreator := NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName)
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 
-	ingressCreator := controllers.NewIngressGenerator(k8sManager.GetClient(), myNamespace, myIngressClassName)
-	reconciler := &controllers.ServiceReconciler{
-		Client:           k8sManager.GetClient(),
-		Scheme:           k8sManager.GetScheme(),
-		IngressGenerator: ingressCreator,
-	}
-	err = reconciler.SetupWithManager(k8sManager)
+	// create ssl updater class
+	sslUpdater, err := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace)
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sManager.Add(sslUpdater)
+	Expect(err).ToNot(HaveOccurred())
+
+	//// create warp menu creator
+	//warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace)
+	//err = k8sManager.Add(warpMenuCreator)
+	//Expect(err).ToNot(HaveOccurred())
+
+	// create maintenance updater
+	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator)
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sManager.Add(maintenanceUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
+
+		defer GinkgoRecover()
 	}()
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})

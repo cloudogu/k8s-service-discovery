@@ -1,15 +1,13 @@
 //go:build k8s_integration
 // +build k8s_integration
 
-package controllers_test
+package controllers
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
 	"time"
-
-	"github.com/cloudogu/k8s-service-discovery/controllers"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -100,7 +98,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
 
-			_, ok := expectedIngress.Items[0].Annotations[controllers.IngressRewriteTargetAnnotation]
+			_, ok := expectedIngress.Items[0].Annotations[ingressRewriteTargetAnnotation]
 			Expect(ok).Should(BeFalse())
 		})
 
@@ -129,7 +127,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
 
-			_, ok := expectedIngress.Items[0].Annotations[controllers.IngressRewriteTargetAnnotation]
+			_, ok := expectedIngress.Items[0].Annotations[ingressRewriteTargetAnnotation]
 			Expect(ok).Should(BeFalse())
 
 			Expect(expectedIngress.Items[1].Namespace).Should(Equal(myNamespace))
@@ -139,7 +137,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(*expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
 			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
-			Expect(expectedIngress.Items[1].Annotations[controllers.IngressRewriteTargetAnnotation]).Should(Equal("/nexus/repository/docker-registry/v2"))
+			Expect(expectedIngress.Items[1].Annotations[ingressRewriteTargetAnnotation]).Should(Equal("/nexus/repository/docker-registry/v2"))
 		})
 	})
 })
