@@ -2,19 +2,19 @@ package logging
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/bombsimon/logrusr/v2"
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const namespaceLogLevel = "LOG_LEVEL"
 
 const (
-	printLevel int = iota
-	errorLevel
+	errorLevel int = iota
 	warningLevel
 	infoLevel
 	debugLevel
@@ -25,52 +25,44 @@ type libraryLogger struct {
 	name   string
 }
 
-func (c libraryLogger) log(level int, args ...interface{}) {
-	c.logger.Info(level, fmt.Sprintf("[%s] %s", c.name, fmt.Sprint(args...)))
+func (l *libraryLogger) log(level int, args ...interface{}) {
+	l.logger.Info(level, fmt.Sprintf("[%s] %s", l.name, fmt.Sprint(args...)))
 }
 
-func (c libraryLogger) logf(level int, format string, args ...interface{}) {
-	c.logger.Info(level, fmt.Sprintf("[%s] %s", c.name, fmt.Sprintf(format, args...)))
+func (l *libraryLogger) logf(level int, format string, args ...interface{}) {
+	l.logger.Info(level, fmt.Sprintf("[%s] %s", l.name, fmt.Sprintf(format, args...)))
 }
 
-func (c libraryLogger) Debug(args ...interface{}) {
-	c.log(debugLevel, args...)
+func (l *libraryLogger) Debug(args ...interface{}) {
+	l.log(debugLevel, args...)
 }
 
-func (c libraryLogger) Info(args ...interface{}) {
-	c.log(infoLevel, args...)
+func (l *libraryLogger) Info(args ...interface{}) {
+	l.log(infoLevel, args...)
 }
 
-func (c libraryLogger) Warning(args ...interface{}) {
-	c.log(warningLevel, args...)
+func (l *libraryLogger) Warning(args ...interface{}) {
+	l.log(warningLevel, args...)
 }
 
-func (c libraryLogger) Error(args ...interface{}) {
-	c.log(errorLevel, args...)
+func (l *libraryLogger) Error(args ...interface{}) {
+	l.log(errorLevel, args...)
 }
 
-func (c libraryLogger) Print(args ...interface{}) {
-	c.log(printLevel, args...)
+func (l *libraryLogger) Debugf(format string, args ...interface{}) {
+	l.logf(debugLevel, format, args...)
 }
 
-func (c libraryLogger) Debugf(format string, args ...interface{}) {
-	c.logf(debugLevel, format, args...)
+func (l *libraryLogger) Infof(format string, args ...interface{}) {
+	l.logf(infoLevel, format, args...)
 }
 
-func (c libraryLogger) Infof(format string, args ...interface{}) {
-	c.logf(infoLevel, format, args...)
+func (l *libraryLogger) Warningf(format string, args ...interface{}) {
+	l.logf(warningLevel, format, args...)
 }
 
-func (c libraryLogger) Warningf(format string, args ...interface{}) {
-	c.logf(warningLevel, format, args...)
-}
-
-func (c libraryLogger) Errorf(format string, args ...interface{}) {
-	c.logf(errorLevel, format, args...)
-}
-
-func (c libraryLogger) Printf(format string, args ...interface{}) {
-	c.logf(printLevel, format, args...)
+func (l *libraryLogger) Errorf(format string, args ...interface{}) {
+	l.logf(errorLevel, format, args...)
 }
 
 func getLogLevelFromEnv() (logrus.Level, error) {
