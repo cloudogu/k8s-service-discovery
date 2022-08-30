@@ -12,10 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#10] Update `ces-build-lib` to version `1.56.0`
 - [#10] Update `makefiles` to version `6.3.0`
 
+## [v0.4.0] - 2022-08-29
+### Added
+- [#8] Add implementation for general logger used in the cesapp-lib
+
 ## [v0.3.0] - 2022-06-09
 ### Added
 - [#5] The certificate for the ingress-nginx will be automatically updated.
-A watch recognizes changes in the registry for the certificate and updates the ssl secret.
+A watch recognizes changes in the registry for the certificate and updates the ssl secret .
 
 ## [v0.2.0] - 2022-06-08
 ### Added
