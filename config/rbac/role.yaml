@@ -10,6 +10,7 @@ rules:
       - ingresses
       - services
       - secrets
+      - pods
     verbs:
       - create
       - delete
