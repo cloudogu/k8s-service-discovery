@@ -32,8 +32,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 	myIngressClass := "my-ingress-class"
 
 	t.Run("skipped as service has no ports", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
@@ -49,8 +47,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 	})
 
 	t.Run("skipped as no annotation exist", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
@@ -69,8 +65,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 	})
 
 	t.Run("error when annotation contains invalid ces service", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -95,8 +89,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 	})
 
 	t.Run("successfully create/update ingress object", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		cesService := []CesService{
 			{
@@ -136,8 +128,6 @@ func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 	myIngressClass := "my-ingress-class"
 
 	t.Run("Create ingress resource for a single ces service", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		cesServiceWithOneWebapp := CesService{
 			Name:     "test",
@@ -178,8 +168,6 @@ func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 	})
 
 	t.Run("Create ingress resource for a single ces service while maintenance mode is active", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		cesServiceWithOneWebapp := CesService{
 			Name:     "test",
@@ -220,8 +208,6 @@ func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 	})
 
 	t.Run("Update an existing ingress object with new ces service data", func(t *testing.T) {
-		t.Parallel()
-
 		// given
 		cesService := CesService{
 			Name:     "test",

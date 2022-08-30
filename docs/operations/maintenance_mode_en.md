@@ -4,7 +4,7 @@ This document explains the maintenance mode and how to control it for the Cloudo
 
 Maintenance mode is a system state of the Ecosystem where external access to the EcoSystem is disabled. The mode is
 required when system critical processes are running. While maintenance mode is activated, a maintenance page is
-displayed for each access to Dogus. access to Dogus, a maintenance page is displayed.
+returned for each access to a Dogus.
 
 # Activate Maintenance Mode
 

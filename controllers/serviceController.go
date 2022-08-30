@@ -61,7 +61,7 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logger.Info(fmt.Sprintf("Found service [%s]", service.Name))
 
-	maintanaceMode, err := r.isMaintenanceModeActive()
+	maintanaceMode, err := isMaintenanceModeActive(r.registry)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -92,8 +92,8 @@ func (r *serviceReconciler) getService(ctx context.Context, req ctrl.Request) (*
 	return service, nil
 }
 
-func (r *serviceReconciler) isMaintenanceModeActive() (bool, error) {
-	_, err := r.registry.GlobalConfig().Get(maintenanceModeGlobalKey)
+func isMaintenanceModeActive(r registry.Registry) (bool, error) {
+	_, err := r.GlobalConfig().Get(maintenanceModeGlobalKey)
 	if registry.IsKeyNotFoundError(err) {
 		return false, nil
 	} else if err != nil {

@@ -124,18 +124,6 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 	})
 }
 
-func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
-
-}
-
-func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
-
-}
-
-func Test_maintenanceModeUpdater_getAllServices(t *testing.T) {
-
-}
-
 func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 	t.Run("activate maintenance mode with error", func(t *testing.T) {
 		// given
@@ -198,12 +186,4 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 		require.ErrorIs(t, err, assert.AnError)
 		mock.AssertExpectationsForObjects(t, regMock, globalConfigMock, regMock, ingressUpdater)
 	})
-}
-
-func Test_maintenanceModeUpdater_isMaintenanceModeActive(t *testing.T) {
-
-}
-
-func Test_maintenanceModeUpdater_startEtcdWatch(t *testing.T) {
-
 }

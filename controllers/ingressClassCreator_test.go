@@ -1,12 +1,11 @@
 package controllers
 
 import (
+	"context"
 	"testing"
 
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/stretchr/testify/require"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -28,7 +27,7 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 		creator := NewIngressClassCreator(clientMock, "my-ingress-class")
 
 		// when
-		err := creator.CreateIngressClass(ctrl.Log.WithName("test"))
+		err := creator.CreateIngressClass(context.Background())
 
 		// then
 		require.NoError(t, err)
@@ -51,7 +50,7 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 		creator := NewIngressClassCreator(clientMock, "my-ingress-class")
 
 		// when
-		err := creator.CreateIngressClass(ctrl.Log.WithName("test"))
+		err := creator.CreateIngressClass(context.Background())
 
 		// then
 		require.NoError(t, err)

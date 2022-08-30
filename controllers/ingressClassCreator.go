@@ -3,14 +3,12 @@ package controllers
 import (
 	"context"
 	"fmt"
-
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/go-logr/logr"
 	networking "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,14 +29,14 @@ func NewIngressClassCreator(client client.Client, className string) *ingressClas
 }
 
 // CreateIngressClass check whether the ingress class for the generator exists. If not it will be created.
-func (icc ingressClassCreator) CreateIngressClass(logger logr.Logger) error {
-	logger.Info(fmt.Sprintf("checking for existing ingress class [%s]", icc.className))
+func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
+	log.FromContext(ctx).Info(fmt.Sprintf("checking for existing ingress class [%s]", icc.className))
 	ok, err := icc.isIngressClassAvailable()
 	if err != nil {
 		return fmt.Errorf("failed to check if ingress class [%s] exists: %w", icc.className, err)
 	}
 	if ok {
-		logger.Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
+		log.FromContext(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
 		return nil
 	}
 
@@ -77,6 +75,6 @@ func (icc ingressClassCreator) isIngressClassAvailable() (bool, error) {
 	return true, nil
 }
 
-func (icc ingressClassCreator) Start(context.Context) error {
-	return icc.CreateIngressClass(ctrl.Log.WithName("ingress-class-creator"))
+func (icc ingressClassCreator) Start(ctx context.Context) error {
+	return icc.CreateIngressClass(ctx)
 }

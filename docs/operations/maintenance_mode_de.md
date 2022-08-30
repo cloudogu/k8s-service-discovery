@@ -2,13 +2,13 @@
 
 Dieses Dokument erklärt den Wartungsmodus und wie man diesen für das Cloudogu EcoSystem MultiNode steuern kann.
 
-Der Wartungsmodus ist ein Systemzustand des Ecosystem, wo ein externer Zugriff auf das EcoSystem deaktiviert wird.
+Der Wartungsmodus ist ein Systemzustand des Ecosystem, bei dem ein externer Zugriff auf das EcoSystem deaktiviert wird.
 Der Modus wird benötigt, wenn systemkritische Prozesse laufen. Während der Wartungsmodus aktiviert ist, wird für jeden
 Zugriff auf Dogus eine Wartungsseite angezeigt.
 
 # Wartungsmodus aktivieren
 
-Um den CES in den Wartungsmodus zu versetzen, muss der folgende String in `/config/_global/maintenance` geschrieben
+Um das CES in den Wartungsmodus zu versetzen, muss der folgende String in `/config/_global/maintenance` geschrieben
 werden:
 
 ```json
@@ -18,10 +18,10 @@ werden:
 }
 ``` 
 
-Jede Anfrage an den CES wird dann mit dem HTTP-Code 503 (Service Unavailable) beantwortet, bis der Schlüssel im etcd
-entweder gelöscht wird. Dabei wird auf der Seite der Inhalt von `title` und `text` angezeigt.
+Jede Anfrage an den CES wird dann mit dem HTTP-Code 503 (Service Unavailable) beantwortet, bis der Schlüssel im etcd (
+s.o.) gelöscht wird. Dabei wird auf der Seite der Inhalt von `title` und `text` angezeigt.
 
-**Hinweis:** Das Aktivieren und Deaktivieren des Wartungsmodus führt zu einem Neustart des Nginx-Static Dogus. Dies 
+**Hinweis:** Das Aktivieren und Deaktivieren des Wartungsmodus führt zu einem Neustart des Nginx-Static Dogus. Dies
 sollte jedoch nur wenige Sekunden in Anspruch nehmen.
 
 ## Vorsicht

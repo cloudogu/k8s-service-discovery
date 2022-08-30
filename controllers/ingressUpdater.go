@@ -40,6 +40,7 @@ type ingressUpdater struct {
 	ingressClassName string
 }
 
+// NewIngressUpdater creates a new instance responsible for updating ingress objects.
 func NewIngressUpdater(client client.Client, namespace string, ingressClassName string) *ingressUpdater {
 	return &ingressUpdater{
 		client:           client,

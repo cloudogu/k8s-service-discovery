@@ -57,9 +57,9 @@ func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg regis
 
 	warpChannel := make(chan *coreosclient.Response)
 	go func() {
-		log.FromContext(ctx).Info("start etcd watcher for maintenance key")
+		log.FromContext(ctx).Info("Start etcd watcher for maintenance key")
 		reg.Watch(ctx, maintenanceModeWatchKey, true, warpChannel)
-		log.FromContext(ctx).Info("stop etcd watcher for maintenance key")
+		log.FromContext(ctx).Info("Stop etcd watcher for maintenance key")
 	}()
 
 	for {
@@ -78,7 +78,7 @@ func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg regis
 func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
 	log.FromContext(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := scu.isMaintenanceModeActive()
+	isActive, err := isMaintenanceModeActive(scu.registry)
 	if err != nil {
 		return err
 	}
@@ -119,17 +119,6 @@ func (scu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) er
 	}
 
 	return nil
-}
-
-func (scu *maintenanceModeUpdater) isMaintenanceModeActive() (bool, error) {
-	_, err := scu.registry.GlobalConfig().Get(maintenanceModeGlobalKey)
-	if registry.IsKeyNotFoundError(err) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("failed to read the maintenance mode from the registry: %w", err)
-	}
-
-	return true, nil
 }
 
 func (scu *maintenanceModeUpdater) getAllServices(ctx context.Context) (*v1.ServiceList, error) {
