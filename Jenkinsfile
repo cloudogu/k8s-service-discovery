@@ -54,7 +54,7 @@ node('docker') {
 
                             stage('Generate k8s Resources') {
                                 make 'create-temporary-release-resources'
-                                archiveArtifacts 'target/*.yaml'
+                                archiveArtifacts 'target/make/k8s/*.yaml'
                             }
                         }
 
@@ -81,8 +81,8 @@ node('docker') {
                 imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
             }
 
-            GString sourceDeploymentYaml="target/${repositoryName}_${controllerVersion}.yaml"
-            GString sourceDeploymentYamlWithNamespace="target/${repositoryName}_${controllerVersion}_namespaced.yaml"
+            GString sourceDeploymentYaml="target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
+            GString sourceDeploymentYamlWithNamespace="target/make/k8s/${repositoryName}_${controllerVersion}_namespaced.yaml"
 
             stage('Update development resources') {
                 sh "cat ${sourceDeploymentYaml} | sed \"s/{{ .Namespace }}/default/\" > ${sourceDeploymentYamlWithNamespace}"
@@ -126,7 +126,7 @@ void stageLintK8SResources() {
 
     docker
             .image(kubevalImage)
-            .inside("-v ${WORKSPACE}/target:/data -t --entrypoint=")
+            .inside("-v ${WORKSPACE}/target/make/k8s:/data -t --entrypoint=")
                     {
                         sh "kubeval /data/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
                     }
@@ -192,7 +192,7 @@ void stageAutomaticRelease() {
         stage('Push to Registry') {
             Makefile makefile = new Makefile(this)
             String controllerVersion = makefile.getVersion()
-            GString targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
+            GString targetOperatorResourceYaml = "target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
 
             DoguRegistry registry = new DoguRegistry(this)
             registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
