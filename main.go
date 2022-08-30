@@ -84,7 +84,13 @@ func startManager() error {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	if err = configureManager(k8sManager, options.Namespace); err != nil {
+	ingressUpdater := controllers.NewIngressUpdater(k8sManager.GetClient(), options.Namespace, IngressClassName)
+
+	if err = handleMaintenanceMode(k8sManager, options.Namespace, ingressUpdater); err != nil {
+		return err
+	}
+
+	if err = configureManager(k8sManager, options.Namespace, ingressUpdater); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
@@ -104,8 +110,8 @@ func createEtcdRegistry(namespace string) (registry.Registry, error) {
 	return r, err
 }
 
-func configureManager(k8sManager manager.Manager, namespace string) error {
-	if err := configureReconciler(k8sManager, namespace); err != nil {
+func configureManager(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater) error {
+	if err := configureReconciler(k8sManager, namespace, updater); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
@@ -189,13 +195,23 @@ func handleSslUpdates(k8sManager manager.Manager, namespace string) error {
 	return nil
 }
 
-func configureReconciler(k8sManager manager.Manager, namespace string) error {
-	ingressGenerator := controllers.NewIngressGenerator(k8sManager.GetClient(), namespace, IngressClassName)
+func handleMaintenanceMode(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater) error {
+	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater)
+	if err != nil {
+		return fmt.Errorf("failed to create new maintenance updater: %w", err)
+	}
 
-	reconciler := &controllers.ServiceReconciler{
-		Client:           k8sManager.GetClient(),
-		Scheme:           k8sManager.GetScheme(),
-		IngressGenerator: ingressGenerator,
+	if err = k8sManager.Add(maintenanceModeUpdater); err != nil {
+		return fmt.Errorf("failed to add maintenance updater as runnable to the manager: %w", err)
+	}
+
+	return nil
+}
+
+func configureReconciler(k8sManager manager.Manager, namespace string, ingressUpdater controllers.IngressUpdater) error {
+	reconciler, err := controllers.NewServiceReconciler(k8sManager.GetClient(), namespace, ingressUpdater)
+	if err != nil {
+		return fmt.Errorf("failed to create service reconciler: %w", err)
 	}
 
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {

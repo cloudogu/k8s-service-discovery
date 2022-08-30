@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/dogu-build-lib@v1.6.0', 'github.com/cloudogu/ces-build-lib@1.51.0'])
+@Library(['github.com/cloudogu/dogu-build-lib@v1.6.0', 'github.com/cloudogu/ces-build-lib@1.56.0'])
 import com.cloudogu.ces.cesbuildlib.*
 import com.cloudogu.ces.dogubuildlib.*
 
@@ -54,7 +54,7 @@ node('docker') {
 
                             stage('Generate k8s Resources') {
                                 make 'create-temporary-release-resources'
-                                archiveArtifacts 'target/*.yaml'
+                                archiveArtifacts 'target/make/k8s/*.yaml'
                             }
                         }
 
@@ -66,7 +66,7 @@ node('docker') {
             stageStaticAnalysisSonarQube()
         }
 
-        K3d k3d = new K3d(this, "${WORKSPACE}/k3d", env.PATH)
+        K3d k3d = new K3d(this, "${WORKSPACE}", "${WORKSPACE}/k3d", env.PATH)
 
         try {
             Makefile makefile = new Makefile(this)
@@ -81,8 +81,8 @@ node('docker') {
                 imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
             }
 
-            GString sourceDeploymentYaml="target/${repositoryName}_${controllerVersion}.yaml"
-            GString sourceDeploymentYamlWithNamespace="target/${repositoryName}_${controllerVersion}_namespaced.yaml"
+            GString sourceDeploymentYaml="target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
+            GString sourceDeploymentYamlWithNamespace="target/make/k8s/${repositoryName}_${controllerVersion}_namespaced.yaml"
 
             stage('Update development resources') {
                 sh "cat ${sourceDeploymentYaml} | sed \"s/{{ .Namespace }}/default/\" > ${sourceDeploymentYamlWithNamespace}"
@@ -126,7 +126,7 @@ void stageLintK8SResources() {
 
     docker
             .image(kubevalImage)
-            .inside("-v ${WORKSPACE}/target:/data -t --entrypoint=")
+            .inside("-v ${WORKSPACE}/target/make/k8s:/data -t --entrypoint=")
                     {
                         sh "kubeval /data/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
                     }
@@ -189,18 +189,17 @@ void stageAutomaticRelease() {
             gitflow.finishRelease(releaseVersion, productionReleaseBranch)
         }
 
-        stage('Sign after Release') {
-            gpg.createSignature()
+        stage('Push to Registry') {
+            Makefile makefile = new Makefile(this)
+            String controllerVersion = makefile.getVersion()
+            GString targetOperatorResourceYaml = "target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
+
+            DoguRegistry registry = new DoguRegistry(this)
+            registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
         }
 
         stage('Add Github-Release') {
-            Makefile makefile = new Makefile(this)
-            String controllerVersion = makefile.getVersion()
-            GString targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
             releaseId = github.createReleaseWithChangelog(releaseVersion, changelog, productionReleaseBranch)
-            github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}")
-            github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}.sha256sum")
-            github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}.sha256sum.asc")
         }
     }
 }

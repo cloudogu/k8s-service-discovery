@@ -6,7 +6,7 @@ VERSION=0.4.0
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.18.1
-MAKEFILES_VERSION=6.0.1
+MAKEFILES_VERSION=7.0.1
 LINT_VERSION?=v1.46.2
 
 ADDITIONAL_CLEAN=dist-clean
@@ -27,7 +27,7 @@ include build/make/clean.mk
 include build/make/digital-signature.mk
 
 K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
-PRE_COMPILE=generate vet
+PRE_COMPILE=generate
 K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config generate-menu-json
 
 include build/make/k8s-controller.mk
