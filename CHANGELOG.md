@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- [#10] Support for maintenance mode. See [maintenence mode](docs/operations/maintenance_mode_en.md) for more details.
+- [#10] Support for maintenance mode. See [maintenance mode](docs/operations/maintenance_mode_en.md) for more details.
 
 ## [v0.3.0] - 2022-06-09
 ### Added
