@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/dogu-build-lib@v1.6.0', 'github.com/cloudogu/ces-build-lib@1.51.0'])
+@Library(['github.com/cloudogu/dogu-build-lib@v1.6.0', 'github.com/cloudogu/ces-build-lib@1.56.0'])
 import com.cloudogu.ces.cesbuildlib.*
 import com.cloudogu.ces.dogubuildlib.*
 
@@ -189,18 +189,17 @@ void stageAutomaticRelease() {
             gitflow.finishRelease(releaseVersion, productionReleaseBranch)
         }
 
-        stage('Sign after Release') {
-            gpg.createSignature()
-        }
-
-        stage('Add Github-Release') {
+        stage('Push to Registry') {
             Makefile makefile = new Makefile(this)
             String controllerVersion = makefile.getVersion()
             GString targetOperatorResourceYaml = "target/${repositoryName}_${controllerVersion}.yaml"
+
+            DoguRegistry registry = new DoguRegistry(this)
+            registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
+        }
+
+        stage('Add Github-Release') {
             releaseId = github.createReleaseWithChangelog(releaseVersion, changelog, productionReleaseBranch)
-            github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}")
-            github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}.sha256sum")
-            github.addReleaseAsset("${releaseId}", "${targetOperatorResourceYaml}.sha256sum.asc")
         }
     }
 }
