@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - [#10] Update `ces-build-lib` to version `1.56.0`
-- [#10] Update `makefiles` to version `6.3.0`
+- [#10] Update `makefiles` to version `7.0.0`
 
 ## [v0.4.0] - 2022-08-29
 ### Added
