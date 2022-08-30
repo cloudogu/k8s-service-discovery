@@ -13,14 +13,10 @@
 #	@echo "Auto-generate deepcopy functions..."
 #	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-
-# This script required the k8s.mk script
+# This script requires the k8s.mk script
 include $(WORKDIR)/build/make/k8s.mk
 
 ## Variables
-
-# Contains the artifact yaml used as
-K8S_RESOURCE_TEMP_YAML=${TARGET_DIR}/${ARTIFACT_ID}_${VERSION}.yaml
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -42,7 +38,7 @@ K8S_INTEGRATION_TEST_DIR=${TARGET_DIR}/k8s-integration-test
 ##@ K8s - EcoSystem
 
 .PHONY: build
-build: k8s-delete image-import k8s-apply ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
+build: image-import k8s-apply ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
 
 ##@ Release
 

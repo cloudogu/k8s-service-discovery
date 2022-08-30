@@ -6,6 +6,8 @@ endif
 
 ## Variables
 
+BINARY_YQ = $(UTILITY_BIN_PATH)/yq
+
 # The cluster root variable is used to the build images to the cluster. It can be defined in a .myenv file.
 K8S_CLUSTER_ROOT ?=
 # The productive tag of the image
@@ -18,7 +20,7 @@ K3CES_REGISTRY_URL_PREFIX="${K3S_CLUSTER_FQDN}:${K3S_LOCAL_REGISTRY_PORT}"
 # Variables for the temporary yaml files. These are used as template to generate a development resource containing
 # the current namespace and the dev image.
 K8S_RESOURCE_TEMP_FOLDER ?= $(TARGET_DIR)/make/k8s
-K8S_RESOURCE_TEMP_YAML ?= $(K8S_RESOURCE_TEMP_FOLDER)/$(ARTIFACT_ID).yaml
+K8S_RESOURCE_TEMP_YAML ?= $(K8S_RESOURCE_TEMP_FOLDER)/$(ARTIFACT_ID)_$(VERSION).yaml
 
 # The current namespace is extracted from the current context.
 K8S_CURRENT_NAMESPACE=$(shell kubectl config view --minify -o jsonpath='{..namespace}')
@@ -67,7 +69,7 @@ K8S_POST_GENERATE_TARGETS ?=
 K8S_PRE_GENERATE_TARGETS ?= k8s-create-temporary-resource
 
 .PHONY: k8s-generate
-k8s-generate: binary-yq $(K8S_RESOURCE_TEMP_FOLDER) $(K8S_PRE_GENERATE_TARGETS) ## Generates the final resource yaml.
+k8s-generate: ${BINARY_YQ} $(K8S_RESOURCE_TEMP_FOLDER) $(K8S_PRE_GENERATE_TARGETS) ## Generates the final resource yaml.
 	@echo "Applying general transformations..."
 	@sed -i "s/'{{ .Namespace }}'/$(K8S_CURRENT_NAMESPACE)/" $(K8S_RESOURCE_TEMP_YAML)
 	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").image)=\"$(IMAGE_DEV)\"" $(K8S_RESOURCE_TEMP_YAML)
@@ -118,7 +120,5 @@ __check_defined = \
     $(if $(value $1),, \
       $(error Undefined $1$(if $2, ($2))))
 
-BINARY_YQ = $(UTILITY_BIN_PATH)/yq
-.PHONY: binary-yq
-binary-yq: ## Download controller-gen locally if necessary.
+${BINARY_YQ}: $(UTILITY_BIN_PATH) ## Download controller-gen locally if necessary.
 	$(call go-get-tool,$(BINARY_YQ),github.com/mikefarah/yq/v4@v4.25.1)
