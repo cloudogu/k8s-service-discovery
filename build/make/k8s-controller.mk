@@ -13,14 +13,10 @@
 #	@echo "Auto-generate deepcopy functions..."
 #	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-
-# This script required the k8s.mk script
+# This script requires the k8s.mk script
 include $(WORKDIR)/build/make/k8s.mk
 
 ## Variables
-
-# Contains the artifact yaml used as
-K8S_RESOURCE_TEMP_YAML=${TARGET_DIR}/${ARTIFACT_ID}_${VERSION}.yaml
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -42,7 +38,7 @@ K8S_INTEGRATION_TEST_DIR=${TARGET_DIR}/k8s-integration-test
 ##@ K8s - EcoSystem
 
 .PHONY: build
-build: k8s-delete image-import k8s-apply ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
+build: image-import k8s-apply ## Builds a new version of the dogu and deploys it into the K8s-EcoSystem.
 
 ##@ Release
 
@@ -59,7 +55,7 @@ build-controller: ${SRC} compile ## Builds the controller Go binary.
 # Allows to perform tasks before locally running the controller
 K8S_RUN_PRE_TARGETS ?=
 .PHONY: run
-run: manifests generate vet $(K8S_RUN_PRE_TARGETS) ## Run a controller from your host.
+run: manifests generate $(K8S_RUN_PRE_TARGETS) ## Run a controller from your host.
 	go run -ldflags "-X main.Version=$(VERSION)" ./main.go
 
 ##@ K8s - Integration test with envtest
@@ -68,7 +64,7 @@ $(K8S_INTEGRATION_TEST_DIR):
 	@mkdir -p $@
 
 .PHONY: k8s-integration-test
-k8s-integration-test: $(K8S_INTEGRATION_TEST_DIR) manifests generate vet envtest ## Run k8s integration tests.
+k8s-integration-test: $(K8S_INTEGRATION_TEST_DIR) manifests generate envtest ## Run k8s integration tests.
 	@echo "Running K8s integration tests..."
 	@KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -tags=k8s_integration ./... -coverprofile ${K8S_INTEGRATION_TEST_DIR}/report-k8s-integration.out
 
@@ -76,7 +72,7 @@ k8s-integration-test: $(K8S_INTEGRATION_TEST_DIR) manifests generate vet envtest
 
 # The pre generation script creates a K8s resource yaml containing generated manager yaml.
 .PHONY: k8s-create-temporary-resource
- k8s-create-temporary-resource: ${TARGET_DIR} manifests kustomize
+ k8s-create-temporary-resource: $(K8S_RESOURCE_TEMP_FOLDER) manifests kustomize
 	@echo "Generating temporary k8s resources $(K8S_RESOURCE_TEMP_YAML)..."
 	cd $(WORKDIR)/config/manager && $(KUSTOMIZE) edit set image controller=$(IMAGE)
 	$(KUSTOMIZE) build config/default > $(K8S_RESOURCE_TEMP_YAML)
