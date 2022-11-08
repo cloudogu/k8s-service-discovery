@@ -84,7 +84,10 @@ func startManager() error {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	ingressUpdater := controllers.NewIngressUpdater(k8sManager.GetClient(), options.Namespace, IngressClassName)
+	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), options.Namespace, IngressClassName)
+	if err != nil {
+		return fmt.Errorf("failed to create new ingress updater: %w", err)
+	}
 
 	if err = handleMaintenanceMode(k8sManager, options.Namespace, ingressUpdater); err != nil {
 		return err

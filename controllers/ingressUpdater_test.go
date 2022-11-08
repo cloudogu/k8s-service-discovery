@@ -9,6 +9,8 @@ import (
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 )
@@ -18,16 +20,23 @@ func TestNewIngressUpdater(t *testing.T) {
 
 	// given
 	clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
+	ctrl.GetConfig = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
 
 	// when
-	creator := NewIngressUpdater(clientMock, "my-namespace", "my-ingress-class-name")
+	creator, err := NewIngressUpdater(clientMock, "my-namespace", "my-ingress-class-name")
 
 	// then
+	require.NoError(t, err)
 	assert.NotNil(t, creator)
 }
 
 func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 	t.Parallel()
+	ctrl.GetConfig = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
 	myNamespace := "my-test-namespace"
 	myIngressClass := "my-ingress-class"
 
@@ -37,7 +46,8 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
 		err := creator.UpdateIngressOfService(context.TODO(), &service, false)
@@ -55,7 +65,8 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
 		err := creator.UpdateIngressOfService(context.TODO(), &service, false)
@@ -78,7 +89,8 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
 		err := creator.UpdateIngressOfService(context.TODO(), &service, false)
@@ -112,7 +124,8 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
 		err := creator.UpdateIngressOfService(context.TODO(), &service, false)
@@ -124,6 +137,9 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 
 func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 	t.Parallel()
+	ctrl.GetConfig = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
 	myNamespace := "my-test-namespace"
 	myIngressClass := "my-ingress-class"
 
@@ -139,10 +155,11 @@ func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
-		err := creator.createCesServiceIngress(context.TODO(), cesServiceWithOneWebapp, &service, false)
+		err := creator.updateServiceIngressObject(context.TODO(), cesServiceWithOneWebapp, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -179,10 +196,11 @@ func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
-		err := creator.createCesServiceIngress(context.TODO(), cesServiceWithOneWebapp, &service, true)
+		err := creator.updateServiceIngressObject(context.TODO(), cesServiceWithOneWebapp, &service, true)
 
 		//then
 		require.NoError(t, err)
@@ -243,10 +261,11 @@ func Test_ingressUpdater_createCesServiceIngress(t *testing.T) {
 									}}}}}}}}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(existingIngress).Build()
-		creator := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		creator, creationError := NewIngressUpdater(clientMock, myNamespace, myIngressClass)
+		require.NoError(t, creationError)
 
 		// when
-		err := creator.createCesServiceIngress(context.TODO(), cesService, &service, false)
+		err := creator.updateServiceIngressObject(context.TODO(), cesService, &service, false)
 		require.NoError(t, err)
 
 		//then
