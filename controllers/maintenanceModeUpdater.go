@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
-	coreosclient "github.com/coreos/etcd/client"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -55,7 +55,7 @@ func (scu maintenanceModeUpdater) Start(ctx context.Context) error {
 func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg registry.WatchConfigurationContext) error {
 	log.FromContext(ctx).Info("Start etcd watcher on maintenance key")
 
-	warpChannel := make(chan *coreosclient.Response)
+	warpChannel := make(chan *etcdclient.Response)
 	go func() {
 		log.FromContext(ctx).Info("Start etcd watcher for maintenance key")
 		reg.Watch(ctx, maintenanceModeWatchKey, true, warpChannel)

@@ -13,7 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	coreosclient "github.com/coreos/etcd/client"
+	etcdclient "go.etcd.io/etcd/client/v2"
 
 	"github.com/stretchr/testify/mock"
 
@@ -68,10 +68,10 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		watchContextMock := &mocks.WatchConfigurationContext{}
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *coreosclient.Response)
+			sendChannel, ok := channelobject.(chan *etcdclient.Response)
 
 			if ok {
-				testResponse := &coreosclient.Response{}
+				testResponse := &etcdclient.Response{}
 				sendChannel <- testResponse
 			}
 		}).Return()
@@ -115,10 +115,10 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		watchContextMock := &mocks.WatchConfigurationContext{}
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *coreosclient.Response)
+			sendChannel, ok := channelobject.(chan *etcdclient.Response)
 
 			if ok {
-				testResponse := &coreosclient.Response{}
+				testResponse := &etcdclient.Response{}
 				sendChannel <- testResponse
 			}
 		}).Return()

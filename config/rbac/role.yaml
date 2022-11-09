@@ -10,6 +10,7 @@ rules:
       - ingresses
       - services
       - secrets
+      - deployments
       - pods
     verbs:
       - create

@@ -2,10 +2,10 @@ package types
 
 import (
 	"github.com/cloudogu/cesapp-lib/registry/mocks"
-	coreosclient "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	"testing"
 )
 
@@ -51,7 +51,7 @@ func Test_createDoguHref(t *testing.T) {
 func Test_isKeyNotFound(t *testing.T) {
 	t.Run("return true on code key not found", func(t *testing.T) {
 		// given
-		err := coreosclient.Error{Code: coreosclient.ErrorCodeKeyNotFound}
+		err := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
 
 		// when
 		result := isKeyNotFound(err)
@@ -76,26 +76,26 @@ func Test_isKeyNotFound(t *testing.T) {
 		key  int
 		want bool
 	}{
-		{name: "error on !key not found", key: coreosclient.ErrorCodeDirNotEmpty, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeTestFailed, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeNotFile, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeNotDir, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeNodeExist, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeRootROnly, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeUnauthorized, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodePrevValueRequired, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeTTLNaN, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeIndexNaN, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeInvalidField, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeInvalidForm, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeRaftInternal, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeLeaderElect, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeWatcherCleared, want: false},
-		{name: "error on !key not found", key: coreosclient.ErrorCodeEventIndexCleared, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeDirNotEmpty, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeTestFailed, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeNotFile, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeNotDir, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeNodeExist, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeRootROnly, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeUnauthorized, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodePrevValueRequired, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeTTLNaN, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeIndexNaN, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeInvalidField, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeInvalidForm, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeRaftInternal, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeLeaderElect, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeWatcherCleared, want: false},
+		{name: "error on !key not found", key: etcdclient.ErrorCodeEventIndexCleared, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := coreosclient.Error{Code: tt.key}
+			err := etcdclient.Error{Code: tt.key}
 			assert.Equalf(t, tt.want, isKeyNotFound(err), "isKeyNotFound(%v)")
 		})
 	}
@@ -258,7 +258,7 @@ func Test_readDoguAsBytes(t *testing.T) {
 	t.Run("no version should not return an error", func(t *testing.T) {
 		// given
 		registryMock := &mocks.WatchConfigurationContext{}
-		testErr := coreosclient.Error{Code: coreosclient.ErrorCodeKeyNotFound}
+		testErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
 		registryMock.On("Get", "dogu/redmine/current").Return("", testErr)
 
 		// when
@@ -274,7 +274,7 @@ func Test_readDoguAsBytes(t *testing.T) {
 	t.Run("no version should not return an error", func(t *testing.T) {
 		// given
 		registryMock := &mocks.WatchConfigurationContext{}
-		testErr := coreosclient.Error{Code: coreosclient.ErrorCodeKeyNotFound}
+		testErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
 		registryMock.On("Get", "dogu/redmine/current").Return("", testErr)
 
 		// when

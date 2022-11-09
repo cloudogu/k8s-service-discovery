@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
-	etcdclient "github.com/coreos/etcd/client"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	"path/filepath"
 	"testing"
 

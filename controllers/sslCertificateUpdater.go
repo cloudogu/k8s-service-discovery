@@ -7,7 +7,7 @@ import (
 
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
-	coreosclient "github.com/coreos/etcd/client"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +58,7 @@ func (scu sslCertificateUpdater) Start(ctx context.Context) error {
 func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg registry.WatchConfigurationContext) error {
 	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on certificate keys")
 
-	warpChannel := make(chan *coreosclient.Response)
+	warpChannel := make(chan *etcdclient.Response)
 	go func() {
 		_ = scu.handleSslChange(ctx)
 		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
