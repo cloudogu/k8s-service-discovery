@@ -36,6 +36,9 @@ var k8sClient client.Client
 var cancel context.CancelFunc
 var testEnv *envtest.Environment
 
+var oldGetConfig func() (*rest.Config, error)
+var oldGetConfigOrDie func() *rest.Config
+
 const myNamespace = "my-test-namespace"
 const myIngressClassName = "my-ingress-class-name"
 
@@ -63,6 +66,16 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	oldGetConfig = ctrl.GetConfig
+	ctrl.GetConfig = func() (*rest.Config, error) {
+		return cfg, nil
+	}
+
+	oldGetConfigOrDie = ctrl.GetConfigOrDie
+	ctrl.GetConfigOrDie = func() *rest.Config {
+		return cfg
+	}
+
 	//+kubebuilder:scaffold:scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:    scheme.Scheme,
@@ -76,7 +89,9 @@ var _ = BeforeSuite(func() {
 	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
 	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
 
-	ingressCreator := NewIngressUpdater(k8sManager.GetClient(), myNamespace, myIngressClassName)
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myNamespace, myIngressClassName)
+	Expect(err).ToNot(HaveOccurred())
+
 	reconciler := &serviceReconciler{
 		client:   k8sManager.GetClient(),
 		registry: myRegistry,
@@ -135,4 +150,7 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+
+	ctrl.GetConfig = oldGetConfig
+	ctrl.GetConfigOrDie = oldGetConfigOrDie
 })
