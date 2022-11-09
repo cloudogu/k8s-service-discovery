@@ -88,7 +88,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		require.NoError(t, creationError)
 
 		// when
-		err := creator.UpdateIngressOfService(ctx, &service, false)
+		err := creator.UpsertIngressForService(ctx, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -106,7 +106,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		require.NoError(t, creationError)
 
 		// when
-		err := creator.UpdateIngressOfService(ctx, &service, false)
+		err := creator.UpsertIngressForService(ctx, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -129,7 +129,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		require.NoError(t, creationError)
 
 		// when
-		err := creator.UpdateIngressOfService(ctx, &service, false)
+		err := creator.UpsertIngressForService(ctx, &service, false)
 
 		//then
 		require.Error(t, err)
@@ -167,7 +167,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		creator.deploymentReadyChecker = deploymentReadyChecker
 
 		// when
-		err := creator.UpdateIngressOfService(ctx, &service, false)
+		err := creator.UpsertIngressForService(ctx, &service, false)
 
 		//then
 		require.ErrorIs(t, err, assert.AnError)
@@ -207,7 +207,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		creator.deploymentReadyReactor = deploymentReadyReactor
 
 		// when
-		err := creator.UpdateIngressOfService(ctx, &service, false)
+		err := creator.UpsertIngressForService(ctx, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -245,7 +245,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		creator.deploymentReadyReactor = deploymentReadyReactor
 
 		// when
-		err := creator.updateServiceIngressObject(ctx, cesServiceWithOneWebapp, &service, false)
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -285,14 +285,13 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)
-		deploymentReadyChecker.On("IsReady", ctx, "test").Return(true, nil)
 		creator.deploymentReadyChecker = deploymentReadyChecker
 
 		deploymentReadyReactor := mocks.NewDeploymentReadyReactor(t)
 		creator.deploymentReadyReactor = deploymentReadyReactor
 
 		// when
-		err := creator.updateServiceIngressObject(ctx, cesServiceWithOneWebapp, &service, true)
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, true)
 
 		//then
 		require.NoError(t, err)
@@ -332,7 +331,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)
-		deploymentReadyChecker.On("IsReady", ctx, "test").Return(false, nil).Twice()
+		deploymentReadyChecker.On("IsReady", ctx, "test").Return(false, nil).Once()
 		creator.deploymentReadyChecker = deploymentReadyChecker
 
 		deploymentReadyReactor := mocks.NewDeploymentReadyReactor(t)
@@ -341,7 +340,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		creator.deploymentReadyReactor = deploymentReadyReactor
 
 		// when
-		err := creator.updateServiceIngressObject(ctx, cesServiceWithOneWebapp, &service, false)
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -384,7 +383,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)
-		deploymentReadyChecker.On("IsReady", ctx, "test").Return(false, nil).Twice()
+		deploymentReadyChecker.On("IsReady", ctx, "test").Return(false, nil).Once()
 		creator.deploymentReadyChecker = deploymentReadyChecker
 
 		deploymentReadyReactor := mocks.NewDeploymentReadyReactor(t)
@@ -400,7 +399,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		creator.deploymentReadyReactor = deploymentReadyReactor
 
 		// when
-		err := creator.updateServiceIngressObject(ctx, cesServiceWithOneWebapp, &service, false)
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, false)
 
 		//then
 		require.NoError(t, err)
@@ -474,7 +473,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		creator.deploymentReadyReactor = deploymentReadyReactor
 
 		// when
-		err := creator.updateServiceIngressObject(ctx, cesService, &service, false)
+		err := creator.upsertIngressForCesService(ctx, cesService, &service, false)
 		require.NoError(t, err)
 
 		//then

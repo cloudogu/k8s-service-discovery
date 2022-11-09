@@ -81,79 +81,130 @@ func NewIngressUpdater(client client.Client, namespace string, ingressClassName 
 	}, nil
 }
 
-// UpdateIngressOfService creates or updates the ingress object of the given service.
-func (i *ingressUpdater) UpdateIngressOfService(ctx context.Context, service *corev1.Service, isMaintenanceMode bool) error {
-	logger := log.FromContext(ctx)
-
-	if len(service.Spec.Ports) <= 0 {
-		logger.Info(fmt.Sprintf("service [%s] has no ports -> skipping ingress creation", service.Name))
-		return nil
-	}
-
-	cesServicesAnnotation, ok := service.Annotations[CesServiceAnnotation]
-	if !ok {
-		logger.Info(fmt.Sprintf("found no [%s] annotation for [%s] -> creating no ingress resource", CesServiceAnnotation, service.Name))
-		return nil
-	}
-
-	var cesServices []CesService
-	err := json.Unmarshal([]byte(cesServicesAnnotation), &cesServices)
+// UpsertIngressForService creates or updates the ingress object of the given service.
+func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service, isMaintenanceMode bool) error {
+	cesServices, ok, err := i.getCesServices(service)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal ces services: %w", err)
+		return fmt.Errorf("failed to get ces services: %w", err)
+	}
+
+	if !ok {
+		log.FromContext(ctx).Info(fmt.Sprintf("service [%s] has no ports or ces services -> skipping ingress creation", service.Name))
+		return nil
 	}
 
 	for _, cesService := range cesServices {
-		err := i.updateServiceIngressObject(ctx, cesService, service, isMaintenanceMode)
+		err := i.upsertIngressForCesService(ctx, cesService, service, isMaintenanceMode)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create ingress object for ces service [%+v]: %w", cesService, err)
 		}
 	}
 
 	return nil
 }
 
-// updateServiceIngressObject upserts a new ingress resource based on the given ces service.
-func (i *ingressUpdater) updateServiceIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
-	isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
-	if err != nil {
-		return err
+func (i *ingressUpdater) getCesServices(service *corev1.Service) ([]CesService, bool, error) {
+	if len(service.Spec.Ports) <= 0 {
+		return []CesService{}, false, nil
 	}
 
-	err = i.updateIngressObject(ctx, cesService, service, isMaintenanceMode)
+	cesServicesAnnotation, ok := service.Annotations[CesServiceAnnotation]
+	if !ok {
+		return []CesService{}, false, nil
+	}
+
+	var cesServices []CesService
+	err := json.Unmarshal([]byte(cesServicesAnnotation), &cesServices)
+	if err != nil {
+		return []CesService{}, false, fmt.Errorf("failed to unmarshal ces services: %w", err)
+	}
+
+	return cesServices, true, nil
+}
+
+func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
+	if isMaintenanceMode {
+		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service)
+	}
+
+	isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
 	if err != nil {
 		return err
 	}
 
 	if !isReady {
-		go func() {
-			waitOptions := dogustart.WaitOptions{
-				Timeout:  waitForDeploymentTimeout,
-				TickRate: waitForDeploymentTickRate,
-			}
-			err := i.deploymentReadyReactor.WaitForReady(ctx, service.GetName(), waitOptions, func(ctx context.Context) {
-				log.FromContext(ctx).Info(fmt.Sprintf("dogu [%s] is ready now -> update ingress object", service.GetName()))
-				err = i.updateIngressObject(ctx, cesService, service, isMaintenanceMode)
-				if err != nil {
-					log.FromContext(ctx).Error(err, fmt.Sprintf("failed to update [%s] ingress object", service.GetName()))
-				}
-			})
-			if err != nil {
-				log.FromContext(ctx).Error(fmt.Errorf("failed to wait for the readiness of the [%s] deployment: %w", service.GetName(), err), "failed to update ingress object")
-			}
-		}()
+		return i.upsertDoguIsStartingIngressObject(ctx, cesService, service)
+	}
+
+	return i.upsertDoguIngressObject(ctx, cesService, service)
+}
+
+func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
+	log.FromContext(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
+	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
+
+	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
+	if err != nil {
+		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
 
 	return nil
 }
 
-func (i *ingressUpdater) updateIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
-	logger := log.FromContext(ctx)
+func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
+	log.FromContext(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
+	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentDoguIsStartingRewrite}
 
-	isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
+	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
 
+	go func() {
+		waitOptions := dogustart.WaitOptions{
+			Timeout:  waitForDeploymentTimeout,
+			TickRate: waitForDeploymentTickRate,
+		}
+
+		err := i.deploymentReadyReactor.WaitForReady(ctx, service.GetName(), waitOptions, func(ctx context.Context) {
+			log.FromContext(ctx).Info(fmt.Sprintf("dogu [%s] is ready now -> update ingress object", service.GetName()))
+			err = i.upsertDoguIngressObject(ctx, cesService, service)
+			if err != nil {
+				log.FromContext(ctx).Error(err, fmt.Sprintf("failed to update [%s] ingress object", service.GetName()))
+			}
+		})
+		if err != nil {
+			log.FromContext(ctx).Error(fmt.Errorf("failed to wait for the readiness of the [%s] deployment: %w", service.GetName(), err), "failed to update ingress object")
+		}
+	}()
+
+	return nil
+}
+
+func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
+	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
+	annotations := map[string]string{}
+
+	if cesService.Pass != cesService.Location {
+		annotations[ingressRewriteTargetAnnotation] = cesService.Pass
+	}
+
+	err := i.upsertIngressObject(ctx, service, cesService, service.GetName(), int32(cesService.Port), annotations)
+	if err != nil {
+		return fmt.Errorf("failed to update ingress object: %w", err)
+	}
+
+	return nil
+}
+
+func (i *ingressUpdater) upsertIngressObject(
+	ctx context.Context,
+	service *corev1.Service,
+	cesService CesService,
+	endpointName string,
+	endpointPort int32,
+	annotations map[string]string,
+) error {
 	pathType := networking.PathTypePrefix
 	ingress := &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
@@ -163,29 +214,8 @@ func (i *ingressUpdater) updateIngressObject(ctx context.Context, cesService Ces
 		},
 	}
 
-	_, err = ctrl.CreateOrUpdate(ctx, i.client, ingress, func() error {
-		ingress.Annotations = map[string]string{}
-
-		serviceName := service.GetName()
-		servicePort := int32(cesService.Port)
-
-		if cesService.Pass != cesService.Location {
-			ingress.Annotations[ingressRewriteTargetAnnotation] = cesService.Pass
-		}
-
-		if isMaintenanceMode && serviceName != staticContentBackendName {
-			logger.Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
-			serviceName = staticContentBackendName
-			servicePort = staticContentBackendPort
-			ingress.Annotations[ingressRewriteTargetAnnotation] = staticContentBackendRewrite
-		} else if !isMaintenanceMode && !isReady && serviceName != staticContentBackendName {
-			logger.Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
-			serviceName = staticContentBackendName
-			servicePort = staticContentBackendPort
-			ingress.Annotations[ingressRewriteTargetAnnotation] = staticContentDoguIsStartingRewrite
-		} else {
-			logger.Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
-		}
+	_, err := ctrl.CreateOrUpdate(ctx, i.client, ingress, func() error {
+		ingress.Annotations = annotations
 
 		ingress.Spec = networking.IngressSpec{
 			IngressClassName: &i.ingressClassName,
@@ -196,9 +226,9 @@ func (i *ingressUpdater) updateIngressObject(ctx context.Context, cesService Ces
 							PathType: &pathType,
 							Backend: networking.IngressBackend{
 								Service: &networking.IngressServiceBackend{
-									Name: serviceName,
+									Name: endpointName,
 									Port: networking.ServiceBackendPort{
-										Number: servicePort,
+										Number: endpointPort,
 									},
 								}}}}}}}}}
 

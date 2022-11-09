@@ -43,7 +43,7 @@ func NewServiceReconciler(client client.Client, namespace string, updater Ingres
 // IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
 type IngressUpdater interface {
 	// UpdateIngressOfService creates or updates the ingress object of the given service.
-	UpdateIngressOfService(ctx context.Context, service *corev1.Service, isMaintenanceMode bool) error
+	UpsertIngressForService(ctx context.Context, service *corev1.Service, isMaintenanceMode bool) error
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -66,7 +66,7 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	err = r.updater.UpdateIngressOfService(ctx, service, maintanaceMode)
+	err = r.updater.UpsertIngressForService(ctx, service, maintanaceMode)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %s", service.Name, err)
 	}

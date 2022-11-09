@@ -141,7 +141,7 @@ func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 
 	for _, service := range serviceList.Items {
 		log.FromContext(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpdateIngressOfService(ctx, &service, false)
+		err := scu.ingressUpdater.UpsertIngressForService(ctx, &service, false)
 		if err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 
 	for _, service := range serviceList.Items {
 		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpdateIngressOfService(ctx, &service, true)
+		err := scu.ingressUpdater.UpsertIngressForService(ctx, &service, true)
 		if err != nil {
 			return err
 		}

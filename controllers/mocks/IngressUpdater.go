@@ -16,7 +16,7 @@ type IngressUpdater struct {
 }
 
 // UpdateIngressOfService provides a mock function with given fields: ctx, service, isMaintenanceMode
-func (_m *IngressUpdater) UpdateIngressOfService(ctx context.Context, service *v1.Service, isMaintenanceMode bool) error {
+func (_m *IngressUpdater) UpsertIngressForService(ctx context.Context, service *v1.Service, isMaintenanceMode bool) error {
 	ret := _m.Called(ctx, service, isMaintenanceMode)
 
 	var r0 error
