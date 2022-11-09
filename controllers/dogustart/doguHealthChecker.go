@@ -5,13 +5,18 @@ import (
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
 )
 
 type deploymentReadyChecker struct {
 	namespace string
 	client    kubernetes.Interface
+}
+
+// WaitOptions defines the timeout and tickrate for waiting functions.
+type WaitOptions struct {
+	Timeout  time.Duration
+	TickRate time.Duration
 }
 
 // NewDeploymentReadyChecker creates a new instance of a health checker capable of checking whether a deployment has a currently ready pod.
@@ -29,18 +34,15 @@ func (d *deploymentReadyChecker) IsReady(ctx context.Context, deploymentName str
 		return false, err
 	}
 
-	log.FromContext(ctx).Info(fmt.Sprintf("Found deployment for jekins with values: [%+v]", deployment))
 	return deployment.Status.ReadyReplicas > 0, nil
 }
 
 // WaitForReady allows the execution of code when the deployment switches from the not ready state into the ready state.
-func (d *deploymentReadyChecker) WaitForReady(ctx context.Context, deploymentName string, onReady func(ctx context.Context)) error {
+func (d *deploymentReadyChecker) WaitForReady(ctx context.Context, deploymentName string, waitOptions WaitOptions, onReady func(ctx context.Context)) error {
 	ok, err := d.IsReady(ctx, deploymentName)
 	if err != nil {
 		return err
 	}
-
-	log.FromContext(ctx).Info(fmt.Sprintf("is ready? %t", ok))
 
 	if ok {
 		// pod is already ready
@@ -55,8 +57,12 @@ func (d *deploymentReadyChecker) WaitForReady(ctx context.Context, deploymentNam
 		return err
 	}
 
+	closeTimeout := time.After(waitOptions.Timeout)
 	for {
 		select {
+		case <-closeTimeout:
+			watch.Stop()
+			return fmt.Errorf("failed to wait for deployment readiness: timeout after [%s] while waiting of pod being ready", waitOptions.Timeout.String())
 		case <-ctx.Done():
 			watch.Stop()
 			return nil
@@ -72,7 +78,7 @@ func (d *deploymentReadyChecker) WaitForReady(ctx context.Context, deploymentNam
 				return nil
 			}
 		default:
-			time.Sleep(3 * time.Second)
+			time.Sleep(waitOptions.TickRate)
 		}
 	}
 }

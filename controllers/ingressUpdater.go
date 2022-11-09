@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 )
 
 const (
@@ -21,6 +22,9 @@ const (
 	staticContentDoguIsStartingRewrite = "/errors/starting.html"
 	ingressRewriteTargetAnnotation     = "nginx.ingress.kubernetes.io/rewrite-target"
 )
+
+const waitForDeploymentTimeout = time.Minute * 30
+const waitForDeploymentTickRate = time.Second
 
 // CesService contains information about one exposed ces service.
 type CesService struct {
@@ -49,9 +53,10 @@ type DeploymentReadyChecker interface {
 	// IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
 }
+
 type DeploymentReadyReactor interface {
 	// WaitForReady allows the execution of code when the deployment switches from the not ready state into the ready state.
-	WaitForReady(ctx context.Context, deploymentName string, onReady func(ctx context.Context)) error
+	WaitForReady(ctx context.Context, deploymentName string, waitOptions dogustart.WaitOptions, onReady func(ctx context.Context)) error
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
@@ -121,7 +126,11 @@ func (i *ingressUpdater) updateServiceIngressObject(ctx context.Context, cesServ
 
 	if !isReady {
 		go func() {
-			err := i.deploymentReadyReactor.WaitForReady(ctx, service.GetName(), func(ctx context.Context) {
+			waitOptions := dogustart.WaitOptions{
+				Timeout:  waitForDeploymentTimeout,
+				TickRate: waitForDeploymentTickRate,
+			}
+			err := i.deploymentReadyReactor.WaitForReady(ctx, service.GetName(), waitOptions, func(ctx context.Context) {
 				log.FromContext(ctx).Info(fmt.Sprintf("dogu [%s] is ready now -> update ingress object", service.GetName()))
 				err = i.updateIngressObject(ctx, cesService, service, isMaintenanceMode)
 				if err != nil {
@@ -129,7 +138,7 @@ func (i *ingressUpdater) updateServiceIngressObject(ctx context.Context, cesServ
 				}
 			})
 			if err != nil {
-				log.FromContext(ctx).Error(err, fmt.Sprintf("failed to execute ingress object watcher -> cannot update the state of the [%s] dogu ingress object", service.GetName()))
+				log.FromContext(ctx).Error(fmt.Errorf("failed to wait for the readiness of the [%s] deployment: %w", service.GetName(), err), "failed to update ingress object")
 			}
 		}()
 	}
