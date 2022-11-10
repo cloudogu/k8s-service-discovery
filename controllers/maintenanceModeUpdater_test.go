@@ -132,7 +132,7 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		ingressUpdater := &mocks.IngressUpdater{}
-		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything, true).Return(assert.AnError)
+		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
@@ -164,7 +164,7 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		ingressUpdater := &mocks.IngressUpdater{}
-		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything, false).Return(assert.AnError)
+		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}

@@ -89,15 +89,21 @@ var _ = BeforeSuite(func() {
 	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
 	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myNamespace, myIngressClassName)
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName)
 	Expect(err).ToNot(HaveOccurred())
 
-	reconciler := &serviceReconciler{
-		client:   k8sManager.GetClient(),
-		registry: myRegistry,
-		updater:  ingressCreator,
+	serviceReconciler := &serviceReconciler{
+		client:  k8sManager.GetClient(),
+		updater: ingressCreator,
 	}
-	err = reconciler.SetupWithManager(k8sManager)
+	err = serviceReconciler.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	deploymentReconciler := &deploymentReconciler{
+		client:  k8sManager.GetClient(),
+		updater: ingressCreator,
+	}
+	err = deploymentReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	// create initial ingress class

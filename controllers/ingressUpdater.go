@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
@@ -41,12 +42,14 @@ type CesService struct {
 type ingressUpdater struct {
 	// client used to communicate with k8s.
 	client client.Client
+	// registry is used to read from the etcd.
+	registry registry.Registry
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
-	ingressClassName       string
+	ingressClassName string
+	// deploymentReadyChecker checks whether dogu are ready (healthy).
 	deploymentReadyChecker DeploymentReadyChecker
-	deploymentReadyReactor DeploymentReadyReactor
 }
 
 type DeploymentReadyChecker interface {
@@ -54,13 +57,8 @@ type DeploymentReadyChecker interface {
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
 }
 
-type DeploymentReadyReactor interface {
-	// WaitForReady allows the execution of code when the deployment switches from the not ready state into the ready state.
-	WaitForReady(ctx context.Context, deploymentName string, waitOptions dogustart.WaitOptions, onReady func(ctx context.Context)) error
-}
-
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(client client.Client, namespace string, ingressClassName string) (*ingressUpdater, error) {
+func NewIngressUpdater(client client.Client, registry registry.Registry, namespace string, ingressClassName string) (*ingressUpdater, error) {
 	restConfig, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster config: %w", err)
@@ -74,15 +72,20 @@ func NewIngressUpdater(client client.Client, namespace string, ingressClassName 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
 	return &ingressUpdater{
 		client:                 client,
+		registry:               registry,
 		namespace:              namespace,
 		ingressClassName:       ingressClassName,
 		deploymentReadyChecker: deploymentReadyChecker,
-		deploymentReadyReactor: deploymentReadyChecker,
 	}, nil
 }
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
-func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service, isMaintenanceMode bool) error {
+func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
+	isMaintenanceMode, err := isMaintenanceModeActive(i.registry)
+	if err != nil {
+		return err
+	}
+
 	cesServices, ok, err := i.getCesServices(service)
 	if err != nil {
 		return fmt.Errorf("failed to get ces services: %w", err)
@@ -127,13 +130,15 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service)
 	}
 
-	isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
-	if err != nil {
-		return err
-	}
+	if hasDoguLabel(service) {
+		isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
+		if err != nil {
+			return err
+		}
 
-	if !isReady {
-		return i.upsertDoguIsStartingIngressObject(ctx, cesService, service)
+		if !isReady {
+			return i.upsertDoguIsStartingIngressObject(ctx, cesService, service)
+		}
 	}
 
 	return i.upsertDoguIngressObject(ctx, cesService, service)
@@ -159,24 +164,6 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
-
-	go func() {
-		waitOptions := dogustart.WaitOptions{
-			Timeout:  waitForDeploymentTimeout,
-			TickRate: waitForDeploymentTickRate,
-		}
-
-		err := i.deploymentReadyReactor.WaitForReady(ctx, service.GetName(), waitOptions, func(ctx context.Context) {
-			log.FromContext(ctx).Info(fmt.Sprintf("dogu [%s] is ready now -> update ingress object", service.GetName()))
-			err = i.upsertDoguIngressObject(ctx, cesService, service)
-			if err != nil {
-				log.FromContext(ctx).Error(err, fmt.Sprintf("failed to update [%s] ingress object", service.GetName()))
-			}
-		})
-		if err != nil {
-			log.FromContext(ctx).Error(fmt.Errorf("failed to wait for the readiness of the [%s] deployment: %w", service.GetName(), err), "failed to update ingress object")
-		}
-	}()
 
 	return nil
 }
@@ -243,4 +230,15 @@ func (i *ingressUpdater) upsertIngressObject(
 	}
 
 	return nil
+}
+
+func isMaintenanceModeActive(r registry.Registry) (bool, error) {
+	_, err := r.GlobalConfig().Get(maintenanceModeGlobalKey)
+	if registry.IsKeyNotFoundError(err) {
+		return false, nil
+	} else if err != nil {
+		return false, fmt.Errorf("failed to read the maintenance mode from the registry: %w", err)
+	}
+
+	return true, nil
 }
