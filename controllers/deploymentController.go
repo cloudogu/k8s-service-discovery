@@ -3,7 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	v12 "k8s.io/api/apps/v1"
+	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,12 +60,12 @@ func (r *deploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // SetupWithManager sets up the controller with the Manager.
 func (r *deploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v12.Deployment{}).
+		For(&v1.Deployment{}).
 		Complete(r)
 }
 
-func (r *deploymentReconciler) getDeployment(ctx context.Context, req ctrl.Request) (*v12.Deployment, error) {
-	deployment := &v12.Deployment{}
+func (r *deploymentReconciler) getDeployment(ctx context.Context, req ctrl.Request) (*v1.Deployment, error) {
+	deployment := &v1.Deployment{}
 	err := r.client.Get(ctx, req.NamespacedName, deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get deployment: %w", err)

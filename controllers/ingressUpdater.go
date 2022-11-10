@@ -13,7 +13,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 )
 
 const (
@@ -23,9 +22,6 @@ const (
 	staticContentDoguIsStartingRewrite = "/errors/starting.html"
 	ingressRewriteTargetAnnotation     = "nginx.ingress.kubernetes.io/rewrite-target"
 )
-
-const waitForDeploymentTimeout = time.Minute * 30
-const waitForDeploymentTickRate = time.Second
 
 // CesService contains information about one exposed ces service.
 type CesService struct {
@@ -52,6 +48,7 @@ type ingressUpdater struct {
 	deploymentReadyChecker DeploymentReadyChecker
 }
 
+// DeploymentReadyChecker checks the readiness from deployments.
 type DeploymentReadyChecker interface {
 	// IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
 	IsReady(ctx context.Context, deploymentName string) (bool, error)

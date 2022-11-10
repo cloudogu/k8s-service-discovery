@@ -8,7 +8,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
-	v12 "k8s.io/api/apps/v1"
+	"k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,7 +40,7 @@ var serviceWebApp = &corev1.Service{}
 var serviceAdditionalBytes []byte
 var serviceAdditional = &corev1.Service{}
 
-var serviceDeployment = &v12.Deployment{}
+var serviceDeployment = &v1.Deployment{}
 
 func resetData() {
 	err := yaml.Unmarshal(serviceNoAnnotationsBytes, serviceNoAnnotations)
@@ -58,13 +58,13 @@ func resetData() {
 		panic(err)
 	}
 
-	serviceDeployment = &v12.Deployment{
+	serviceDeployment = &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nexus",
 			Namespace: "my-test-namespace",
 			Labels:    map[string]string{"dogu": "nexus"},
 		},
-		Spec: v12.DeploymentSpec{
+		Spec: v1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"dogu": "nexus"},
 			},
@@ -79,7 +79,7 @@ func resetData() {
 				},
 			},
 		},
-		Status: v12.DeploymentStatus{
+		Status: v1.DeploymentStatus{
 			Replicas:      0,
 			ReadyReplicas: 0,
 		},
@@ -149,7 +149,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
 			Expect(err).NotTo(HaveOccurred())
 			deploymentWaiter := dogustart.NewDeploymentReadyChecker(client, "my-test-namespace")
-			waitOptions := dogustart.WaitOptions{Timeout: waitForDeploymentTimeout, TickRate: waitForDeploymentTickRate}
+			waitOptions := dogustart.WaitOptions{Timeout: time.Minute * 30, TickRate: time.Millisecond * 200}
 			err = deploymentWaiter.WaitForReady(ctx, "nexus", waitOptions, func(ctx context.Context) {})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -300,7 +300,7 @@ func cleanup() {
 	}, timeoutInterval, pollingInterval).Should(BeTrue())
 
 	By("Cleanup all deployments")
-	deploymentList := &v12.DeploymentList{}
+	deploymentList := &v1.DeploymentList{}
 	Eventually(func() bool {
 		err := k8sClient.List(ctx, deploymentList)
 		if err != nil {
