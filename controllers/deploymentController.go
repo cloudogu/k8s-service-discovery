@@ -76,7 +76,7 @@ func (r *deploymentReconciler) getDeployment(ctx context.Context, req ctrl.Reque
 
 func hasDoguLabel(deployment client.Object) bool {
 	for label := range deployment.GetLabels() {
-		if label == "dogu" {
+		if label == "dogu" || label == "dogu.name" {
 			return true
 		}
 	}

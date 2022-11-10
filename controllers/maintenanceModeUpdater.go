@@ -105,7 +105,7 @@ func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 
 func (scu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) error {
 	podList := &v1.PodList{}
-	staticNginxRequirement, _ := labels.NewRequirement("dogu", selection.Equals, []string{"nginx-static"})
+	staticNginxRequirement, _ := labels.NewRequirement("dogu.name", selection.Equals, []string{"nginx-static"})
 	err := scu.client.List(ctx, podList, &client.ListOptions{Namespace: scu.namespace, LabelSelector: labels.NewSelector().Add(*staticNginxRequirement)})
 	if err != nil {
 		return fmt.Errorf("failed to list [%s] pods: %w", "nginx-static", err)

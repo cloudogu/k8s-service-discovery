@@ -62,15 +62,15 @@ func resetData() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nexus",
 			Namespace: "my-test-namespace",
-			Labels:    map[string]string{"dogu": "nexus"},
+			Labels:    map[string]string{"dogu.name": "nexus"},
 		},
 		Spec: v1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"dogu": "nexus"},
+				MatchLabels: map[string]string{"dogu.name": "nexus"},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"dogu": "nexus"},
+					Labels: map[string]string{"dogu.name": "nexus"},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{

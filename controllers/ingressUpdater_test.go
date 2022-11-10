@@ -167,7 +167,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 				Annotations: map[string]string{
 					CesServiceAnnotation: string(cesServiceString),
 				},
-				Labels: map[string]string{"dogu": "test"},
+				Labels: map[string]string{"dogu.name": "test"},
 			},
 			Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{
 				{Name: "testPort", Port: 55},
@@ -205,7 +205,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 				Annotations: map[string]string{
 					CesServiceAnnotation: string(cesServiceString),
 				},
-				Labels: map[string]string{"dogu": "test"},
+				Labels: map[string]string{"dogu.name": "test"},
 			},
 			Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{
 				{Name: "testPort", Port: 55},
@@ -245,7 +245,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		}
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "test",
-				Labels: map[string]string{"dogu": "test"}},
+				Labels: map[string]string{"dogu.name": "test"}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass)
@@ -333,7 +333,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		}
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "test",
-				Labels: map[string]string{"dogu": "test"}},
+				Labels: map[string]string{"dogu.name": "test"}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass)
@@ -381,7 +381,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		}
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "test",
-				Labels: map[string]string{"dogu": "test"}},
+				Labels: map[string]string{"dogu.name": "test"}},
 		}
 		pathType := networking.PathTypePrefix
 		existingIngress := &networking.Ingress{
