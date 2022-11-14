@@ -3,6 +3,7 @@ package dogustart
 import (
 	"context"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"time"
@@ -30,7 +31,9 @@ func NewDeploymentReadyChecker(clientset kubernetes.Interface, namespace string)
 // IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
 func (d *deploymentReadyChecker) IsReady(ctx context.Context, deploymentName string) (bool, error) {
 	deployment, err := d.client.AppsV1().Deployments(d.namespace).Get(ctx, deploymentName, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
 		return false, err
 	}
 
