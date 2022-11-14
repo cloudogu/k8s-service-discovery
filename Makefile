@@ -62,6 +62,6 @@ generate-menu-json:
 create-temporary-release-resources: $(K8S_PRE_GENERATE_TARGETS)
 
 .PHONY: template-dev-only-image-pull-policy
-template-dev-only-image-pull-policy:
+template-dev-only-image-pull-policy: $(BINARY_YQ)
 	@echo "Setting pull policy to always!"
 	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)
