@@ -63,6 +63,13 @@ func Test_startManager(t *testing.T) {
 		return &rest.Config{}
 	}
 
+	// override default controller method to retrieve a kube config
+	oldGetConfig := ctrl.GetConfig
+	defer func() { ctrl.GetConfig = oldGetConfig }()
+	ctrl.GetConfig = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
+
 	// override default controller method to signal the setup handler
 	oldHandler := ctrl.SetupSignalHandler
 	defer func() { ctrl.SetupSignalHandler = oldHandler }()

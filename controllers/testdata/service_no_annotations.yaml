@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: nexus
   namespace: my-test-namespace
+  labels:
+    dogu: nexus
 spec:
   selector:
     app: example

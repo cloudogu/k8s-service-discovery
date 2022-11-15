@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
-	"github.com/coreos/etcd/client"
+	"go.etcd.io/etcd/client/v2"
 	"strings"
 
 	"github.com/pkg/errors"

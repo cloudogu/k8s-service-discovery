@@ -8,36 +8,20 @@ rules:
       - "*"
     resources:
       - ingresses
-      - services
-      - secrets
-      - pods
     verbs:
       - create
-      - delete
       - get
       - list
-      - patch
-      - update
       - watch
-  - apiGroups:
-      - ""
-    resources:
-      - services/finalizers
-    verbs:
+      - delete
       - update
   - apiGroups:
-      - ""
+      - "*"
     resources:
-      - services/status
+      - deployments
+      - secrets
+      - services
     verbs:
-      - get
-      - patch
-      - update
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - get
-      - create
       - list
+      - watch
+      - get
