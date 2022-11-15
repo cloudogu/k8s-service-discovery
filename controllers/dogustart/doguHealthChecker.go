@@ -14,9 +14,11 @@ type deploymentReadyChecker struct {
 	client    kubernetes.Interface
 }
 
-// WaitOptions defines the timeout and tickrate for waiting functions.
+// WaitOptions defines options for the waiting functions.
 type WaitOptions struct {
-	Timeout  time.Duration
+	// Timeout defines the interval of time needed to terminate the waiting.
+	Timeout time.Duration
+	// TickRate defines the interval at which the wait function periodically checks for new updates.
 	TickRate time.Duration
 }
 
@@ -48,7 +50,6 @@ func (d *deploymentReadyChecker) WaitForReady(ctx context.Context, deploymentNam
 	}
 
 	if ok {
-		// pod is already ready
 		onReady(ctx)
 		return nil
 	}

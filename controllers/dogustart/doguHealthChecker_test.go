@@ -31,17 +31,17 @@ func Test_deploymentPodChecker_IsReady(t *testing.T) {
 	deploymentNamespace := "myNamespace"
 	deploymentName := "myDeployment"
 
-	t.Run("Error when retrieving deployment with checker", func(t *testing.T) {
+	t.Run("false when no deployment is found in the cluster", func(t *testing.T) {
 		// given
 		client := fake2.NewSimpleClientset()
 		checker := NewDeploymentReadyChecker(client, deploymentNamespace)
 
 		// when
-		_, err := checker.IsReady(ctx, deploymentName)
+		ok, err := checker.IsReady(ctx, deploymentName)
 
 		// then
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "deployments.apps \"myDeployment\" not found")
+		require.NoError(t, err)
+		assert.False(t, ok)
 	})
 	t.Run("Not ready for zero ready replicas", func(t *testing.T) {
 		// given
@@ -100,19 +100,6 @@ func Test_deploymentReadyChecker_WaitForReady(t *testing.T) {
 		},
 	}
 
-	t.Run("Error when checking readiness", func(t *testing.T) {
-		// given
-		client := fake2.NewSimpleClientset()
-		checker := NewDeploymentReadyChecker(client, deploymentNamespace)
-		waitOptions := WaitOptions{Timeout: time.Second, TickRate: time.Second}
-
-		// when
-		err := checker.WaitForReady(ctx, deploymentName, waitOptions, func(ctx context.Context) {})
-
-		// then
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "deployments.apps \"myDeployment\" not found")
-	})
 	t.Run("Instantly terminate when deployment is already ready", func(t *testing.T) {
 		// given
 		deployment.Status.ReadyReplicas = 1
