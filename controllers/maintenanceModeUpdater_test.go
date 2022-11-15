@@ -18,7 +18,7 @@ import (
 func TestNewMaintenanceModeUpdater(t *testing.T) {
 	t.Run("failed to create registry", func(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, err := NewMaintenanceModeUpdater(clientMock, "%!%*Ä'%'!%'", &mocks.IngressUpdater{})
+		creator, err := NewMaintenanceModeUpdater(clientMock, "%!%*Ä'%'!%'", &mocks.IngressUpdater{}, mocks.NewEventRecorder(t))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create etcd client")
@@ -27,7 +27,7 @@ func TestNewMaintenanceModeUpdater(t *testing.T) {
 
 	t.Run("successfully create updater", func(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, err := NewMaintenanceModeUpdater(clientMock, "test", &mocks.IngressUpdater{})
+		creator, err := NewMaintenanceModeUpdater(clientMock, "test", &mocks.IngressUpdater{}, mocks.NewEventRecorder(t))
 
 		require.NoError(t, err)
 		require.NotNil(t, creator)

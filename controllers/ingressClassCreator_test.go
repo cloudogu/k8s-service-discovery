@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 	"testing"
 
 	networking "k8s.io/api/networking/v1"
@@ -13,7 +14,7 @@ import (
 
 func TestNewIngressClassCreator(t *testing.T) {
 	clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-	creator := NewIngressClassCreator(clientMock, "my-ingress-class")
+	creator := NewIngressClassCreator(clientMock, "my-ingress-class", mocks.NewEventRecorder(t))
 
 	require.NotNil(t, creator)
 }
@@ -24,7 +25,7 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		// given
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressClassCreator(clientMock, "my-ingress-class")
+		creator := NewIngressClassCreator(clientMock, "my-ingress-class", mocks.NewEventRecorder(t))
 
 		// when
 		err := creator.CreateIngressClass(context.Background())
@@ -47,7 +48,7 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 			},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(ingressClass).Build()
-		creator := NewIngressClassCreator(clientMock, "my-ingress-class")
+		creator := NewIngressClassCreator(clientMock, "my-ingress-class", mocks.NewEventRecorder(t))
 
 		// when
 		err := creator.CreateIngressClass(context.Background())

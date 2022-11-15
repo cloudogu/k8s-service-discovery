@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -25,10 +26,11 @@ type maintenanceModeUpdater struct {
 	namespace      string
 	registry       registry.Registry
 	ingressUpdater IngressUpdater
+	eventRecorder  record.EventRecorder
 }
 
 // NewMaintenanceModeUpdater creates a new maintenance mode updater.
-func NewMaintenanceModeUpdater(client client.Client, namespace string, ingressUpdater IngressUpdater) (*maintenanceModeUpdater, error) {
+func NewMaintenanceModeUpdater(client client.Client, namespace string, ingressUpdater IngressUpdater, recorder record.EventRecorder) (*maintenanceModeUpdater, error) {
 	endpoint := fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)
 	reg, err := registry.New(core.Registry{
 		Type:      "etcd",
@@ -43,6 +45,7 @@ func NewMaintenanceModeUpdater(client client.Client, namespace string, ingressUp
 		namespace:      namespace,
 		registry:       reg,
 		ingressUpdater: ingressUpdater,
+		eventRecorder:  recorder,
 	}, nil
 }
 
@@ -99,6 +102,8 @@ func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 	if err != nil {
 		return err
 	}
+
+	// TODO Event New Maintenance-Mode-Change
 
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
+	"k8s.io/client-go/tools/record"
 	"os"
 
 	"github.com/cloudogu/cesapp-lib/core"
@@ -18,7 +19,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 const (
@@ -39,7 +40,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	if err := logging.ConfigureLogger(); err != nil {
 		setupLog.Error(err, "unable configure logger")
@@ -67,7 +68,9 @@ func startManager() error {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
 
-	if err = handleIngressClassCreation(k8sManager); err != nil {
+	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery")
+
+	if err = handleIngressClassCreation(k8sManager, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
@@ -76,24 +79,24 @@ func startManager() error {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
 
-	if err = handleWarpMenuCreation(k8sManager, reg, options.Namespace); err != nil {
+	if err = handleWarpMenuCreation(k8sManager, reg, options.Namespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err = handleSslUpdates(k8sManager, options.Namespace); err != nil {
+	if err = handleSslUpdates(k8sManager, options.Namespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg, options.Namespace, IngressClassName)
+	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg, options.Namespace, IngressClassName, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new ingress updater: %w", err)
 	}
 
-	if err = handleMaintenanceMode(k8sManager, options.Namespace, ingressUpdater); err != nil {
+	if err = handleMaintenanceMode(k8sManager, options.Namespace, ingressUpdater, eventRecorder); err != nil {
 		return err
 	}
 
-	if err = configureManager(k8sManager, options.Namespace, ingressUpdater); err != nil {
+	if err = configureManager(k8sManager, ingressUpdater); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
@@ -113,13 +116,13 @@ func createEtcdRegistry(namespace string) (registry.Registry, error) {
 	return r, err
 }
 
-func configureManager(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater) error {
+func configureManager(k8sManager manager.Manager, updater controllers.IngressUpdater) error {
 	if err := configureReconciler(k8sManager, updater); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
 	// This kubebuilder marking inserts boilerplate code required for the manager. Do not remove it!
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := addChecks(k8sManager); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
@@ -165,8 +168,8 @@ func startK8sManager(k8sManager manager.Manager) error {
 	return nil
 }
 
-func handleIngressClassCreation(k8sManager manager.Manager) error {
-	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName)
+func handleIngressClassCreation(k8sManager manager.Manager, recorder record.EventRecorder) error {
+	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName, recorder)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
 		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)
@@ -175,8 +178,8 @@ func handleIngressClassCreation(k8sManager manager.Manager) error {
 	return nil
 }
 
-func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Registry, namespace string) error {
-	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), registry, namespace)
+func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Registry, namespace string, recorder record.EventRecorder) error {
+	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), registry, namespace, recorder)
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
 		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
@@ -185,8 +188,8 @@ func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Regist
 	return nil
 }
 
-func handleSslUpdates(k8sManager manager.Manager, namespace string) error {
-	sslUpdater, err := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace)
+func handleSslUpdates(k8sManager manager.Manager, namespace string, recorder record.EventRecorder) error {
+	sslUpdater, err := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace, recorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new ssl certificate updater: %w", err)
 	}
@@ -198,8 +201,8 @@ func handleSslUpdates(k8sManager manager.Manager, namespace string) error {
 	return nil
 }
 
-func handleMaintenanceMode(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater) error {
-	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater)
+func handleMaintenanceMode(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater, recorder record.EventRecorder) error {
+	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater, recorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new maintenance updater: %w", err)
 	}

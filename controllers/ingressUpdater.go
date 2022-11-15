@@ -10,6 +10,7 @@ import (
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -46,6 +47,7 @@ type ingressUpdater struct {
 	ingressClassName string
 	// deploymentReadyChecker checks whether dogu are ready (healthy).
 	deploymentReadyChecker DeploymentReadyChecker
+	eventRecorder          record.EventRecorder
 }
 
 // DeploymentReadyChecker checks the readiness from deployments.
@@ -55,7 +57,7 @@ type DeploymentReadyChecker interface {
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(client client.Client, registry registry.Registry, namespace string, ingressClassName string) (*ingressUpdater, error) {
+func NewIngressUpdater(client client.Client, registry registry.Registry, namespace string, ingressClassName string, recorder record.EventRecorder) (*ingressUpdater, error) {
 	restConfig, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster config: %w", err)
@@ -73,6 +75,7 @@ func NewIngressUpdater(client client.Client, registry registry.Registry, namespa
 		namespace:              namespace,
 		ingressClassName:       ingressClassName,
 		deploymentReadyChecker: deploymentReadyChecker,
+		eventRecorder:          recorder,
 	}, nil
 }
 
@@ -177,6 +180,8 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
+
+	// TODO Event New regular Ingress-Object
 
 	return nil
 }

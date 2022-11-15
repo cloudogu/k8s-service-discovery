@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/record"
 	"strings"
 
 	"github.com/cloudogu/cesapp-lib/core"
@@ -25,13 +26,14 @@ const (
 
 // sslCertificateUpdater is responsible to update the ssl certificate of the ecosystem.
 type sslCertificateUpdater struct {
-	client    client.Client
-	namespace string
-	registry  registry.Registry
+	client        client.Client
+	namespace     string
+	registry      registry.Registry
+	eventRecorder record.EventRecorder
 }
 
 // NewSslCertificateUpdater creates a new updater.
-func NewSslCertificateUpdater(client client.Client, namespace string) (*sslCertificateUpdater, error) {
+func NewSslCertificateUpdater(client client.Client, namespace string, recorder record.EventRecorder) (*sslCertificateUpdater, error) {
 	endpoint := fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)
 	reg, err := registry.New(core.Registry{
 		Type:      "etcd",
@@ -42,9 +44,10 @@ func NewSslCertificateUpdater(client client.Client, namespace string) (*sslCerti
 	}
 
 	return &sslCertificateUpdater{
-		client:    client,
-		namespace: namespace,
-		registry:  reg,
+		client:        client,
+		namespace:     namespace,
+		registry:      reg,
+		eventRecorder: recorder,
 	}, nil
 }
 
@@ -110,6 +113,8 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create ssl secret: %w", err)
 	}
+
+	// TODO Event SSL-Cert changed
 
 	return nil
 }

@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -16,15 +17,17 @@ import (
 
 // ingressClassCreator is responsible to create a cluster wide ingress class in the cluster.
 type ingressClassCreator struct {
-	client    client.Client
-	className string
+	client        client.Client
+	className     string
+	eventRecorder record.EventRecorder
 }
 
 // NewIngressClassCreator creates a new ingress class creator.
-func NewIngressClassCreator(client client.Client, className string) *ingressClassCreator {
+func NewIngressClassCreator(client client.Client, className string, recorder record.EventRecorder) *ingressClassCreator {
 	return &ingressClassCreator{
-		client:    client,
-		className: className,
+		client:        client,
+		className:     className,
+		eventRecorder: recorder,
 	}
 }
 
@@ -36,6 +39,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 		return fmt.Errorf("failed to check if ingress class [%s] exists: %w", icc.className, err)
 	}
 	if ok {
+		// TODO Event Ingress Class already exists
 		log.FromContext(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
 		return nil
 	}
@@ -54,6 +58,8 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot create ingress class [%s] with clientset: %w", icc.className, err)
 	}
+
+	// TODO Event Ingress Class created
 
 	return nil
 }
