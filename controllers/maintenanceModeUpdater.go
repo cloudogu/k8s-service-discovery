@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
-	coreosclient "github.com/coreos/etcd/client"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -55,7 +55,7 @@ func (scu maintenanceModeUpdater) Start(ctx context.Context) error {
 func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg registry.WatchConfigurationContext) error {
 	log.FromContext(ctx).Info("Start etcd watcher on maintenance key")
 
-	warpChannel := make(chan *coreosclient.Response)
+	warpChannel := make(chan *etcdclient.Response)
 	go func() {
 		log.FromContext(ctx).Info("Start etcd watcher for maintenance key")
 		reg.Watch(ctx, maintenanceModeWatchKey, true, warpChannel)
@@ -105,7 +105,7 @@ func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 
 func (scu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) error {
 	podList := &v1.PodList{}
-	staticNginxRequirement, _ := labels.NewRequirement("dogu", selection.Equals, []string{"nginx-static"})
+	staticNginxRequirement, _ := labels.NewRequirement("dogu.name", selection.Equals, []string{"nginx-static"})
 	err := scu.client.List(ctx, podList, &client.ListOptions{Namespace: scu.namespace, LabelSelector: labels.NewSelector().Add(*staticNginxRequirement)})
 	if err != nil {
 		return fmt.Errorf("failed to list [%s] pods: %w", "nginx-static", err)
@@ -141,7 +141,7 @@ func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 
 	for _, service := range serviceList.Items {
 		log.FromContext(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpdateIngressOfService(ctx, &service, false)
+		err := scu.ingressUpdater.UpsertIngressForService(ctx, &service)
 		if err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 
 	for _, service := range serviceList.Items {
 		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpdateIngressOfService(ctx, &service, true)
+		err := scu.ingressUpdater.UpsertIngressForService(ctx, &service)
 		if err != nil {
 			return err
 		}

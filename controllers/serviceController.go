@@ -3,13 +3,12 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/core"
-	"github.com/cloudogu/cesapp-lib/registry"
-
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // CesServiceAnnotation can be appended to service with information of ces services.
@@ -17,33 +16,22 @@ const CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
 
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
-	updater  IngressUpdater
-	client   client.Client
-	registry registry.Registry
+	updater IngressUpdater
+	client  client.Client
 }
 
 // NewServiceReconciler creates a new service reconciler.
-func NewServiceReconciler(client client.Client, namespace string, updater IngressUpdater) (*serviceReconciler, error) {
-	endpoint := fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)
-	reg, err := registry.New(core.Registry{
-		Type:      "etcd",
-		Endpoints: []string{endpoint},
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func NewServiceReconciler(client client.Client, updater IngressUpdater) *serviceReconciler {
 	return &serviceReconciler{
-		client:   client,
-		updater:  updater,
-		registry: reg,
-	}, nil
+		client:  client,
+		updater: updater,
+	}
 }
 
 // IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
 type IngressUpdater interface {
-	// UpdateIngressOfService creates or updates the ingress object of the given service.
-	UpdateIngressOfService(ctx context.Context, service *corev1.Service, isMaintenanceMode bool) error
+	// UpsertIngressForService creates or updates the ingress object of the given service.
+	UpsertIngressForService(ctx context.Context, service *corev1.Service) error
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -61,12 +49,7 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logger.Info(fmt.Sprintf("Found service [%s]", service.Name))
 
-	maintanaceMode, err := isMaintenanceModeActive(r.registry)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	err = r.updater.UpdateIngressOfService(ctx, service, maintanaceMode)
+	err = r.updater.UpsertIngressForService(ctx, service)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %s", service.Name, err)
 	}
@@ -77,8 +60,13 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *serviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&corev1.Service{}).
+		WithEventFilter(predicate.Funcs{
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				// We don't need to listen to delete events
+				return false
+			},
+		}).
 		Complete(r)
 }
 
@@ -90,15 +78,4 @@ func (r *serviceReconciler) getService(ctx context.Context, req ctrl.Request) (*
 	}
 
 	return service, nil
-}
-
-func isMaintenanceModeActive(r registry.Registry) (bool, error) {
-	_, err := r.GlobalConfig().Get(maintenanceModeGlobalKey)
-	if registry.IsKeyNotFoundError(err) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("failed to read the maintenance mode from the registry: %w", err)
-	}
-
-	return true, nil
 }

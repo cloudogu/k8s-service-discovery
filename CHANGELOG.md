@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.0] - 2022-11-15
+### Added
+- [#12] All dogus that are not ready are created with a "Dogu is starting"-page ingress object. The ingress object is 
+  automatically updated after the dogu becomes ready.
+
 ## [v0.5.0] - 2022-08-30
 ### Added
 - [#10] Support for maintenance mode. See [maintenance mode](docs/operations/maintenance_mode_en.md) for more details.

@@ -9,7 +9,7 @@ import (
 	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
-	coreosclient "github.com/coreos/etcd/client"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,7 +55,7 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.
 
 // Run creates the warp menu and update the menu whenever a relevant etcd key was changed
 func (w *Watcher) Run(ctx context.Context) {
-	warpChannel := make(chan *coreosclient.Response)
+	warpChannel := make(chan *etcdclient.Response)
 
 	for _, source := range w.configuration.Sources {
 		go func(source config.Source) {

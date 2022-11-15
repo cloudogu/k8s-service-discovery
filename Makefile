@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.5.0
+VERSION=0.6.0
 
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
@@ -28,7 +28,7 @@ include build/make/digital-signature.mk
 
 K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
 PRE_COMPILE=generate
-K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config generate-menu-json
+K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config generate-menu-json template-dev-only-image-pull-policy
 
 include build/make/k8s-controller.mk
 
@@ -61,4 +61,7 @@ generate-menu-json:
 
 create-temporary-release-resources: $(K8S_PRE_GENERATE_TARGETS)
 
-
+.PHONY: template-dev-only-image-pull-policy
+template-dev-only-image-pull-policy: $(BINARY_YQ)
+	@echo "Setting pull policy to always!"
+	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)

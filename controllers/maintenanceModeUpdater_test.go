@@ -4,11 +4,10 @@ import (
 	"context"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
-	coreosclient "github.com/coreos/etcd/client"
-	etcdclient "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -43,10 +42,10 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		watchContextMock := &cesmocks.WatchConfigurationContext{}
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *coreosclient.Response)
+			sendChannel, ok := channelobject.(chan *etcdclient.Response)
 
 			if ok {
-				testResponse := &coreosclient.Response{}
+				testResponse := &etcdclient.Response{}
 				sendChannel <- testResponse
 			}
 		}).Return()
@@ -87,10 +86,10 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		watchContextMock := &cesmocks.WatchConfigurationContext{}
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *coreosclient.Response)
+			sendChannel, ok := channelobject.(chan *etcdclient.Response)
 
 			if ok {
-				testResponse := &coreosclient.Response{}
+				testResponse := &etcdclient.Response{}
 				sendChannel <- testResponse
 			}
 		}).Return()
@@ -133,7 +132,7 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		ingressUpdater := &mocks.IngressUpdater{}
-		ingressUpdater.On("UpdateIngressOfService", mock.Anything, mock.Anything, true).Return(assert.AnError)
+		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
@@ -165,7 +164,7 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		ingressUpdater := &mocks.IngressUpdater{}
-		ingressUpdater.On("UpdateIngressOfService", mock.Anything, mock.Anything, false).Return(assert.AnError)
+		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}

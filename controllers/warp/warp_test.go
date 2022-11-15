@@ -6,10 +6,10 @@ import (
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
-	coreosclient "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	corev1 "k8s.io/api/core/v1"
 	"os"
 	client2 "sigs.k8s.io/controller-runtime/pkg/client"
@@ -109,10 +109,10 @@ func TestWatcher_Run(t *testing.T) {
 		namespace := "test"
 		mockRegistry := &cesmocks.Registry{}
 		watchRegistry := &cesmocks.WatchConfigurationContext{}
-		watchEvent := &coreosclient.Response{}
+		watchEvent := &etcdclient.Response{}
 		mockRegistry.On("RootConfig").Return(watchRegistry)
 		watchRegistry.On("Watch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			warpChannel := args.Get(3).(chan *coreosclient.Response)
+			warpChannel := args.Get(3).(chan *etcdclient.Response)
 			warpChannel <- watchEvent
 		}).Times(3)
 

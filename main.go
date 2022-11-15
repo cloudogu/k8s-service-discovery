@@ -84,7 +84,10 @@ func startManager() error {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	ingressUpdater := controllers.NewIngressUpdater(k8sManager.GetClient(), options.Namespace, IngressClassName)
+	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg, options.Namespace, IngressClassName)
+	if err != nil {
+		return fmt.Errorf("failed to create new ingress updater: %w", err)
+	}
 
 	if err = handleMaintenanceMode(k8sManager, options.Namespace, ingressUpdater); err != nil {
 		return err
@@ -111,7 +114,7 @@ func createEtcdRegistry(namespace string) (registry.Registry, error) {
 }
 
 func configureManager(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater) error {
-	if err := configureReconciler(k8sManager, namespace, updater); err != nil {
+	if err := configureReconciler(k8sManager, updater); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
@@ -208,14 +211,15 @@ func handleMaintenanceMode(k8sManager manager.Manager, namespace string, updater
 	return nil
 }
 
-func configureReconciler(k8sManager manager.Manager, namespace string, ingressUpdater controllers.IngressUpdater) error {
-	reconciler, err := controllers.NewServiceReconciler(k8sManager.GetClient(), namespace, ingressUpdater)
-	if err != nil {
-		return fmt.Errorf("failed to create service reconciler: %w", err)
-	}
-
+func configureReconciler(k8sManager manager.Manager, ingressUpdater controllers.IngressUpdater) error {
+	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
+	}
+
+	deploymentReconciler := controllers.NewDeploymentReconciler(k8sManager.GetClient(), ingressUpdater)
+	if err := deploymentReconciler.SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("failed to setup deployment reconciler with the manager: %w", err)
 	}
 
 	return nil
