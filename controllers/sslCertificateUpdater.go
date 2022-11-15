@@ -24,6 +24,10 @@ const (
 	certificateSecretName  = "ecosystem-certificate"
 )
 
+const (
+	certificateChangeEventReason = "Certificate"
+)
+
 // sslCertificateUpdater is responsible to update the ssl certificate of the ecosystem.
 type sslCertificateUpdater struct {
 	client        client.Client
@@ -115,6 +119,7 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 	}
 
 	// TODO Event SSL-Cert changed
+	scu.eventRecorder.Event(nil, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
 
 	return nil
 }

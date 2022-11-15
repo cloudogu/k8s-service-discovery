@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	mocks2 "github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 	"testing"
 	"time"
 
@@ -43,12 +44,16 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Return()
 
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*50)
@@ -82,12 +87,16 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*2)
@@ -228,6 +237,9 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+
 		namespace := "myTestNamespace"
 		initialSslSecret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -242,9 +254,10 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(initialSslSecret).Build()
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		// when
@@ -271,12 +284,16 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		// when

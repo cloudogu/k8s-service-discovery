@@ -25,7 +25,9 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		// given
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewIngressClassCreator(clientMock, "my-ingress-class", mocks.NewEventRecorder(t))
+		recorderMock := mocks.NewEventRecorder(t)
+		recorderMock.On("Eventf", nil, "Normal", "Creation", "Ingress class [%s] created.", "my-ingress-class")
+		creator := NewIngressClassCreator(clientMock, "my-ingress-class", recorderMock)
 
 		// when
 		err := creator.CreateIngressClass(context.Background())
@@ -41,14 +43,17 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 		ingressClass := &networking.IngressClass{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "myIngressClass",
+				Name:      "my-ingress-class",
+				Namespace: "",
 			},
 			Spec: networking.IngressClassSpec{
 				Controller: "k8s.io/nginx-ingress",
 			},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(ingressClass).Build()
-		creator := NewIngressClassCreator(clientMock, "my-ingress-class", mocks.NewEventRecorder(t))
+		recorderMock := mocks.NewEventRecorder(t)
+		recorderMock.On("Eventf", nil, "Warning", "ErrCreation", "Ingress class [%s] already exists.", "my-ingress-class")
+		creator := NewIngressClassCreator(clientMock, "my-ingress-class", recorderMock)
 
 		// when
 		err := creator.CreateIngressClass(context.Background())

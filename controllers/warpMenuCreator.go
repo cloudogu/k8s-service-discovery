@@ -35,7 +35,7 @@ func (wmc warpMenuCreator) Start(ctx context.Context) error {
 // CreateWarpMenu reads the warp configuration and starts watchers to refresh the menu.json configmap
 // in background.
 func (wmc warpMenuCreator) CreateWarpMenu(ctx context.Context) error {
-	warpWatcher, err := warp.NewWatcher(ctx, wmc.client, wmc.registry, wmc.namespace)
+	warpWatcher, err := warp.NewWatcher(ctx, wmc.client, wmc.registry, wmc.namespace, wmc.eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to create warp menu watcher: %w", err)
 	}

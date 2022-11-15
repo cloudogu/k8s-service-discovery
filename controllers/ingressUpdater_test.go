@@ -212,7 +212,9 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, mocks.NewEventRecorder(t))
+		recorderMock := mocks.NewEventRecorder(t)
+		recorderMock.On("Eventf", nil, "Normal", "Ingress creation", "Ingress for service [%s] created.", "test")
+		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)
@@ -248,7 +250,10 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 				Labels: map[string]string{"dogu.name": "test"}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, mocks.NewEventRecorder(t))
+		recorderMock := mocks.NewEventRecorder(t)
+		recorderMock.On("Eventf", nil, "Normal", "Ingress creation", "Ingress for service [%s] created.", "test")
+
+		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)
@@ -408,7 +413,10 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 									}}}}}}}}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(existingIngress).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, mocks.NewEventRecorder(t))
+		recorderMock := mocks.NewEventRecorder(t)
+		recorderMock.On("Eventf", nil, "Normal", "Ingress creation", "Ingress for service [%s] created.", "test")
+
+		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)

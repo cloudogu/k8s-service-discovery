@@ -24,6 +24,10 @@ const (
 	ingressRewriteTargetAnnotation     = "nginx.ingress.kubernetes.io/rewrite-target"
 )
 
+const (
+	ingressCreationEventReason = "Ingress creation"
+)
+
 // CesService contains information about one exposed ces service.
 type CesService struct {
 	// Name of the ces service serving as identifier.
@@ -141,6 +145,13 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		}
 	}
 
+	err := i.upsertDoguIngressObject(ctx, cesService, service)
+	if err != nil {
+		return err
+	}
+	// TODO Event New regular Ingress-Object
+	i.eventRecorder.Eventf(nil, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] created.", cesService.Name)
+
 	return i.upsertDoguIngressObject(ctx, cesService, service)
 }
 
@@ -180,8 +191,6 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
-
-	// TODO Event New regular Ingress-Object
 
 	return nil
 }

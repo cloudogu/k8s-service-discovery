@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -13,6 +14,11 @@ import (
 	networking "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	ingressClassCreationEventReason        = "Creation"
+	errorOnIngressClassCreationEventReason = "ErrCreation"
 )
 
 // ingressClassCreator is responsible to create a cluster wide ingress class in the cluster.
@@ -40,6 +46,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	}
 	if ok {
 		// TODO Event Ingress Class already exists
+		icc.eventRecorder.Eventf(nil, corev1.EventTypeWarning, errorOnIngressClassCreationEventReason, "Ingress class [%s] already exists.", icc.className)
 		log.FromContext(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
 		return nil
 	}
@@ -60,6 +67,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	}
 
 	// TODO Event Ingress Class created
+	icc.eventRecorder.Eventf(nil, corev1.EventTypeNormal, ingressClassCreationEventReason, "Ingress class [%s] created.", icc.className)
 
 	return nil
 }

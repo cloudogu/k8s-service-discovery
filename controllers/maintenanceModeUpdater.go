@@ -20,6 +20,10 @@ const (
 	maintenanceModeGlobalKey = "maintenance"
 )
 
+const (
+	maintenanceChangeEventReason = "Maintenance"
+)
+
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
 	client         client.Client
@@ -104,6 +108,7 @@ func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 	}
 
 	// TODO Event New Maintenance-Mode-Change
+	scu.eventRecorder.Eventf(nil, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed from %t to %t.", isActive, !isActive)
 
 	return nil
 }

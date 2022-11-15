@@ -3,6 +3,7 @@ package warp
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -15,6 +16,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	warpMenuUpdateEventReason        = "UpdateWarpMenu"
+	errorOnWarpMenuUpdateEventReason = "ErrUpdateWarpMenu"
+)
+
 // Watcher is used to watch a registry and for every change he reads from the registry a specific config path,
 // build warp menu categories and writes them to a configmap.
 type Watcher struct {
@@ -23,6 +29,7 @@ type Watcher struct {
 	k8sClient       client.Client
 	ConfigReader    Reader
 	namespace       string
+	eventRecorder   record.EventRecorder
 }
 
 // Reader is used to fetch warp categories with a configuration
@@ -31,7 +38,7 @@ type Reader interface {
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.Registry, namespace string) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.Registry, namespace string, recorder record.EventRecorder) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)
@@ -50,6 +57,7 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.
 		k8sClient:       k8sClient,
 		namespace:       namespace,
 		ConfigReader:    reader,
+		eventRecorder:   recorder,
 	}, nil
 }
 
@@ -79,6 +87,8 @@ func (w *Watcher) Run(ctx context.Context) {
 func (w *Watcher) execute() {
 	categories, err := w.ConfigReader.Read(w.configuration)
 	if err != nil {
+		// TODO Event error on write
+		w.eventRecorder.Eventf(nil, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
 		ctrl.Log.Info("Error during Read:", err)
 		return
 	}
@@ -86,9 +96,12 @@ func (w *Watcher) execute() {
 	err = w.jsonWriter(categories)
 	if err != nil {
 		// TODO Event error on write
+		w.eventRecorder.Eventf(nil, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
 		ctrl.Log.Info(fmt.Sprintf("failed to write warp menu as json: %s", err.Error()))
+		return
 	}
 	// TODO Event new Warp-Menu
+	w.eventRecorder.Event(nil, corev1.EventTypeNormal, warpMenuUpdateEventReason, "Warp menu updated.")
 }
 
 func (w *Watcher) jsonWriter(data interface{}) error {

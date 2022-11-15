@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
+	mocks2 "github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +55,7 @@ func TestNewWatcher(t *testing.T) {
 		require.NoError(t, err)
 
 		// when
-		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace)
+		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, mocks2.NewEventRecorder(t))
 
 		// then
 		require.NoError(t, err)
@@ -74,7 +75,7 @@ func TestNewWatcher(t *testing.T) {
 		client := fake.NewClientBuilder().Build()
 
 		// when
-		_, err = NewWatcher(context.TODO(), client, nil, "test")
+		_, err = NewWatcher(context.TODO(), client, nil, "test", mocks2.NewEventRecorder(t))
 
 		// then
 		require.Error(t, err)
@@ -116,7 +117,11 @@ func TestWatcher_Run(t *testing.T) {
 			warpChannel <- watchEvent
 		}).Times(3)
 
-		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace)
+		// TODO Check this test
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", nil, "Normal", "UpdateWarpMenu", "Warp menu updated.")
+
+		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, recorderMock)
 		require.NoError(t, err)
 
 		// prepare result categories

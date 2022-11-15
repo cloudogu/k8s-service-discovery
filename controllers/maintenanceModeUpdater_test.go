@@ -56,6 +56,8 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
+		eventRecorderMock := mocks.NewEventRecorder(t)
+
 		ingressUpdater := &mocks.IngressUpdater{}
 
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
@@ -65,6 +67,7 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 			namespace:      namespace,
 			registry:       regMock,
 			ingressUpdater: ingressUpdater,
+			eventRecorder:  eventRecorderMock,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*100)
@@ -100,6 +103,9 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
+		eventRecorderMock := mocks.NewEventRecorder(t)
+		eventRecorderMock.On("Eventf", nil, "Normal", "Maintenance", "Maintenance mode changed from %t to %t.", true, false)
+
 		ingressUpdater := &mocks.IngressUpdater{}
 
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
@@ -109,6 +115,7 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 			namespace:      namespace,
 			registry:       regMock,
 			ingressUpdater: ingressUpdater,
+			eventRecorder:  eventRecorderMock,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*100)
