@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
+	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 	etcdclient "go.etcd.io/etcd/client/v2"
 	"path/filepath"
 	"testing"
@@ -25,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -76,7 +77,7 @@ var _ = BeforeSuite(func() {
 		return cfg
 	}
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:    scheme.Scheme,
 		Namespace: myNamespace,
@@ -88,8 +89,9 @@ var _ = BeforeSuite(func() {
 	keyNotFoundErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
 	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
 	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
+	recorderMock := &mocks.EventRecorder{}
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName)
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName, recorderMock)
 	Expect(err).ToNot(HaveOccurred())
 
 	serviceReconciler := &serviceReconciler{
@@ -107,23 +109,23 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	// create initial ingress class
-	ingressClassCreator := NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName)
+	ingressClassCreator := NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName, recorderMock)
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 
 	// create ssl updater class
-	sslUpdater, err := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace)
+	sslUpdater, err := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, recorderMock)
 	Expect(err).ToNot(HaveOccurred())
 	err = k8sManager.Add(sslUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
-	//// create warp menu creator
-	//warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace)
-	//err = k8sManager.Add(warpMenuCreator)
-	//Expect(err).ToNot(HaveOccurred())
+	// // create warp menu creator
+	// warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace)
+	// err = k8sManager.Add(warpMenuCreator)
+	// Expect(err).ToNot(HaveOccurred())
 
 	// create maintenance updater
-	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator)
+	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator, recorderMock)
 	Expect(err).ToNot(HaveOccurred())
 	err = k8sManager.Add(maintenanceUpdater)
 	Expect(err).ToNot(HaveOccurred())
