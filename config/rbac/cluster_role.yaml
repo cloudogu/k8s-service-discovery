@@ -6,7 +6,7 @@ metadata:
 rules:
   # We need to check whether the ingress class for the ingress objects exists. If not, we need to create it.
   - apiGroups:
-      - ""
+      - "*"
     resources:
       - ingressclasses
     verbs:
