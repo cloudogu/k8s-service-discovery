@@ -70,7 +70,7 @@ func startManager() error {
 
 	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery")
 
-	if err = handleIngressClassCreation(k8sManager, eventRecorder); err != nil {
+	if err = handleIngressClassCreation(k8sManager, options.Namespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
@@ -168,8 +168,8 @@ func startK8sManager(k8sManager manager.Manager) error {
 	return nil
 }
 
-func handleIngressClassCreation(k8sManager manager.Manager, recorder record.EventRecorder) error {
-	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName, recorder)
+func handleIngressClassCreation(k8sManager manager.Manager, namespace string, recorder record.EventRecorder) error {
+	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName, namespace, recorder)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
 		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)

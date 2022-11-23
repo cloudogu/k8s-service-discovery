@@ -3,7 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	mocks2 "github.com/cloudogu/k8s-service-discovery/controllers/mocks"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"testing"
 	"time"
 
@@ -29,6 +32,11 @@ import (
 func getScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group:   "k8s.cloudogu.com",
+		Version: "v1",
+		Kind:    "Dogu",
+	}, &doguv1.Dogu{})
 	return scheme
 }
 
@@ -45,10 +53,11 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Return()
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		sslUpdater := &sslCertificateUpdater{
 			client:        clientMock,
 			namespace:     namespace,
@@ -88,10 +97,11 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		sslUpdater := &sslCertificateUpdater{
 			client:        clientMock,
 			namespace:     namespace,
@@ -238,7 +248,7 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
 
 		namespace := "myTestNamespace"
 		initialSslSecret := &v1.Secret{
@@ -252,7 +262,9 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 			},
 			Type: v1.SecretTypeTLS,
 		}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(initialSslSecret).Build()
+
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment, initialSslSecret).Build()
 		sslUpdater := &sslCertificateUpdater{
 			client:        clientMock,
 			namespace:     namespace,
@@ -285,10 +297,11 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", nil, "Normal", "Certificate", "SSL secret changed.")
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		sslUpdater := &sslCertificateUpdater{
 			client:        clientMock,
 			namespace:     namespace,

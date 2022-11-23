@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/tools/record"
 	"strings"
 
@@ -118,8 +119,12 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 		return fmt.Errorf("failed to create ssl secret: %w", err)
 	}
 
-	// TODO Event SSL-Cert changed
-	scu.eventRecorder.Event(nil, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
+	deployment := &appsv1.Deployment{}
+	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery", Namespace: scu.namespace}, deployment)
+	if err != nil {
+		return fmt.Errorf("ssl changed: failed to get deployment [%s]: %w", "k8s-service-discovery", err)
+	}
+	scu.eventRecorder.Event(deployment, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
 
 	return nil
 }

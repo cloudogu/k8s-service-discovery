@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -25,14 +26,16 @@ const (
 type ingressClassCreator struct {
 	client        client.Client
 	className     string
+	namespace     string
 	eventRecorder record.EventRecorder
 }
 
 // NewIngressClassCreator creates a new ingress class creator.
-func NewIngressClassCreator(client client.Client, className string, recorder record.EventRecorder) *ingressClassCreator {
+func NewIngressClassCreator(client client.Client, className string, namespace string, recorder record.EventRecorder) *ingressClassCreator {
 	return &ingressClassCreator{
 		client:        client,
 		className:     className,
+		namespace:     namespace,
 		eventRecorder: recorder,
 	}
 }
@@ -44,9 +47,15 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to check if ingress class [%s] exists: %w", icc.className, err)
 	}
+
+	deployment := &appsv1.Deployment{}
+	err = icc.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery", Namespace: icc.namespace}, deployment)
+	if err != nil {
+		return fmt.Errorf("create ingress class: failed to get deployment [%s]: %w", "k8s-service-discovery", err)
+	}
+
 	if ok {
-		// TODO Event Ingress Class already exists
-		icc.eventRecorder.Eventf(nil, corev1.EventTypeWarning, errorOnIngressClassCreationEventReason, "Ingress class [%s] already exists.", icc.className)
+		icc.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnIngressClassCreationEventReason, "Ingress class [%s] already exists.", icc.className)
 		log.FromContext(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
 		return nil
 	}
@@ -65,9 +74,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot create ingress class [%s] with clientset: %w", icc.className, err)
 	}
-
-	// TODO Event Ingress Class created
-	icc.eventRecorder.Eventf(nil, corev1.EventTypeNormal, ingressClassCreationEventReason, "Ingress class [%s] created.", icc.className)
+	icc.eventRecorder.Eventf(deployment, corev1.EventTypeNormal, ingressClassCreationEventReason, "Ingress class [%s] created.", icc.className)
 
 	return nil
 }

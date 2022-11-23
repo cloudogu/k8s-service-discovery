@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/registry"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -130,8 +132,15 @@ func (i *ingressUpdater) getCesServices(service *corev1.Service) ([]CesService, 
 }
 
 func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
+	namespacedName := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
+	dogu := &doguv1.Dogu{}
+	err := i.client.Get(ctx, namespacedName, dogu)
+	if err != nil {
+		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
+	}
+
 	if isMaintenanceMode {
-		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service)
+		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service, dogu)
 	}
 
 	if hasDoguLabel(service) {
@@ -145,17 +154,16 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		}
 	}
 
-	err := i.upsertDoguIngressObject(ctx, cesService, service)
+	err = i.upsertDoguIngressObject(ctx, cesService, service)
 	if err != nil {
 		return err
 	}
-	// TODO Event New regular Ingress-Object
-	i.eventRecorder.Eventf(nil, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] created.", cesService.Name)
+	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Created regular ingress for service [%s].", cesService.Name)
 
-	return i.upsertDoguIngressObject(ctx, cesService, service)
+	return err
 }
 
-func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
+func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv1.Dogu) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
 
@@ -163,6 +171,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
+	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] has been updated to maintenance mode.", cesService.Name)
 
 	return nil
 }

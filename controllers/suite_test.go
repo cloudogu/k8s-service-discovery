@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
-	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	etcdclient "go.etcd.io/etcd/client/v2"
+	v1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"path/filepath"
 	"testing"
 
@@ -19,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -57,10 +58,15 @@ var _ = BeforeSuite(func() {
 	var ctx context.Context
 	ctx, cancel = context.WithCancel(context.TODO())
 
+	testScheme := scheme.Scheme
+	err := doguv1.AddToScheme(testScheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "vendor", "github.com", "cloudogu", "k8s-dogu-operator", "api", "v1")},
 		ErrorIfCRDPathMissing: false,
+		Scheme:                testScheme,
 	}
 
 	cfg, err := testEnv.Start()
@@ -79,7 +85,7 @@ var _ = BeforeSuite(func() {
 
 	// +kubebuilder:scaffold:scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:    scheme.Scheme,
+		Scheme:    testScheme,
 		Namespace: myNamespace,
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -89,9 +95,10 @@ var _ = BeforeSuite(func() {
 	keyNotFoundErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
 	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
 	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
-	recorderMock := &mocks.EventRecorder{}
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName, recorderMock)
+	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery")
+
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
 
 	serviceReconciler := &serviceReconciler{
@@ -109,48 +116,40 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	// create initial ingress class
-	ingressClassCreator := NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName, recorderMock)
+	ingressClassCreator := NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName, myNamespace, eventRecorder)
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 
 	// create ssl updater class
-	sslUpdater, err := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, recorderMock)
+	sslUpdater, err := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
 	err = k8sManager.Add(sslUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
 	// // create warp menu creator
-	// warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace)
+	// warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace, eventRecorder)
 	// err = k8sManager.Add(warpMenuCreator)
 	// Expect(err).ToNot(HaveOccurred())
 
 	// create maintenance updater
-	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator, recorderMock)
+	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
 	err = k8sManager.Add(maintenanceUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
+		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
-
-		defer GinkgoRecover()
 	}()
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	By(fmt.Sprintf("Create %s", myNamespace))
-	namespace := corev1.Namespace{
-		TypeMeta:   metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{Name: myNamespace},
-		Spec:       corev1.NamespaceSpec{},
-		Status:     corev1.NamespaceStatus{},
-	}
-	err = k8sClient.Create(context.Background(), &namespace)
-	Expect(err).NotTo(HaveOccurred())
-
+	createTestNamespace()
+	createSelfDeployment()
+	createTestDogu()
 }, 60)
 
 var _ = AfterSuite(func() {
@@ -162,3 +161,47 @@ var _ = AfterSuite(func() {
 	ctrl.GetConfig = oldGetConfig
 	ctrl.GetConfigOrDie = oldGetConfigOrDie
 })
+
+func createTestNamespace() {
+	By(fmt.Sprintf("Create %s", myNamespace))
+	namespace := corev1.Namespace{
+		TypeMeta:   metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{Name: myNamespace},
+		Spec:       corev1.NamespaceSpec{},
+		Status:     corev1.NamespaceStatus{},
+	}
+	err := k8sClient.Create(context.Background(), &namespace)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func createSelfDeployment() {
+	labels := make(map[string]string)
+	labels["app"] = "ces"
+	selfDeploy := &v1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "k8s-service-discovery",
+			Namespace: myNamespace,
+			Labels:    labels,
+		},
+		Spec: v1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "testcontainer", Image: "testimage"},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Labels: labels},
+			},
+		},
+	}
+	Expect(k8sClient.Create(context.Background(), selfDeploy)).Should(Succeed())
+}
+
+func createTestDogu() {
+	By("Create dogu")
+	dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
+	Expect(k8sClient.Create(context.Background(), dogu)).Should(Succeed())
+}

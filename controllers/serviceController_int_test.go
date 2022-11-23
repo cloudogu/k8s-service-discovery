@@ -92,21 +92,21 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 	Context("Handle new service resource", func() {
 		AfterEach(cleanup)
-		//
-		//It("Should do nothing if service without annotations", func() {
-		//	By("Creating service with no annotations")
-		//	Expect(k8sClient.Create(ctx, serviceNoAnnotations)).Should(Succeed())
-		//
-		//	By("Expect no ingress resource")
-		//	expectedIngress := &networking.IngressList{}
-		//
-		//	Eventually(func() bool {
-		//		err := k8sClient.List(ctx, expectedIngress)
-		//		return err == nil
-		//	}, timeoutInterval, pollingInterval).Should(BeTrue())
-		//
-		//	Expect(len(expectedIngress.Items)).Should(Equal(0))
-		//})
+
+		It("Should do nothing if service without annotations", func() {
+			By("Creating service with no annotations")
+			Expect(k8sClient.Create(ctx, serviceNoAnnotations)).Should(Succeed())
+
+			By("Expect no ingress resource")
+			expectedIngress := &networking.IngressList{}
+
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, expectedIngress)
+				return err == nil
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
+
+			Expect(len(expectedIngress.Items)).Should(Equal(0))
+		})
 
 		It("Should create ingress object for simple webapp service", func() {
 			By("Create deployment for service (which is not ready)")
@@ -180,65 +180,64 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(ok).Should(BeFalse())
 		})
 
-		//It("Should create ingress object for multiple ces services", func() {
-		//	By("Create deployment for service (which is not ready)")
-		//	Expect(k8sClient.Create(ctx, serviceDeployment)).Should(Succeed())
-		//
-		//	By("Wait for deployment to become ready")
-		//	serviceDeployment.Status.ReadyReplicas = 1
-		//	serviceDeployment.Status.Replicas = 1
-		//	err := k8sClient.Status().Update(ctx, serviceDeployment)
-		//	Expect(err).NotTo(HaveOccurred())
-		//
-		//	client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
-		//	Expect(err).NotTo(HaveOccurred())
-		//	deploymentWaiter := dogustart.NewDeploymentReadyChecker(client, "my-test-namespace")
-		//	waitOptions := dogustart.WaitOptions{Timeout: waitForDeploymentTimeout, TickRate: waitForDeploymentTickRate}
-		//	err = deploymentWaiter.WaitForReady(ctx, "nexus", waitOptions, func(ctx context.Context) {})
-		//	Expect(err).NotTo(HaveOccurred())
-		//
-		//	By("Creating service with multiple ces services")
-		//	Expect(k8sClient.Create(ctx, serviceAdditional)).Should(Succeed())
-		//
-		//	By("Expect exactly two ingress resource for the service")
-		//	expectedIngress := &networking.IngressList{}
-		//
-		//	Eventually(func() bool {
-		//		err := k8sClient.List(ctx, expectedIngress)
-		//		if err != nil {
-		//			_ = fmt.Errorf("%w", err)
-		//			return false
-		//		}
-		//
-		//		return len(expectedIngress.Items) == 2
-		//	}, timeoutInterval, pollingInterval).Should(BeTrue())
-		//
-		//	Expect(expectedIngress.Items[0].Namespace).Should(Equal(myNamespace))
-		//	Expect(expectedIngress.Items[0].Name).Should(Equal("nexus"))
-		//	Expect(*expectedIngress.Items[0].Spec.IngressClassName).Should(Equal(myIngressClassName))
-		//	Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Path).Should(Equal("/nexus"))
-		//	Expect(*expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
-		//	Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
-		//	Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
-		//
-		//	_, ok := expectedIngress.Items[0].Annotations[ingressRewriteTargetAnnotation]
-		//	Expect(ok).Should(BeFalse())
-		//
-		//	Expect(expectedIngress.Items[1].Namespace).Should(Equal(myNamespace))
-		//	Expect(expectedIngress.Items[1].Name).Should(Equal("nexus-docker-registry"))
-		//	Expect(*expectedIngress.Items[1].Spec.IngressClassName).Should(Equal(myIngressClassName))
-		//	Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Path).Should(Equal("/v2"))
-		//	Expect(*expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
-		//	Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
-		//	Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
-		//	Expect(expectedIngress.Items[1].Annotations[ingressRewriteTargetAnnotation]).Should(Equal("/nexus/repository/docker-registry/v2"))
-		//})
+		It("Should create ingress object for multiple ces services", func() {
+			By("Create deployment for service (which is not ready)")
+			Expect(k8sClient.Create(ctx, serviceDeployment)).Should(Succeed())
+
+			By("Wait for deployment to become ready")
+			serviceDeployment.Status.ReadyReplicas = 1
+			serviceDeployment.Status.Replicas = 1
+			err := k8sClient.Status().Update(ctx, serviceDeployment)
+			Expect(err).NotTo(HaveOccurred())
+
+			client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
+			Expect(err).NotTo(HaveOccurred())
+			deploymentWaiter := dogustart.NewDeploymentReadyChecker(client, "my-test-namespace")
+			waitOptions := dogustart.WaitOptions{Timeout: 5, TickRate: 3}
+			err = deploymentWaiter.WaitForReady(ctx, "nexus", waitOptions, func(ctx context.Context) {})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Creating service with multiple ces services")
+			Expect(k8sClient.Create(ctx, serviceAdditional)).Should(Succeed())
+
+			By("Expect exactly two ingress resource for the service")
+			expectedIngress := &networking.IngressList{}
+
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, expectedIngress)
+				if err != nil {
+					_ = fmt.Errorf("%w", err)
+					return false
+				}
+
+				return len(expectedIngress.Items) == 2
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
+
+			Expect(expectedIngress.Items[0].Namespace).Should(Equal(myNamespace))
+			Expect(expectedIngress.Items[0].Name).Should(Equal("nexus"))
+			Expect(*expectedIngress.Items[0].Spec.IngressClassName).Should(Equal(myIngressClassName))
+			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Path).Should(Equal("/nexus"))
+			Expect(*expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
+			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
+			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
+
+			_, ok := expectedIngress.Items[0].Annotations[ingressRewriteTargetAnnotation]
+			Expect(ok).Should(BeFalse())
+
+			Expect(expectedIngress.Items[1].Namespace).Should(Equal(myNamespace))
+			Expect(expectedIngress.Items[1].Name).Should(Equal("nexus-docker-registry"))
+			Expect(*expectedIngress.Items[1].Spec.IngressClassName).Should(Equal(myIngressClassName))
+			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Path).Should(Equal("/v2"))
+			Expect(*expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
+			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
+			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
+			Expect(expectedIngress.Items[1].Annotations[ingressRewriteTargetAnnotation]).Should(Equal("/nexus/repository/docker-registry/v2"))
+		})
 	})
 })
 
 var _ = Describe("Ingress class should be created automatically", func() {
 	ctx := context.TODO()
-
 	Context("Ingress class should be created automatically", func() {
 		It("Ingress class should be created automatically", func() {
 			By("Check for creation of ingress class")

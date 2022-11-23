@@ -3,6 +3,8 @@ package warp
 import (
 	"context"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	types2 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -85,23 +87,27 @@ func (w *Watcher) Run(ctx context.Context) {
 }
 
 func (w *Watcher) execute() {
+	deployment := &appsv1.Deployment{}
+	err := w.k8sClient.Get(context.Background(), types2.NamespacedName{Name: "k8s-service-discovery", Namespace: w.namespace}, deployment)
+	if err != nil {
+		ctrl.Log.Error(err, "warp update: failed to get deployment [%s]", "k8s-service-discovery")
+		return
+	}
+
 	categories, err := w.ConfigReader.Read(w.configuration)
 	if err != nil {
-		// TODO Event error on write
-		w.eventRecorder.Eventf(nil, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
+		w.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
 		ctrl.Log.Info("Error during Read:", err)
 		return
 	}
 	ctrl.Log.Info(fmt.Sprintf("All found Categories: %v", categories))
 	err = w.jsonWriter(categories)
 	if err != nil {
-		// TODO Event error on write
-		w.eventRecorder.Eventf(nil, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
+		w.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
 		ctrl.Log.Info(fmt.Sprintf("failed to write warp menu as json: %s", err.Error()))
 		return
 	}
-	// TODO Event new Warp-Menu
-	w.eventRecorder.Event(nil, corev1.EventTypeNormal, warpMenuUpdateEventReason, "Warp menu updated.")
+	w.eventRecorder.Event(deployment, corev1.EventTypeNormal, warpMenuUpdateEventReason, "Warp menu updated.")
 }
 
 func (w *Watcher) jsonWriter(data interface{}) error {

@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	etcdclient "go.etcd.io/etcd/client/v2"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	client2 "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -97,17 +99,14 @@ func TestWatcher_Run(t *testing.T) {
 		}()
 
 		// create the config with 3 sources and an empty menu json configmap
-		client := fake.NewClientBuilder().Build()
 		k8sConfig.ResourceVersion = ""
-		err := client.Create(ctx, &k8sConfig)
-		require.NoError(t, err)
-		err = client.Create(ctx, &menuConfigMap)
-		require.NoError(t, err)
-		err = os.Unsetenv("STAGE")
+		namespace := "test"
+		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		client := fake.NewClientBuilder().WithObjects(&k8sConfig, &menuConfigMap, deployment).Build()
+		err := os.Unsetenv("STAGE")
 		require.NoError(t, err)
 
 		// prepare mocks
-		namespace := "test"
 		mockRegistry := &cesmocks.Registry{}
 		watchRegistry := &cesmocks.WatchConfigurationContext{}
 		watchEvent := &etcdclient.Response{}
@@ -117,9 +116,8 @@ func TestWatcher_Run(t *testing.T) {
 			warpChannel <- watchEvent
 		}).Times(3)
 
-		// TODO Check this test
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", nil, "Normal", "UpdateWarpMenu", "Warp menu updated.")
+		recorderMock.On("Event", mock.IsType(&v1.Deployment{}), "Normal", "UpdateWarpMenu", "Warp menu updated.")
 
 		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, recorderMock)
 		require.NoError(t, err)

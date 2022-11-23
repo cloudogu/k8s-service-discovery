@@ -6,9 +6,11 @@ import (
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
 	etcdclient "go.etcd.io/etcd/client/v2"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -107,8 +109,12 @@ func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 		return err
 	}
 
-	// TODO Event New Maintenance-Mode-Change
-	scu.eventRecorder.Eventf(nil, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed from %t to %t.", isActive, !isActive)
+	deployment := &appsv1.Deployment{}
+	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery", Namespace: scu.namespace}, deployment)
+	if err != nil {
+		return fmt.Errorf("maintenance mode: failed to get deployment [%s]: %w", "k8s-service-discovery", err)
+	}
+	scu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed from %t to %t.", isActive, !isActive)
 
 	return nil
 }
