@@ -50,8 +50,8 @@ func TestNewWatcher(t *testing.T) {
 		err := client.Create(ctx, &k8sConfig)
 		require.NoError(t, err)
 		namespace := "test"
-		mockRegistry := &cesmocks.Registry{}
-		watchRegistry := &cesmocks.WatchConfigurationContext{}
+		mockRegistry := cesmocks.NewRegistry(t)
+		watchRegistry := cesmocks.NewWatchConfigurationContext(t)
 		mockRegistry.On("RootConfig").Return(watchRegistry)
 		err = os.Unsetenv("STAGE")
 		require.NoError(t, err)
@@ -101,14 +101,14 @@ func TestWatcher_Run(t *testing.T) {
 		// create the config with 3 sources and an empty menu json configmap
 		k8sConfig.ResourceVersion = ""
 		namespace := "test"
-		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		client := fake.NewClientBuilder().WithObjects(&k8sConfig, &menuConfigMap, deployment).Build()
 		err := os.Unsetenv("STAGE")
 		require.NoError(t, err)
 
 		// prepare mocks
-		mockRegistry := &cesmocks.Registry{}
-		watchRegistry := &cesmocks.WatchConfigurationContext{}
+		mockRegistry := cesmocks.NewRegistry(t)
+		watchRegistry := cesmocks.NewWatchConfigurationContext(t)
 		watchEvent := &etcdclient.Response{}
 		mockRegistry.On("RootConfig").Return(watchRegistry)
 		watchRegistry.On("Watch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -117,7 +117,7 @@ func TestWatcher_Run(t *testing.T) {
 		}).Times(3)
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", mock.IsType(&v1.Deployment{}), "Normal", "UpdateWarpMenu", "Warp menu updated.")
+		recorderMock.On("Event", mock.IsType(&v1.Deployment{}), "Normal", "WarpMenu", "Warp menu updated.")
 
 		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, recorderMock)
 		require.NoError(t, err)

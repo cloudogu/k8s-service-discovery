@@ -38,9 +38,8 @@ func TestNewMaintenanceModeUpdater(t *testing.T) {
 func Test_maintenanceModeUpdater_Start(t *testing.T) {
 	t.Run("error on maintenance update", func(t *testing.T) {
 		// given
-		regMock := &cesmocks.Registry{}
-
-		watchContextMock := &cesmocks.WatchConfigurationContext{}
+		regMock := cesmocks.NewRegistry(t)
+		watchContextMock := cesmocks.NewWatchConfigurationContext(t)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
 			sendChannel, ok := channelobject.(chan *etcdclient.Response)
@@ -51,8 +50,7 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 			}
 		}).Return()
 
-		globalConfigMock := &cesmocks.ConfigurationContext{}
-
+		globalConfigMock := cesmocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "maintenance").Return("", assert.AnError)
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
@@ -80,14 +78,12 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		mock.AssertExpectationsForObjects(t, regMock, watchContextMock, globalConfigMock, regMock)
 	})
 
 	t.Run("fail to get deployment", func(t *testing.T) {
 		// given
-		regMock := &cesmocks.Registry{}
-
-		watchContextMock := &cesmocks.WatchConfigurationContext{}
+		regMock := cesmocks.NewRegistry(t)
+		watchContextMock := cesmocks.NewWatchConfigurationContext(t)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
 			sendChannel, ok := channelobject.(chan *etcdclient.Response)
@@ -98,8 +94,7 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 			}
 		}).Return()
 
-		globalConfigMock := &cesmocks.ConfigurationContext{}
-
+		globalConfigMock := cesmocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "maintenance").Return("false", nil)
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
@@ -124,15 +119,13 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "maintenance mode: failed to get deployment [k8s-service-discovery]")
-		mock.AssertExpectationsForObjects(t, regMock, watchContextMock, globalConfigMock, regMock)
+		assert.ErrorContains(t, err, "maintenance mode: failed to get deployment [k8s-service-discovery-controller-manager]")
 	})
 
 	t.Run("run and terminate without any problems", func(t *testing.T) {
 		// given
-		regMock := &cesmocks.Registry{}
-
-		watchContextMock := &cesmocks.WatchConfigurationContext{}
+		regMock := cesmocks.NewRegistry(t)
+		watchContextMock := cesmocks.NewWatchConfigurationContext(t)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
 			sendChannel, ok := channelobject.(chan *etcdclient.Response)
@@ -143,8 +136,7 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 			}
 		}).Return()
 
-		globalConfigMock := &cesmocks.ConfigurationContext{}
-
+		globalConfigMock := cesmocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "maintenance").Return("false", nil)
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
@@ -152,11 +144,11 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		ingressUpdater := &mocks.IngressUpdater{}
 
 		namespace := "myTestNamespace"
-		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 
 		eventRecorderMock := mocks.NewEventRecorder(t)
-		eventRecorderMock.On("Eventf", mock.IsType(deployment), "Normal", "Maintenance", "Maintenance mode changed from %t to %t.", true, false)
+		eventRecorderMock.On("Eventf", mock.IsType(deployment), "Normal", "Maintenance", "Maintenance mode changed to %t.", true)
 
 		maintenanceUpdater := &maintenanceModeUpdater{
 			client:         clientMock,
@@ -174,19 +166,18 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		mock.AssertExpectationsForObjects(t, regMock, watchContextMock, globalConfigMock, regMock)
 	})
 }
 
 func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 	t.Run("activate maintenance mode with error", func(t *testing.T) {
 		// given
-		regMock := &cesmocks.Registry{}
-		globalConfigMock := &cesmocks.ConfigurationContext{}
+		regMock := cesmocks.NewRegistry(t)
+		globalConfigMock := cesmocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "maintenance").Return("true", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
-		ingressUpdater := &mocks.IngressUpdater{}
+		ingressUpdater := mocks.NewIngressUpdater(t)
 		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
@@ -206,19 +197,18 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
-		mock.AssertExpectationsForObjects(t, regMock, globalConfigMock, regMock, ingressUpdater)
 	})
 
 	t.Run("deactivate maintenance mode with error", func(t *testing.T) {
 		// given
-		regMock := &cesmocks.Registry{}
-		globalConfigMock := &cesmocks.ConfigurationContext{}
+		regMock := cesmocks.NewRegistry(t)
+		globalConfigMock := cesmocks.NewConfigurationContext(t)
 
 		keyNotFoundErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
 		globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
-		ingressUpdater := &mocks.IngressUpdater{}
+		ingressUpdater := mocks.NewIngressUpdater(t)
 		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
@@ -238,6 +228,5 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
-		mock.AssertExpectationsForObjects(t, regMock, globalConfigMock, regMock, ingressUpdater)
 	})
 }

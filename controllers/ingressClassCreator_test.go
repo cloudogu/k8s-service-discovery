@@ -36,17 +36,17 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		require.ErrorContains(t, err, "create ingress class: failed to get deployment [k8s-service-discovery]")
+		require.ErrorContains(t, err, "create ingress class: failed to get deployment [k8s-service-discovery-controller-manager]")
 	})
 
 	t.Run("ingress class does not exists and is begin created", func(t *testing.T) {
 		t.Parallel()
 
 		// given
-		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(deployment), "Normal", "Creation", "Ingress class [%s] created.", "my-ingress-class")
+		recorderMock.On("Eventf", mock.IsType(deployment), "Normal", "IngressClassCreation", "Ingress class [%s] created.", "my-ingress-class")
 		creator := NewIngressClassCreator(clientMock, "my-ingress-class", namespace, recorderMock)
 
 		// when
@@ -70,10 +70,10 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 				Controller: "k8s.io/nginx-ingress",
 			},
 		}
-		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery", Namespace: namespace}}
+		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(ingressClass, deployment).Build()
 		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(deployment), "Warning", "ErrCreation", "Ingress class [%s] already exists.", "my-ingress-class")
+		recorderMock.On("Eventf", mock.IsType(deployment), "Normal", "IngressClassCreation", "Ingress class [%s] already exists.", "my-ingress-class")
 		creator := NewIngressClassCreator(clientMock, "my-ingress-class", namespace, recorderMock)
 
 		// when

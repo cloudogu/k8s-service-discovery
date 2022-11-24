@@ -110,7 +110,7 @@ func Test_startManager(t *testing.T) {
 		mockDefinitions := map[string]mockDefinition{
 			"GetClient":           {ReturnValue: client},
 			"Add":                 {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
-			"GetEventRecorderFor": {Arguments: []interface{}{"k8s-service-discovery"}, ReturnValue: nil},
+			"GetEventRecorderFor": {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
 		}
 		getNewMockManager(t, nil, mockDefinitions)
 
@@ -130,7 +130,7 @@ func Test_startManager(t *testing.T) {
 			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: expectedError},
 			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
 			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery"}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
 			"GetLogger":            {ReturnValue: ctrl.Log},
 		}
 		getNewMockManager(t, nil, mockDefinitions)
@@ -152,7 +152,7 @@ func Test_startManager(t *testing.T) {
 			"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: expectedError},
 			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
 			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery"}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
 			"GetLogger":            {ReturnValue: ctrl.Log},
 		}
 		getNewMockManager(t, nil, mockDefinitions)
@@ -174,7 +174,7 @@ func Test_startManager(t *testing.T) {
 			"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
 			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
 			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery"}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
 			"GetLogger":            {ReturnValue: ctrl.Log},
 			"Start":                {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
 		}
@@ -195,7 +195,7 @@ func Test_startManager(t *testing.T) {
 			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
 			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
 			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery"}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
 			"GetLogger":            {ReturnValue: ctrl.Log},
 		}
 		getNewMockManager(t, nil, mockDefinitions)

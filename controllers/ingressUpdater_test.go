@@ -259,7 +259,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
 		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "Ingress creation", "Created regular ingress for service [%s].", "test")
+		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
 
@@ -300,7 +300,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
 		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "Ingress creation", "Created regular ingress for service [%s].", "test")
+		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 
 		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
@@ -348,7 +348,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
 		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "Ingress creation", "Ingress for service [%s] has been updated to maintenance mode.", "test")
+		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Ingress for service [%s] has been updated to maintenance mode.", "test")
 		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(true), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
 
@@ -470,7 +470,7 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu, existingIngress).Build()
 		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "Ingress creation", "Created regular ingress for service [%s].", "test")
+		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 
 		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)

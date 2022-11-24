@@ -8,9 +8,11 @@ import (
 	"fmt"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/stretchr/testify/mock"
 	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -40,6 +42,8 @@ var testEnv *envtest.Environment
 
 var oldGetConfig func() (*rest.Config, error)
 var oldGetConfigOrDie func() *rest.Config
+
+var stage string
 
 const myNamespace = "my-test-namespace"
 const myIngressClassName = "my-ingress-class-name"
@@ -96,7 +100,7 @@ var _ = BeforeSuite(func() {
 	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
 	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
 
-	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery")
+	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
 	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
@@ -126,10 +130,22 @@ var _ = BeforeSuite(func() {
 	err = k8sManager.Add(sslUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
-	// // create warp menu creator
-	// warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace, eventRecorder)
-	// err = k8sManager.Add(warpMenuCreator)
-	// Expect(err).ToNot(HaveOccurred())
+	// create warp menu creator
+	stage = os.Getenv("STAGE")
+	err = os.Unsetenv("STAGE")
+	Expect(err).NotTo(HaveOccurred())
+
+	watchRegistry := &cesmocks.WatchConfigurationContext{}
+	watchEvent := &etcdclient.Response{}
+	myRegistry.On("RootConfig").Return(watchRegistry)
+	watchRegistry.On("Watch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		warpChannel := args.Get(3).(chan *etcdclient.Response)
+		warpChannel <- watchEvent
+	}).Times(3)
+
+	warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace, eventRecorder)
+	err = k8sManager.Add(warpMenuCreator)
+	Expect(err).ToNot(HaveOccurred())
 
 	// create maintenance updater
 	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator, eventRecorder)
@@ -147,10 +163,16 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	createInitialTestData()
+
+}, 60)
+
+func createInitialTestData() {
 	createTestNamespace()
+	createMenuJsonConfig()
 	createSelfDeployment()
 	createTestDogu()
-}, 60)
+}
 
 var _ = AfterSuite(func() {
 	cancel()
@@ -160,6 +182,8 @@ var _ = AfterSuite(func() {
 
 	ctrl.GetConfig = oldGetConfig
 	ctrl.GetConfigOrDie = oldGetConfigOrDie
+	err = os.Setenv("STAGE", stage)
+	Expect(err).NotTo(HaveOccurred())
 })
 
 func createTestNamespace() {
@@ -179,7 +203,7 @@ func createSelfDeployment() {
 	labels["app"] = "ces"
 	selfDeploy := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "k8s-service-discovery",
+			Name:      "k8s-service-discovery-controller-manager",
 			Namespace: myNamespace,
 			Labels:    labels,
 		},
@@ -204,4 +228,9 @@ func createTestDogu() {
 	By("Create dogu")
 	dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
 	Expect(k8sClient.Create(context.Background(), dogu)).Should(Succeed())
+}
+
+func createMenuJsonConfig() {
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "k8s-ces-warp-config", Namespace: myNamespace}}
+	Expect(k8sClient.Create(context.Background(), cm)).Should(Succeed())
 }

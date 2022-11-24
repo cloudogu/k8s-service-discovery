@@ -42,3 +42,10 @@ rules:
       - get
       - create
       - list
+  - apiGroups:
+      - "k8s.cloudogu.com"
+    resources:
+      - dogus
+    verbs:
+      - watch
+      - list

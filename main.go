@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
 	"k8s.io/client-go/tools/record"
 	"os"
@@ -40,6 +41,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	if err := logging.ConfigureLogger(); err != nil {
@@ -68,7 +70,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
 
-	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery")
+	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
 	if err = handleIngressClassCreation(k8sManager, options.Namespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)

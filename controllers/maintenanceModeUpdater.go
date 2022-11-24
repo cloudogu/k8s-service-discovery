@@ -110,11 +110,11 @@ func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 	}
 
 	deployment := &appsv1.Deployment{}
-	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery", Namespace: scu.namespace}, deployment)
+	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
 	if err != nil {
-		return fmt.Errorf("maintenance mode: failed to get deployment [%s]: %w", "k8s-service-discovery", err)
+		return fmt.Errorf("maintenance mode: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
-	scu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed from %t to %t.", isActive, !isActive)
+	scu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed to %t.", isActive)
 
 	return nil
 }

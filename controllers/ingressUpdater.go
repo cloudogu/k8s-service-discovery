@@ -27,7 +27,7 @@ const (
 )
 
 const (
-	ingressCreationEventReason = "Ingress creation"
+	ingressCreationEventReason = "IngressCreation"
 )
 
 // CesService contains information about one exposed ces service.

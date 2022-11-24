@@ -68,7 +68,6 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg regist
 
 	warpChannel := make(chan *etcdclient.Response)
 	go func() {
-		_ = scu.handleSslChange(ctx)
 		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
 		reg.Watch(ctx, serverCertificatePath, true, warpChannel)
 		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
@@ -120,9 +119,9 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 	}
 
 	deployment := &appsv1.Deployment{}
-	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery", Namespace: scu.namespace}, deployment)
+	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
 	if err != nil {
-		return fmt.Errorf("ssl changed: failed to get deployment [%s]: %w", "k8s-service-discovery", err)
+		return fmt.Errorf("ssl changed: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
 	scu.eventRecorder.Event(deployment, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
 

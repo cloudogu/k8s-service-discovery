@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	ingressClassCreationEventReason        = "Creation"
-	errorOnIngressClassCreationEventReason = "ErrCreation"
+	ingressClassCreationEventReason = "IngressClassCreation"
 )
 
 // ingressClassCreator is responsible to create a cluster wide ingress class in the cluster.
@@ -49,13 +48,13 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	}
 
 	deployment := &appsv1.Deployment{}
-	err = icc.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery", Namespace: icc.namespace}, deployment)
+	err = icc.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: icc.namespace}, deployment)
 	if err != nil {
-		return fmt.Errorf("create ingress class: failed to get deployment [%s]: %w", "k8s-service-discovery", err)
+		return fmt.Errorf("create ingress class: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
 
 	if ok {
-		icc.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnIngressClassCreationEventReason, "Ingress class [%s] already exists.", icc.className)
+		icc.eventRecorder.Eventf(deployment, corev1.EventTypeNormal, ingressClassCreationEventReason, "Ingress class [%s] already exists.", icc.className)
 		log.FromContext(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
 		return nil
 	}

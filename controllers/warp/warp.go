@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	warpMenuUpdateEventReason        = "UpdateWarpMenu"
+	warpMenuUpdateEventReason        = "WarpMenu"
 	errorOnWarpMenuUpdateEventReason = "ErrUpdateWarpMenu"
 )
 
@@ -69,7 +69,6 @@ func (w *Watcher) Run(ctx context.Context) {
 
 	for _, source := range w.configuration.Sources {
 		go func(source config.Source) {
-			w.execute()
 			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start etcd watcher for source [%s]", source))
 			w.registryToWatch.Watch(ctx, source.Path, true, warpChannel)
 			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("stop etcd watcher for source [%s]", source))
@@ -88,9 +87,9 @@ func (w *Watcher) Run(ctx context.Context) {
 
 func (w *Watcher) execute() {
 	deployment := &appsv1.Deployment{}
-	err := w.k8sClient.Get(context.Background(), types2.NamespacedName{Name: "k8s-service-discovery", Namespace: w.namespace}, deployment)
+	err := w.k8sClient.Get(context.Background(), types2.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: w.namespace}, deployment)
 	if err != nil {
-		ctrl.Log.Error(err, "warp update: failed to get deployment [%s]", "k8s-service-discovery")
+		ctrl.Log.Error(err, "warp update: failed to get deployment [%s]", "k8s-service-discovery-controller-manager")
 		return
 	}
 
