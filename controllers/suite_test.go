@@ -153,6 +153,8 @@ var _ = BeforeSuite(func() {
 	err = k8sManager.Add(maintenanceUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
+	createInitialTestData(k8sManager.GetClient())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
@@ -163,15 +165,13 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	createInitialTestData()
-
 }, 60)
 
-func createInitialTestData() {
-	createTestNamespace()
-	createMenuJsonConfig()
-	createSelfDeployment()
-	createTestDogu()
+func createInitialTestData(client client.Client) {
+	createTestNamespace(client)
+	createMenuJsonConfig(client)
+	createSelfDeployment(client)
+	createTestDogu(client)
 }
 
 var _ = AfterSuite(func() {
@@ -186,7 +186,7 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func createTestNamespace() {
+func createTestNamespace(client client.Client) {
 	By(fmt.Sprintf("Create %s", myNamespace))
 	namespace := corev1.Namespace{
 		TypeMeta:   metav1.TypeMeta{},
@@ -194,11 +194,11 @@ func createTestNamespace() {
 		Spec:       corev1.NamespaceSpec{},
 		Status:     corev1.NamespaceStatus{},
 	}
-	err := k8sClient.Create(context.Background(), &namespace)
+	err := client.Create(context.Background(), &namespace)
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createSelfDeployment() {
+func createSelfDeployment(client client.Client) {
 	labels := make(map[string]string)
 	labels["app"] = "ces"
 	selfDeploy := &v1.Deployment{
@@ -221,16 +221,16 @@ func createSelfDeployment() {
 			},
 		},
 	}
-	Expect(k8sClient.Create(context.Background(), selfDeploy)).Should(Succeed())
+	Expect(client.Create(context.Background(), selfDeploy)).Should(Succeed())
 }
 
-func createTestDogu() {
+func createTestDogu(client client.Client) {
 	By("Create dogu")
 	dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
-	Expect(k8sClient.Create(context.Background(), dogu)).Should(Succeed())
+	Expect(client.Create(context.Background(), dogu)).Should(Succeed())
 }
 
-func createMenuJsonConfig() {
+func createMenuJsonConfig(client client.Client) {
 	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "k8s-ces-warp-config", Namespace: myNamespace}}
-	Expect(k8sClient.Create(context.Background(), cm)).Should(Succeed())
+	Expect(client.Create(context.Background(), cm)).Should(Succeed())
 }
