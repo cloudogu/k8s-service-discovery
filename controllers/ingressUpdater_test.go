@@ -185,7 +185,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		err := creator.UpsertIngressForService(ctx, &service)
 
 		// then
-		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to create ingress object for ces service [{Name:test Port:55 Location:/myLocation Pass:/myPass}]")
 		assert.ErrorContains(t, err, "not found")
 	})
