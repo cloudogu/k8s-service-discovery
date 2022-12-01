@@ -158,8 +158,8 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 	if err != nil {
 		return err
 	}
+	
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Created regular ingress for service [%s].", cesService.Name)
-
 	return err
 }
 
@@ -171,8 +171,8 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
+	
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] has been updated to maintenance mode.", cesService.Name)
-
 	return nil
 }
 
