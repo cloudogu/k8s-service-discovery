@@ -158,8 +158,8 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 	if err != nil {
 		return err
 	}
+	
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Created regular ingress for service [%s].", cesService.Name)
-
 	return err
 }
 
