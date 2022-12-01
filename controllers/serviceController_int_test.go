@@ -193,7 +193,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
 			Expect(err).NotTo(HaveOccurred())
 			deploymentWaiter := dogustart.NewDeploymentReadyChecker(client, "my-test-namespace")
-			waitOptions := dogustart.WaitOptions{Timeout: 5, TickRate: 3}
+			waitOptions := dogustart.WaitOptions{Timeout: 5, TickRate: time.Millisecond * 200}
 			err = deploymentWaiter.WaitForReady(ctx, "nexus", waitOptions, func(ctx context.Context) {})
 			Expect(err).NotTo(HaveOccurred())
 

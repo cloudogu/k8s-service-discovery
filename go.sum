@@ -191,6 +191,8 @@ github.com/cloudogu/k8s-dogu-operator v0.0.0-20221123100925-123d7f505b5e h1:/fli
 github.com/cloudogu/k8s-dogu-operator v0.0.0-20221123100925-123d7f505b5e/go.mod h1:mCBGU8HUL68zQhXERcao+iOo8ooox9YdVrSHORxwSPk=
 github.com/cloudogu/k8s-dogu-operator v0.16.0 h1:PBN7etFstboQ+9QLowhzXmqb8Ykaal++3PmYdcVJ1QY=
 github.com/cloudogu/k8s-dogu-operator v0.16.0/go.mod h1:mCBGU8HUL68zQhXERcao+iOo8ooox9YdVrSHORxwSPk=
+github.com/cloudogu/k8s-dogu-operator v0.18.0 h1:tp9cxP1m/B4Wzlg4eGB3dL+0pkHTbRBaG3mBvb3obG4=
+github.com/cloudogu/k8s-dogu-operator v0.18.0/go.mod h1:mCBGU8HUL68zQhXERcao+iOo8ooox9YdVrSHORxwSPk=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/udpa/go v0.0.0-20210930031921-04548b0d99d4/go.mod h1:6pvJx4me5XPnfI9Z40ddWsdw2W/uZgQLFXToKeRcDiI=
 github.com/cncf/xds/go v0.0.0-20210922020428-25de7278fc84/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
