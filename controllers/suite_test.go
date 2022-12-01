@@ -14,9 +14,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"os"
 	"path/filepath"
-	"testing"
-
 	ctrl "sigs.k8s.io/controller-runtime"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,7 +68,7 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "vendor", "github.com", "cloudogu", "k8s-dogu-operator", "api", "v1")},
-		ErrorIfCRDPathMissing: true,
+		ErrorIfCRDPathMissing: false,
 		Scheme:                testScheme,
 	}
 
