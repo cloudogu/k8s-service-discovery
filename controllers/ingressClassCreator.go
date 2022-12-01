@@ -50,7 +50,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	deployment := &appsv1.Deployment{}
 	err = icc.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: icc.namespace}, deployment)
 	if err != nil {
-		return fmt.Errorf("create ingress class: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
+		return fmt.Errorf("create ingress class: failed to get deployment [k8s-service-discovery-controller-manager]: %w", err)
 	}
 
 	if ok {
