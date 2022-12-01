@@ -11,14 +11,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"os"
 	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -153,7 +152,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	createInitialTestData(k8sManager.GetClient())
-
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
@@ -170,7 +168,6 @@ func createInitialTestData(client client.Client) {
 	createTestNamespace(client)
 	createMenuJsonConfig(client)
 	createSelfDeployment(client)
-	createTestDogu(client)
 }
 
 var _ = AfterSuite(func() {
@@ -221,12 +218,6 @@ func createSelfDeployment(client client.Client) {
 		},
 	}
 	Expect(client.Create(context.Background(), selfDeploy)).Should(Succeed())
-}
-
-func createTestDogu(client client.Client) {
-	By("Create dogu")
-	dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
-	Expect(client.Create(context.Background(), dogu)).Should(Succeed())
 }
 
 func createMenuJsonConfig(client client.Client) {
