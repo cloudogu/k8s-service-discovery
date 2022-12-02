@@ -139,7 +139,7 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
 	}
 
-	if isMaintenanceMode {
+	if isMaintenanceMode && dogu.Name != staticContentBackendName {
 		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service, dogu)
 	}
 
