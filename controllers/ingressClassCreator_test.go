@@ -35,7 +35,6 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 		err := creator.CreateIngressClass(context.Background())
 
 		// then
-		require.Error(t, err)
 		require.ErrorContains(t, err, "create ingress class: failed to get deployment [k8s-service-discovery-controller-manager]")
 	})
 

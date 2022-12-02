@@ -7,14 +7,14 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	"k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"time"
-
-	"k8s.io/apimachinery/pkg/types"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -94,6 +94,14 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 		AfterEach(cleanup)
 
 		It("Should do nothing if service without annotations", func() {
+			By("Create dogu")
+			dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
+			Expect(k8sClient.Create(context.Background(), dogu)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: "nexus", Namespace: myNamespace}, &doguv1.Dogu{})
+				return err == nil
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
+
 			By("Creating service with no annotations")
 			Expect(k8sClient.Create(ctx, serviceNoAnnotations)).Should(Succeed())
 
@@ -193,7 +201,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
 			Expect(err).NotTo(HaveOccurred())
 			deploymentWaiter := dogustart.NewDeploymentReadyChecker(client, "my-test-namespace")
-			waitOptions := dogustart.WaitOptions{Timeout: 5, TickRate: 3}
+			waitOptions := dogustart.WaitOptions{Timeout: time.Minute * 1, TickRate: time.Second * 1}
 			err = deploymentWaiter.WaitForReady(ctx, "nexus", waitOptions, func(ctx context.Context) {})
 			Expect(err).NotTo(HaveOccurred())
 
