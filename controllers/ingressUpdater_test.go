@@ -151,7 +151,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to unmarshal ces services")
 	})
-
 	t.Run("error when fetching the dogu", func(t *testing.T) {
 		// given
 		cesService := []CesService{
@@ -189,7 +188,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to create ingress object for ces service [{Name:test Port:55 Location:/myLocation Pass:/myPass}]")
 		assert.ErrorContains(t, err, "not found")
 	})
-
 	t.Run("error when updating service ingress object", func(t *testing.T) {
 		// given
 		cesService := []CesService{
@@ -311,6 +309,59 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 
 		// when
 		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, false)
+
+		// then
+		require.NoError(t, err)
+		ingressResource := &networking.Ingress{}
+		ingressResourceKey := types.NamespacedName{
+			Namespace: myNamespace,
+			Name:      cesServiceWithOneWebapp.Name,
+		}
+
+		err = clientMock.Get(ctx, ingressResourceKey, ingressResource)
+		require.NoError(t, err)
+
+		assert.Equal(t, myNamespace, ingressResource.Namespace)
+		assert.Equal(t, "Service", ingressResource.OwnerReferences[0].Kind)
+		assert.Equal(t, service.GetName(), ingressResource.OwnerReferences[0].Name)
+		assert.Equal(t, cesServiceWithOneWebapp.Name, ingressResource.Name)
+		assert.Equal(t, myIngressClass, *ingressResource.Spec.IngressClassName)
+		assert.Equal(t, cesServiceWithOneWebapp.Location, ingressResource.Spec.Rules[0].HTTP.Paths[0].Path)
+		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
+		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
+		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
+		assert.Equal(t, cesServiceWithOneWebapp.Pass, ingressResource.Annotations[ingressRewriteTargetAnnotation])
+	})
+	t.Run("Create default ingress for nginx-static dogu even when maintenance mode is active", func(t *testing.T) {
+		doguName := "nginx-static"
+
+		// given
+		cesServiceWithOneWebapp := CesService{
+			Name:     doguName,
+			Port:     12345,
+			Location: "/myLocation",
+			Pass:     "/myPass",
+		}
+		service := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      doguName,
+				Namespace: myNamespace,
+				Labels:    map[string]string{"dogu.name": doguName}},
+		}
+		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: doguName, Namespace: myNamespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
+		recorderMock := mocks.NewEventRecorder(t)
+		recorderMock.On("Eventf", mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", doguName)
+
+		creator, creationError := NewIngressUpdater(clientMock, getRegistryMockWithMaintenance(true), myNamespace, myIngressClass, recorderMock)
+		require.NoError(t, creationError)
+
+		deploymentReadyChecker := mocks.NewDeploymentReadyChecker(t)
+		deploymentReadyChecker.On("IsReady", ctx, doguName).Return(true, nil)
+		creator.deploymentReadyChecker = deploymentReadyChecker
+
+		// when
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, true)
 
 		// then
 		require.NoError(t, err)
