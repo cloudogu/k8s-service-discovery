@@ -28,12 +28,21 @@ rules:
       - "*"
     resources:
       - deployments
-      - secrets
       - services
     verbs:
       - list
       - watch
       - get
+  - apiGroups:
+      - "*"
+    resources:
+      - secrets
+    verbs:
+      - list
+      - watch
+      - get
+      - create
+      - delete
   - apiGroups:
       - "k8s.cloudogu.com"
     resources:
