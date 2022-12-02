@@ -3,8 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/core"
-	"github.com/cloudogu/cesapp-lib/registry"
+
 	etcdclient "go.etcd.io/etcd/client/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -15,6 +14,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
 )
 
 const (
@@ -37,11 +39,7 @@ type maintenanceModeUpdater struct {
 
 // NewMaintenanceModeUpdater creates a new maintenance mode updater.
 func NewMaintenanceModeUpdater(client client.Client, namespace string, ingressUpdater IngressUpdater, recorder record.EventRecorder) (*maintenanceModeUpdater, error) {
-	endpoint := fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)
-	reg, err := registry.New(core.Registry{
-		Type:      "etcd",
-		Endpoints: []string{endpoint},
-	})
+	reg, err := cesregistry.Create(namespace)
 	if err != nil {
 		return nil, err
 	}

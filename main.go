@@ -3,15 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cloudogu/k8s-dogu-operator/api/v1"
-	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
-	"k8s.io/client-go/tools/record"
 	"os"
 
-	"github.com/cloudogu/cesapp-lib/core"
-	"github.com/cloudogu/cesapp-lib/registry"
+	"k8s.io/client-go/tools/record"
 
-	"github.com/cloudogu/k8s-service-discovery/controllers"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,6 +16,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	// +kubebuilder:scaffold:imports
+
+	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
+
+	"github.com/cloudogu/k8s-dogu-operator/api/v1"
+
+	"github.com/cloudogu/k8s-service-discovery/controllers"
+	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
 )
 
 const (
@@ -76,7 +79,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	reg, err := createEtcdRegistry(options.Namespace)
+	reg, err := cesregistry.Create(options.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
@@ -107,15 +110,6 @@ func startManager() error {
 	}
 
 	return nil
-}
-
-func createEtcdRegistry(namespace string) (registry.Registry, error) {
-	r, err := registry.New(core.Registry{
-		Type:      "etcd",
-		Endpoints: []string{fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)},
-	})
-
-	return r, err
 }
 
 func configureManager(k8sManager manager.Manager, updater controllers.IngressUpdater) error {
