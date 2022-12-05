@@ -19,6 +19,8 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 )
 
+var testCtx = context.Background()
+
 func TestNewMaintenanceModeUpdater(t *testing.T) {
 	t.Run("failed to create registry", func(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
@@ -252,7 +254,6 @@ func Test_isServiceNginxRelated(t *testing.T) {
 }
 
 func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
-	testCtx := context.Background()
 	testNS := "test-namespace"
 	t.Run("should rewrite selector of dogu service to a non-existing target for maintenance mode activation", func(t *testing.T) {
 		// given
@@ -351,6 +352,40 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 
 		// when
 		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "could not rewrite service nexus")
+	})
+}
+
+func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
+	t.Run("should error during maintenance deactivation", func(t *testing.T) {
+		// given
+		svc := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "nexus",
+				Labels: map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
+		}
+		internalSvcList := []corev1.Service{svc}
+		svcPointer := &(internalSvcList[0])
+		svcList := &corev1.ServiceList{Items: internalSvcList}
+		mockRecorder := mocks.NewEventRecorder(t)
+		mockRecorder.On("Eventf", mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
+		clientMock := mocks.NewClient(t)
+		clientMock.On("Update", testCtx, svcPointer).Return(assert.AnError)
+
+		sut := &maintenanceModeUpdater{
+			client:        clientMock,
+			namespace:     "el-espacio-del-nombre",
+			eventRecorder: mockRecorder,
+		}
+
+		// when
+		err := sut.rewriteServices(testCtx, svcList, false)
 
 		// then
 		require.Error(t, err)
