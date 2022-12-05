@@ -260,6 +260,7 @@ func Test_isServiceNginxRelated(t *testing.T) {
 
 func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 	testNS := "test-namespace"
+
 	t.Run("should rewrite selector of dogu service to a non-existing target for maintenance mode activation", func(t *testing.T) {
 		// given
 		svc := &corev1.Service{
@@ -300,6 +301,7 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 		assert.Equal(t, expectedSvc.Spec, actualSvc.Spec)
 		assert.Equal(t, expectedSvc.ObjectMeta, actualSvc.ObjectMeta)
 	})
+
 	t.Run("should rewrite selector of dogu service to a non-existing target for maintenance mode activation", func(t *testing.T) {
 		// given
 		svc := &corev1.Service{
@@ -340,6 +342,7 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 		assert.Equal(t, expectedSvc.Spec, actualSvc.Spec)
 		assert.Equal(t, expectedSvc.ObjectMeta, actualSvc.ObjectMeta)
 	})
+
 	t.Run("should error when API request fails", func(t *testing.T) {
 		// given
 		svc := &corev1.Service{
@@ -362,6 +365,62 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "could not rewrite service nexus")
+	})
+	t.Run("should exit early on ClusterIP service", func(t *testing.T) {
+		// given
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
+		}
+		mockRecorder := mocks.NewEventRecorder(t)
+		clientMock := mocks.NewClient(t)
+
+		// when
+		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
+
+		// then
+		require.NoError(t, err)
+	})
+	t.Run("should exit early on non-dogu service", func(t *testing.T) {
+		// given
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"a-fun-label": "goes-here"},
+			},
+		}
+		mockRecorder := mocks.NewEventRecorder(t)
+		clientMock := mocks.NewClient(t)
+
+		// when
+		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
+
+		// then
+		require.NoError(t, err)
+	})
+	t.Run("should exit early on nginx services so we don't lock us self out", func(t *testing.T) {
+		// given
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nginx-ingress",
+				Labels:    map[string]string{"dogu.name": "nginx-ingress"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nginx-ingress"}},
+		}
+		mockRecorder := mocks.NewEventRecorder(t)
+		clientMock := mocks.NewClient(t)
+
+		// when
+		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
+
+		// then
+		require.NoError(t, err)
 	})
 }
 
@@ -496,6 +555,58 @@ func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to rewrite services during maintenance mode deactivation")
+	})
+}
+
+func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
+	t.Run("should error on listing services", func(t *testing.T) {
+		// given
+		noopRec := &NoopEventRecorder{}
+		clientMock := mocks.NewClient(t)
+		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		updateMock := mocks.NewIngressUpdater(t)
+		svcRewriter := NewServiceRewriter(t)
+
+		sut := &maintenanceModeUpdater{
+			client:          clientMock,
+			namespace:       "el-espacio-del-nombre",
+			eventRecorder:   noopRec,
+			ingressUpdater:  updateMock,
+			serviceRewriter: svcRewriter,
+		}
+
+		// when
+		err := sut.activateMaintenanceMode(testCtx)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get list of all services")
+	})
+	t.Run("should error on rewriting service", func(t *testing.T) {
+		// given
+		noopRec := &NoopEventRecorder{}
+		clientMock := mocks.NewClient(t)
+		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(nil)
+		updateMock := mocks.NewIngressUpdater(t)
+		svcRewriter := NewServiceRewriter(t)
+		svcRewriter.On("rewrite", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+
+		sut := &maintenanceModeUpdater{
+			client:          clientMock,
+			namespace:       "el-espacio-del-nombre",
+			eventRecorder:   noopRec,
+			ingressUpdater:  updateMock,
+			serviceRewriter: svcRewriter,
+		}
+
+		// when
+		err := sut.activateMaintenanceMode(testCtx)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to rewrite services during maintenance mode activation")
 	})
 }
 
