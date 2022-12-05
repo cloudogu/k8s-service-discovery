@@ -36,13 +36,18 @@ const exposedServiceMaintenanceSelectorKey = "deactivatedDuringMaintenance"
 
 type v1ServiceList []*v1.Service
 
+type serviceRewriter interface {
+	rewrite(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error
+}
+
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
-	client         client.Client
-	namespace      string
-	registry       registry.Registry
-	ingressUpdater IngressUpdater
-	eventRecorder  record.EventRecorder
+	client          client.Client
+	namespace       string
+	registry        registry.Registry
+	ingressUpdater  IngressUpdater
+	eventRecorder   record.EventRecorder
+	serviceRewriter serviceRewriter
 }
 
 // NewMaintenanceModeUpdater creates a new maintenance mode updater.
@@ -52,12 +57,15 @@ func NewMaintenanceModeUpdater(client client.Client, namespace string, ingressUp
 		return nil, err
 	}
 
+	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
+
 	return &maintenanceModeUpdater{
-		client:         client,
-		namespace:      namespace,
-		registry:       reg,
-		ingressUpdater: ingressUpdater,
-		eventRecorder:  recorder,
+		client:          client,
+		namespace:       namespace,
+		registry:        reg,
+		ingressUpdater:  ingressUpdater,
+		eventRecorder:   recorder,
+		serviceRewriter: rewriter,
 	}, nil
 }
 
@@ -174,7 +182,7 @@ func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 		}
 	}
 
-	err = scu.rewriteServices(ctx, serviceList, false)
+	err = scu.serviceRewriter.rewrite(ctx, serviceList, false)
 	if err != nil {
 		return fmt.Errorf("failed to rewrite services during maintenance mode deactivation: %w", err)
 	}
@@ -198,7 +206,7 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 		}
 	}
 
-	err = scu.rewriteServices(ctx, serviceList, true)
+	err = scu.serviceRewriter.rewrite(ctx, serviceList, true)
 	if err != nil {
 		return fmt.Errorf("failed to rewrite services during maintenance mode activation: %w", err)
 	}
@@ -206,10 +214,16 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 	return err
 }
 
-func (scu *maintenanceModeUpdater) rewriteServices(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error {
+type defaultServiceRewriter struct {
+	client        client.Client
+	eventRecorder record.EventRecorder
+	namespace     string
+}
+
+func (sw *defaultServiceRewriter) rewrite(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error {
 	var err error
 	for _, service := range serviceList {
-		rewriteErr := rewriteNonSimpleServiceRoute(ctx, scu.client, scu.eventRecorder, service, activateMaintenanceMode)
+		rewriteErr := rewriteNonSimpleServiceRoute(ctx, sw.client, sw.eventRecorder, service, activateMaintenanceMode)
 		if rewriteErr != nil {
 			err = multierror.Append(err, rewriteErr)
 		}

@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/registry"
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
-	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
+
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +14,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/cloudogu/cesapp-lib/registry"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 )
 
 const (
@@ -158,7 +160,7 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 	if err != nil {
 		return err
 	}
-	
+
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Created regular ingress for service [%s].", cesService.Name)
 	return err
 }
@@ -171,7 +173,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}
-	
+
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] has been updated to maintenance mode.", cesService.Name)
 	return nil
 }

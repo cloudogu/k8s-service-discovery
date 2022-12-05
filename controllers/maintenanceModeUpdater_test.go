@@ -12,6 +12,7 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -60,18 +61,18 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
-		eventRecorderMock := mocks.NewEventRecorder(t)
-
 		ingressUpdater := &mocks.IngressUpdater{}
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		namespace := "myTestNamespace"
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects().Build()
+		svcRewriter := &NoopServiceRewriter{}
+
 		maintenanceUpdater := &maintenanceModeUpdater{
-			client:         clientMock,
-			namespace:      namespace,
-			registry:       regMock,
-			ingressUpdater: ingressUpdater,
-			eventRecorder:  eventRecorderMock,
+			client:          clientMock,
+			namespace:       namespace,
+			registry:        regMock,
+			ingressUpdater:  ingressUpdater,
+			serviceRewriter: svcRewriter,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*100)
@@ -108,12 +109,14 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 		namespace := "myTestNamespace"
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects().Build()
+		svcRewriter := &NoopServiceRewriter{}
 
 		maintenanceUpdater := &maintenanceModeUpdater{
-			client:         clientMock,
-			namespace:      namespace,
-			registry:       regMock,
-			ingressUpdater: ingressUpdater,
+			client:          clientMock,
+			namespace:       namespace,
+			registry:        regMock,
+			ingressUpdater:  ingressUpdater,
+			serviceRewriter: svcRewriter,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*100)
@@ -154,13 +157,15 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 		eventRecorderMock := mocks.NewEventRecorder(t)
 		eventRecorderMock.On("Eventf", mock.IsType(deployment), "Normal", "Maintenance", "Maintenance mode changed to %t.", true)
+		svcRewriter := &NoopServiceRewriter{}
 
 		maintenanceUpdater := &maintenanceModeUpdater{
-			client:         clientMock,
-			namespace:      namespace,
-			registry:       regMock,
-			ingressUpdater: ingressUpdater,
-			eventRecorder:  eventRecorderMock,
+			client:          clientMock,
+			namespace:       namespace,
+			registry:        regMock,
+			ingressUpdater:  ingressUpdater,
+			eventRecorder:   eventRecorderMock,
+			serviceRewriter: svcRewriter,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*100)
@@ -360,7 +365,7 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 	})
 }
 
-func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
+func Test_defaultServiceRewriter_rewrite(t *testing.T) {
 	t.Run("should error during maintenance deactivation", func(t *testing.T) {
 		// given
 		svc := corev1.Service{
@@ -376,14 +381,14 @@ func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
 		clientMock := mocks.NewClient(t)
 		clientMock.On("Update", testCtx, &svc).Return(assert.AnError)
 
-		sut := &maintenanceModeUpdater{
+		sut := &defaultServiceRewriter{
 			client:        clientMock,
 			namespace:     "el-espacio-del-nombre",
 			eventRecorder: mockRecorder,
 		}
 
 		// when
-		err := sut.rewriteServices(testCtx, internalSvcList, false)
+		err := sut.rewrite(testCtx, internalSvcList, false)
 
 		// then
 		require.Error(t, err)
@@ -405,14 +410,14 @@ func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
 		clientMock := mocks.NewClient(t)
 		clientMock.On("Update", testCtx, &svc).Return(assert.AnError)
 
-		sut := &maintenanceModeUpdater{
+		sut := &defaultServiceRewriter{
 			client:        clientMock,
 			namespace:     "el-espacio-del-nombre",
 			eventRecorder: mockRecorder,
 		}
 
 		// when
-		err := sut.rewriteServices(testCtx, internalSvcList, true)
+		err := sut.rewrite(testCtx, internalSvcList, true)
 
 		// then
 		require.Error(t, err)
@@ -420,3 +425,87 @@ func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
 		assert.ErrorContains(t, err, "could not rewrite service nexus")
 	})
 }
+
+func Test_maintenanceModeUpdater_getAllServices(t *testing.T) {
+	t.Run("should return error from the API", func(t *testing.T) {
+		// given
+		clientMock := mocks.NewClient(t)
+		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+
+		sut := &maintenanceModeUpdater{
+			client:    clientMock,
+			namespace: "el-espacio-del-nombre",
+		}
+
+		// when
+		_, err := sut.getAllServices(testCtx)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get list of all services in namespace [el-espacio-del-nombre]:")
+	})
+}
+
+func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
+	t.Run("should error on listing services", func(t *testing.T) {
+		// given
+		noopRec := &NoopEventRecorder{}
+		clientMock := mocks.NewClient(t)
+		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		updateMock := mocks.NewIngressUpdater(t)
+		svcRewriter := NewServiceRewriter(t)
+
+		sut := &maintenanceModeUpdater{
+			client:          clientMock,
+			namespace:       "el-espacio-del-nombre",
+			eventRecorder:   noopRec,
+			ingressUpdater:  updateMock,
+			serviceRewriter: svcRewriter,
+		}
+
+		// when
+		err := sut.deactivateMaintenanceMode(testCtx)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get list of all services")
+	})
+	t.Run("should error on rewriting service", func(t *testing.T) {
+		// given
+		noopRec := &NoopEventRecorder{}
+		clientMock := mocks.NewClient(t)
+		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(nil)
+		updateMock := mocks.NewIngressUpdater(t)
+		svcRewriter := NewServiceRewriter(t)
+		svcRewriter.On("rewrite", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+
+		sut := &maintenanceModeUpdater{
+			client:          clientMock,
+			namespace:       "el-espacio-del-nombre",
+			eventRecorder:   noopRec,
+			ingressUpdater:  updateMock,
+			serviceRewriter: svcRewriter,
+		}
+
+		// when
+		err := sut.deactivateMaintenanceMode(testCtx)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to rewrite services during maintenance mode deactivation")
+	})
+}
+
+type NoopEventRecorder struct{}
+
+func (n *NoopEventRecorder) Event(_ runtime.Object, _, _, _ string)                    {}
+func (n *NoopEventRecorder) Eventf(_ runtime.Object, _, _, _ string, _ ...interface{}) {}
+func (n *NoopEventRecorder) AnnotatedEventf(_ runtime.Object, _ map[string]string, _, _, _ string, _ ...interface{}) {
+}
+
+type NoopServiceRewriter struct{}
+
+func (n *NoopServiceRewriter) rewrite(_ context.Context, _ v1ServiceList, _ bool) error { return nil }
