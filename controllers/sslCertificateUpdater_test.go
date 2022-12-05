@@ -3,6 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	mocks2 "github.com/cloudogu/k8s-service-discovery/controllers/mocks"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"testing"
 	"time"
 
@@ -28,27 +32,32 @@ import (
 func getScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group:   "k8s.cloudogu.com",
+		Version: "v1",
+		Kind:    "Dogu",
+	}, &doguv1.Dogu{})
 	return scheme
 }
 
 func Test_sslCertificateUpdater_Start(t *testing.T) {
-	t.Run("run start and send done to context", func(t *testing.T) {
+	t.Run("run start without change and send done to context", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-		watchContextMock := &mocks.WatchConfigurationContext{}
-		globalConfigMock := &mocks.ConfigurationContext{}
-		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
-		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
+		regMock := mocks.NewRegistry(t)
+		watchContextMock := mocks.NewWatchConfigurationContext(t)
 		regMock.On("RootConfig").Return(watchContextMock, nil)
-		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Return()
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
+		recorderMock := mocks2.NewEventRecorder(t)
+
 		namespace := "myTestNamespace"
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*50)
@@ -63,9 +72,8 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 
 	t.Run("run start and send change event", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		watchContextMock := &mocks.WatchConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		watchContextMock := mocks.NewWatchConfigurationContext(t)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
 			sendChannel, ok := channelobject.(chan *etcdclient.Response)
@@ -77,17 +85,22 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		}).Return()
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 
-		globalConfigMock := &mocks.ConfigurationContext{}
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
 		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
+
 		namespace := "myTestNamespace"
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*2)
@@ -110,9 +123,8 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 
 	t.Run("run start and get error on ssl change method", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		watchContextMock := &mocks.WatchConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		watchContextMock := mocks.NewWatchConfigurationContext(t)
 		watchContextMock.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Run(func(args mock.Arguments) {
 			channelobject := args.Get(3)
 			sendChannel, ok := channelobject.(chan *etcdclient.Response)
@@ -124,7 +136,7 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		}).Return()
 		regMock.On("RootConfig").Return(watchContextMock, nil)
 
-		globalConfigMock := &mocks.ConfigurationContext{}
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("", assert.AnError)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
@@ -150,9 +162,8 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 	t.Run("error on retrieving server cert", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		globalConfigMock := &mocks.ConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("", assert.AnError)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
@@ -173,9 +184,8 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 
 	t.Run("error on retrieving server key", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		globalConfigMock := &mocks.ConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
 		globalConfigMock.On("Get", "certificate/server.key").Return("", assert.AnError)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
@@ -197,9 +207,8 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 
 	t.Run("key not found on retrieving server key result in no error", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		globalConfigMock := &mocks.ConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
 		globalConfigMock.On("Get", "certificate/server.key").Return("", fmt.Errorf("error: Key not found"))
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
@@ -221,12 +230,14 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 
 	t.Run("successfully handle ssl change with existing ssl secret", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		globalConfigMock := &mocks.ConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
 		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
 
 		namespace := "myTestNamespace"
 		initialSslSecret := &v1.Secret{
@@ -240,11 +251,14 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 			},
 			Type: v1.SecretTypeTLS,
 		}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(initialSslSecret).Build()
+
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment, initialSslSecret).Build()
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		// when
@@ -264,19 +278,23 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 
 	t.Run("successfully handle ssl change", func(t *testing.T) {
 		// given
-		regMock := &mocks.Registry{}
-
-		globalConfigMock := &mocks.ConfigurationContext{}
+		regMock := mocks.NewRegistry(t)
+		globalConfigMock := mocks.NewConfigurationContext(t)
 		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
 		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
+
 		namespace := "myTestNamespace"
+		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 		sslUpdater := &sslCertificateUpdater{
-			client:    clientMock,
-			namespace: namespace,
-			registry:  regMock,
+			client:        clientMock,
+			namespace:     namespace,
+			registry:      regMock,
+			eventRecorder: recorderMock,
 		}
 
 		// when

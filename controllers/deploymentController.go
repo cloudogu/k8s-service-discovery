@@ -3,12 +3,17 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 )
+
+const legacyDoguLabel = "dogu"
 
 // deploymentReconciler watches every Deployment object in the cluster and creates ingress objects when the ready state
 // of a dogu changes between ready <-> not ready.
@@ -76,7 +81,7 @@ func (r *deploymentReconciler) getDeployment(ctx context.Context, req ctrl.Reque
 
 func hasDoguLabel(deployment client.Object) bool {
 	for label := range deployment.GetLabels() {
-		if label == "dogu" || label == "dogu.name" {
+		if label == legacyDoguLabel || label == k8sv1.DoguLabelName {
 			return true
 		}
 	}

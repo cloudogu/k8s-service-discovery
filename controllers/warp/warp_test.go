@@ -4,13 +4,16 @@ import (
 	"context"
 	_ "embed"
 	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
+	mocks2 "github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	etcdclient "go.etcd.io/etcd/client/v2"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	client2 "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -47,14 +50,14 @@ func TestNewWatcher(t *testing.T) {
 		err := client.Create(ctx, &k8sConfig)
 		require.NoError(t, err)
 		namespace := "test"
-		mockRegistry := &cesmocks.Registry{}
-		watchRegistry := &cesmocks.WatchConfigurationContext{}
+		mockRegistry := cesmocks.NewRegistry(t)
+		watchRegistry := cesmocks.NewWatchConfigurationContext(t)
 		mockRegistry.On("RootConfig").Return(watchRegistry)
 		err = os.Unsetenv("STAGE")
 		require.NoError(t, err)
 
 		// when
-		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace)
+		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, mocks2.NewEventRecorder(t))
 
 		// then
 		require.NoError(t, err)
@@ -74,7 +77,7 @@ func TestNewWatcher(t *testing.T) {
 		client := fake.NewClientBuilder().Build()
 
 		// when
-		_, err = NewWatcher(context.TODO(), client, nil, "test")
+		_, err = NewWatcher(context.TODO(), client, nil, "test", mocks2.NewEventRecorder(t))
 
 		// then
 		require.Error(t, err)
@@ -96,19 +99,16 @@ func TestWatcher_Run(t *testing.T) {
 		}()
 
 		// create the config with 3 sources and an empty menu json configmap
-		client := fake.NewClientBuilder().Build()
 		k8sConfig.ResourceVersion = ""
-		err := client.Create(ctx, &k8sConfig)
-		require.NoError(t, err)
-		err = client.Create(ctx, &menuConfigMap)
-		require.NoError(t, err)
-		err = os.Unsetenv("STAGE")
+		namespace := "test"
+		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
+		client := fake.NewClientBuilder().WithObjects(&k8sConfig, &menuConfigMap, deployment).Build()
+		err := os.Unsetenv("STAGE")
 		require.NoError(t, err)
 
 		// prepare mocks
-		namespace := "test"
-		mockRegistry := &cesmocks.Registry{}
-		watchRegistry := &cesmocks.WatchConfigurationContext{}
+		mockRegistry := cesmocks.NewRegistry(t)
+		watchRegistry := cesmocks.NewWatchConfigurationContext(t)
 		watchEvent := &etcdclient.Response{}
 		mockRegistry.On("RootConfig").Return(watchRegistry)
 		watchRegistry.On("Watch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -116,7 +116,10 @@ func TestWatcher_Run(t *testing.T) {
 			warpChannel <- watchEvent
 		}).Times(3)
 
-		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace)
+		recorderMock := mocks2.NewEventRecorder(t)
+		recorderMock.On("Event", mock.IsType(&v1.Deployment{}), "Normal", "WarpMenu", "Warp menu updated.")
+
+		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, recorderMock)
 		require.NoError(t, err)
 
 		// prepare result categories

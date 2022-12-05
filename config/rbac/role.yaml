@@ -18,10 +18,44 @@ rules:
   - apiGroups:
       - "*"
     resources:
+      - pods
+    verbs:
+      - list
+      - watch
+      - get
+      - delete
+  - apiGroups:
+      - "*"
+    resources:
       - deployments
-      - secrets
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - "*"
+    resources:
       - services
     verbs:
       - list
       - watch
       - get
+# update is necessary for rewriting exposed services to be blocked during maintenance mode
+      - update
+  - apiGroups:
+      - "*"
+    resources:
+      - secrets
+    verbs:
+      - list
+      - watch
+      - get
+      - create
+      - delete
+  - apiGroups:
+      - "k8s.cloudogu.com"
+    resources:
+      - dogus
+    verbs:
+      - watch
+      - list
