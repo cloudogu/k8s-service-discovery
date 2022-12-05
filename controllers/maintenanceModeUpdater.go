@@ -167,6 +167,11 @@ func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 		}
 	}
 
+	err = scu.rewriteServices(ctx, serviceList, false)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite services during maintenance mode deactivation: %w", err)
+	}
+
 	return nil
 }
 
@@ -200,13 +205,13 @@ func (scu *maintenanceModeUpdater) rewriteServices(ctx context.Context, serviceL
 		// we act on actual services in the list because we want to modify the underlying data structure (which would be
 		// copied with the range while the service list only contains services as values, not as pointers)
 		service := serviceList.Items[i]
-		err2 := rewriteNonSimpleServiceRoute(ctx, scu.client, scu.eventRecorder, &service, activateMaintenanceMode)
-		if err != nil {
-			err = multierror.Append(err, err2)
+		rewriteErr := rewriteNonSimpleServiceRoute(ctx, scu.client, scu.eventRecorder, &service, activateMaintenanceMode)
+		if rewriteErr != nil {
+			err = multierror.Append(err, rewriteErr)
 		}
 	}
 
-	return nil
+	return err
 }
 
 func rewriteNonSimpleServiceRoute(ctx context.Context, cli client.Client, recorder record.EventRecorder, service *v1.Service, rewriteToMaintenance bool) error {

@@ -28,11 +28,20 @@ rules:
       - "*"
     resources:
       - deployments
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - "*"
+    resources:
       - services
     verbs:
       - list
       - watch
       - get
+# update is necessary for rewriting exposed services to be blocked during maintenance mode
+      - update
   - apiGroups:
       - "*"
     resources:
