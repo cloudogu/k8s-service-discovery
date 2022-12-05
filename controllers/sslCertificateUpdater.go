@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudogu/cesapp-lib/core"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/tools/record"
+
 	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
+
 	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,28 +27,30 @@ const (
 	certificateSecretName  = "ecosystem-certificate"
 )
 
+const (
+	certificateChangeEventReason = "Certificate"
+)
+
 // sslCertificateUpdater is responsible to update the ssl certificate of the ecosystem.
 type sslCertificateUpdater struct {
-	client    client.Client
-	namespace string
-	registry  registry.Registry
+	client        client.Client
+	namespace     string
+	registry      registry.Registry
+	eventRecorder record.EventRecorder
 }
 
 // NewSslCertificateUpdater creates a new updater.
-func NewSslCertificateUpdater(client client.Client, namespace string) (*sslCertificateUpdater, error) {
-	endpoint := fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)
-	reg, err := registry.New(core.Registry{
-		Type:      "etcd",
-		Endpoints: []string{endpoint},
-	})
+func NewSslCertificateUpdater(client client.Client, namespace string, recorder record.EventRecorder) (*sslCertificateUpdater, error) {
+	reg, err := cesregistry.Create(namespace)
 	if err != nil {
 		return nil, err
 	}
 
 	return &sslCertificateUpdater{
-		client:    client,
-		namespace: namespace,
-		registry:  reg,
+		client:        client,
+		namespace:     namespace,
+		registry:      reg,
+		eventRecorder: recorder,
 	}, nil
 }
 
@@ -60,7 +66,6 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg regist
 
 	warpChannel := make(chan *etcdclient.Response)
 	go func() {
-		_ = scu.handleSslChange(ctx)
 		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
 		reg.Watch(ctx, serverCertificatePath, true, warpChannel)
 		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
@@ -110,6 +115,13 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create ssl secret: %w", err)
 	}
+
+	deployment := &appsv1.Deployment{}
+	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
+	if err != nil {
+		return fmt.Errorf("ssl changed: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
+	}
+	scu.eventRecorder.Event(deployment, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
 
 	return nil
 }

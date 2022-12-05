@@ -29,23 +29,14 @@ type mockDefinition struct {
 	ReturnValue interface{}
 }
 
-func getCopyMap(definitions map[string]mockDefinition) map[string]mockDefinition {
-	newCopyMap := map[string]mockDefinition{}
-	for k, v := range definitions {
-		newCopyMap[k] = v
-	}
-	return newCopyMap
-}
-
-func getNewMockManager(expectedErrorOnNewManager error, definitions map[string]mockDefinition) manager.Manager {
-	k8sManager := &mocks.Manager{}
+func getNewMockManager(t *testing.T, expectedErrorOnNewManager error, definitions map[string]mockDefinition) *mocks.Manager {
+	k8sManager := mocks.NewManager(t)
 	ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 		for key, value := range definitions {
 			k8sManager.Mock.On(key, value.Arguments...).Return(value.ReturnValue)
 		}
 		return k8sManager, expectedErrorOnNewManager
 	}
-	k8sManager.Mock.On("GetLogger").Return(ctrl.Log)
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	return k8sManager
@@ -85,22 +76,11 @@ func Test_startManager(t *testing.T) {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	defaultMockDefinitions := map[string]mockDefinition{
-		"GetScheme":            {ReturnValue: scheme},
-		"GetClient":            {ReturnValue: client},
-		"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-		"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
-		"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
-		"Start":                {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-		"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
-		"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-	}
-
 	t.Run("Error on missing namespace environment variable", func(t *testing.T) {
 		// given
 		err := os.Unsetenv("WATCH_NAMESPACE")
 		require.NoError(t, err)
-		getNewMockManager(nil, defaultMockDefinitions)
+		getNewMockManager(t, nil, nil)
 
 		// when
 		err = startManager()
@@ -116,7 +96,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given
-		getNewMockManager(expectedError, defaultMockDefinitions)
+		getNewMockManager(t, expectedError, nil)
 
 		// when
 		err := startManager()
@@ -125,29 +105,105 @@ func Test_startManager(t *testing.T) {
 		require.ErrorIs(t, err, expectedError)
 	})
 
-	mockDefinitionsThatCanFail := []string{
-		"Add",
-		"AddHealthzCheck",
-		"AddReadyzCheck",
-		"Start",
-		"SetFields",
-	}
+	t.Run("fail setup when error on Add", func(t *testing.T) {
+		// given
+		mockDefinitions := map[string]mockDefinition{
+			"GetClient":           {ReturnValue: client},
+			"Add":                 {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
+			"GetEventRecorderFor": {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
+		}
+		getNewMockManager(t, nil, mockDefinitions)
 
-	for _, mockDefinitionName := range mockDefinitionsThatCanFail {
-		t.Run(fmt.Sprintf("fail setup when error on %s", mockDefinitionName), func(t *testing.T) {
-			// given
-			adaptedMockDefinitions := getCopyMap(defaultMockDefinitions)
-			adaptedMockDefinitions[mockDefinitionName] = mockDefinition{
-				Arguments:   adaptedMockDefinitions[mockDefinitionName].Arguments,
-				ReturnValue: expectedError,
-			}
-			getNewMockManager(nil, adaptedMockDefinitions)
+		// when
+		err := startManager()
 
-			// when
-			err := startManager()
+		// then
+		require.ErrorIs(t, err, expectedError)
+	})
 
-			// then
-			require.ErrorIs(t, err, expectedError)
-		})
-	}
+	t.Run("fail setup when error on AddHealthzCheck", func(t *testing.T) {
+		// given
+		mockDefinitions := map[string]mockDefinition{
+			"GetScheme":            {ReturnValue: scheme},
+			"GetClient":            {ReturnValue: client},
+			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: expectedError},
+			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
+			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
+			"GetLogger":            {ReturnValue: ctrl.Log},
+		}
+		getNewMockManager(t, nil, mockDefinitions)
+
+		// when
+		err := startManager()
+
+		// then
+		require.ErrorIs(t, err, expectedError)
+	})
+
+	t.Run("fail setup when error on AddReadyzCheck", func(t *testing.T) {
+		// given
+		mockDefinitions := map[string]mockDefinition{
+			"GetScheme":            {ReturnValue: scheme},
+			"GetClient":            {ReturnValue: client},
+			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
+			"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: expectedError},
+			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
+			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
+			"GetLogger":            {ReturnValue: ctrl.Log},
+		}
+		getNewMockManager(t, nil, mockDefinitions)
+
+		// when
+		err := startManager()
+
+		// then
+		require.ErrorIs(t, err, expectedError)
+	})
+
+	t.Run("fail setup when error on Start", func(t *testing.T) {
+		// given
+		mockDefinitions := map[string]mockDefinition{
+			"GetScheme":            {ReturnValue: scheme},
+			"GetClient":            {ReturnValue: client},
+			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
+			"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
+			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
+			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
+			"GetLogger":            {ReturnValue: ctrl.Log},
+			"Start":                {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
+		}
+		getNewMockManager(t, nil, mockDefinitions)
+
+		// when
+		err := startManager()
+
+		// then
+		require.ErrorIs(t, err, expectedError)
+	})
+
+	t.Run("fail setup when error on SetFields", func(t *testing.T) {
+		// given
+		mockDefinitions := map[string]mockDefinition{
+			"GetScheme":            {ReturnValue: scheme},
+			"GetClient":            {ReturnValue: client},
+			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
+			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
+			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
+			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
+			"GetLogger":            {ReturnValue: ctrl.Log},
+		}
+		getNewMockManager(t, nil, mockDefinitions)
+
+		// when
+		err := startManager()
+
+		// then
+		require.ErrorIs(t, err, expectedError)
+	})
 }
