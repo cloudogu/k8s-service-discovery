@@ -2,8 +2,9 @@ package controllers
 
 import (
 	"context"
-	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
-	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -11,9 +12,11 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
-	"time"
+
+	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
+	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 )
 
 func TestNewMaintenanceModeUpdater(t *testing.T) {
@@ -228,5 +231,130 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func Test_isServiceNginxRelated(t *testing.T) {
+	t.Run("should return true for nginx-prefixed dogu service", func(t *testing.T) {
+		svc := &corev1.Service{Spec: corev1.ServiceSpec{
+			Selector: map[string]string{"dogu.name": "nginx-static"},
+		}}
+
+		assert.True(t, isServiceNginxRelated(svc))
+	})
+	t.Run("should return false for other dogu services", func(t *testing.T) {
+		svc := &corev1.Service{Spec: corev1.ServiceSpec{
+			Selector: map[string]string{"dogu.name": "totally-not-an-nginx-static-service"},
+		}}
+
+		assert.False(t, isServiceNginxRelated(svc))
+	})
+}
+
+func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
+	testCtx := context.Background()
+	testNS := "test-namespace"
+	t.Run("should rewrite selector of dogu service to a non-existing target for maintenance mode activation", func(t *testing.T) {
+		// given
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nexus"}},
+		}
+		mockRecorder := mocks.NewEventRecorder(t)
+		mockRecorder.On("Eventf", svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was activated, rewriting exposed service %s", "nexus")
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(svc).Build()
+
+		// when
+		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, true)
+
+		// then
+		require.NoError(t, err)
+		actualSvc := corev1.Service{}
+		err = clientMock.Get(testCtx, types.NamespacedName{
+			Namespace: testNS,
+			Name:      "nexus",
+		}, &actualSvc)
+		require.NoError(t, err)
+
+		expectedSvc := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
+		}
+		// ignore version which the client introduces
+		expectedSvc.ResourceVersion = "1000"
+		actualSvc.ResourceVersion = "1000"
+		assert.Equal(t, expectedSvc.Spec, actualSvc.Spec)
+		assert.Equal(t, expectedSvc.ObjectMeta, actualSvc.ObjectMeta)
+	})
+	t.Run("should rewrite selector of dogu service to a non-existing target for maintenance mode activation", func(t *testing.T) {
+		// given
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
+		}
+		mockRecorder := mocks.NewEventRecorder(t)
+		mockRecorder.On("Eventf", svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(svc).Build()
+
+		// when
+		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
+
+		// then
+		require.NoError(t, err)
+		actualSvc := corev1.Service{}
+		err = clientMock.Get(testCtx, types.NamespacedName{
+			Namespace: testNS,
+			Name:      "nexus",
+		}, &actualSvc)
+		require.NoError(t, err)
+
+		expectedSvc := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nexus"}},
+		}
+		// ignore version which the client introduces
+		expectedSvc.ResourceVersion = "1000"
+		actualSvc.ResourceVersion = "1000"
+		assert.Equal(t, expectedSvc.Spec, actualSvc.Spec)
+		assert.Equal(t, expectedSvc.ObjectMeta, actualSvc.ObjectMeta)
+	})
+	t.Run("should error when API request fails", func(t *testing.T) {
+		// given
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testNS,
+				Name:      "nexus",
+				Labels:    map[string]string{"dogu.name": "nexus"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
+		}
+		mockRecorder := mocks.NewEventRecorder(t)
+		mockRecorder.On("Eventf", svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
+		clientMock := mocks.NewClient(t)
+		clientMock.On("Update", testCtx, svc).Return(assert.AnError)
+
+		// when
+		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "could not rewrite service nexus")
 	})
 }

@@ -3,7 +3,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	etcdclient "go.etcd.io/etcd/client/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -16,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/cloudogu/cesapp-lib/registry"
+	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+
 	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
 )
 
@@ -27,6 +31,8 @@ const (
 const (
 	maintenanceChangeEventReason = "Maintenance"
 )
+
+const exposedServiceMaintenanceSelectorKey = "deactivatedDuringMaintenance"
 
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
@@ -180,5 +186,62 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 		}
 	}
 
+	err = scu.rewriteServices(ctx, serviceList, true)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite services during maintenance mode activation: %w", err)
+	}
+
+	return err
+}
+
+func (scu *maintenanceModeUpdater) rewriteServices(ctx context.Context, serviceList *v1.ServiceList, activateMaintenanceMode bool) error {
+	var err error
+	for i := range serviceList.Items {
+		// we act on actual services in the list because we want to modify the underlying data structure (which would be
+		// copied with the range while the service list only contains services as values, not as pointers)
+		service := serviceList.Items[i]
+		err2 := rewriteNonSimpleServiceRoute(ctx, scu.client, scu.eventRecorder, &service, activateMaintenanceMode)
+		if err != nil {
+			err = multierror.Append(err, err2)
+		}
+	}
+
 	return nil
+}
+
+func rewriteNonSimpleServiceRoute(ctx context.Context, cli client.Client, recorder record.EventRecorder, service *v1.Service, rewriteToMaintenance bool) error {
+	if service.Spec.Type == v1.ServiceTypeClusterIP {
+		return nil
+	}
+
+	if service.Spec.Selector[k8sv1.DoguLabelName] == "" {
+		return nil
+	}
+
+	if isServiceNginxRelated(service) {
+		return nil
+	}
+
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating service object [%s]", service.Name))
+
+	var serviceEventMsg string
+	if rewriteToMaintenance {
+		serviceEventMsg = "Maintenance mode was activated, rewriting exposed service %s"
+		service.Spec.Selector = map[string]string{k8sv1.DoguLabelName: exposedServiceMaintenanceSelectorKey}
+	} else {
+		serviceEventMsg = "Maintenance mode was deactivated, restoring exposed service %s"
+		service.Spec.Selector = map[string]string{k8sv1.DoguLabelName: service.Labels[k8sv1.DoguLabelName]}
+	}
+	recorder.Eventf(service, v1.EventTypeNormal, maintenanceChangeEventReason, serviceEventMsg, service.Name)
+
+	err := cli.Update(ctx, service)
+	if err != nil {
+		return fmt.Errorf("could not rewrite service %s: %w", service.Name, err)
+	}
+
+	return nil
+}
+
+func isServiceNginxRelated(service *v1.Service) bool {
+	return strings.HasPrefix(service.Spec.Selector[k8sv1.DoguLabelName], "nginx-")
 }
