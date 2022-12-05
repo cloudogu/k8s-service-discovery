@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.0] - 2022-12-05
+
 ## [v0.6.0] - 2022-11-15
 ### Added
 - [#12] All dogus that are not ready are created with a "Dogu is starting"-page ingress object. The ingress object is 
