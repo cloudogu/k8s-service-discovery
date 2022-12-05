@@ -3,12 +3,14 @@ package controllers
 import (
 	"context"
 	"fmt"
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/client-go/tools/record"
 	"strings"
 
-	"github.com/cloudogu/cesapp-lib/core"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/tools/record"
+
 	"github.com/cloudogu/cesapp-lib/registry"
+	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
+
 	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -39,11 +41,7 @@ type sslCertificateUpdater struct {
 
 // NewSslCertificateUpdater creates a new updater.
 func NewSslCertificateUpdater(client client.Client, namespace string, recorder record.EventRecorder) (*sslCertificateUpdater, error) {
-	endpoint := fmt.Sprintf("http://etcd.%s.svc.cluster.local:4001", namespace)
-	reg, err := registry.New(core.Registry{
-		Type:      "etcd",
-		Endpoints: []string{endpoint},
-	})
+	reg, err := cesregistry.Create(namespace)
 	if err != nil {
 		return nil, err
 	}
