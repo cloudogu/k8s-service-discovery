@@ -370,13 +370,11 @@ func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
 			},
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
 		}
-		internalSvcList := []corev1.Service{svc}
-		svcPointer := &(internalSvcList[0])
-		svcList := &corev1.ServiceList{Items: internalSvcList}
+		internalSvcList := []*corev1.Service{&svc}
 		mockRecorder := mocks.NewEventRecorder(t)
 		mockRecorder.On("Eventf", mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
 		clientMock := mocks.NewClient(t)
-		clientMock.On("Update", testCtx, svcPointer).Return(assert.AnError)
+		clientMock.On("Update", testCtx, &svc).Return(assert.AnError)
 
 		sut := &maintenanceModeUpdater{
 			client:        clientMock,
@@ -385,7 +383,36 @@ func Test_maintenanceModeUpdater_rewriteServices(t *testing.T) {
 		}
 
 		// when
-		err := sut.rewriteServices(testCtx, svcList, false)
+		err := sut.rewriteServices(testCtx, internalSvcList, false)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "could not rewrite service nexus")
+	})
+	t.Run("should error during maintenance activation", func(t *testing.T) {
+		// given
+		svc := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "nexus",
+				Labels: map[string]string{"dogu.name": "deactivatedDuringMaintenance"},
+			},
+			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nexus"}},
+		}
+		internalSvcList := []*corev1.Service{&svc}
+		mockRecorder := mocks.NewEventRecorder(t)
+		mockRecorder.On("Eventf", mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was activated, rewriting exposed service %s", "nexus")
+		clientMock := mocks.NewClient(t)
+		clientMock.On("Update", testCtx, &svc).Return(assert.AnError)
+
+		sut := &maintenanceModeUpdater{
+			client:        clientMock,
+			namespace:     "el-espacio-del-nombre",
+			eventRecorder: mockRecorder,
+		}
+
+		// when
+		err := sut.rewriteServices(testCtx, internalSvcList, true)
 
 		// then
 		require.Error(t, err)

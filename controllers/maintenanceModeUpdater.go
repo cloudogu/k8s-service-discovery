@@ -34,6 +34,8 @@ const (
 
 const exposedServiceMaintenanceSelectorKey = "deactivatedDuringMaintenance"
 
+type v1ServiceList []*v1.Service
+
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
 	client         client.Client
@@ -141,14 +143,19 @@ func (scu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) er
 	return nil
 }
 
-func (scu *maintenanceModeUpdater) getAllServices(ctx context.Context) (*v1.ServiceList, error) {
+func (scu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1ServiceList, error) {
 	serviceList := &v1.ServiceList{}
 	err := scu.client.List(ctx, serviceList, &client.ListOptions{Namespace: scu.namespace})
 	if err != nil {
-		return &v1.ServiceList{}, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", scu.namespace, err)
+		return nil, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", scu.namespace, err)
 	}
 
-	return serviceList, nil
+	var modifiableServiceList v1ServiceList
+	for _, svc := range serviceList.Items {
+		modifiableServiceList = append(modifiableServiceList, &svc)
+	}
+
+	return modifiableServiceList, nil
 }
 
 func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context) error {
@@ -159,9 +166,9 @@ func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 		return fmt.Errorf("failed to deactivate maintenance mode: %w", err)
 	}
 
-	for _, service := range serviceList.Items {
+	for _, service := range serviceList {
 		log.FromContext(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpsertIngressForService(ctx, &service)
+		err := scu.ingressUpdater.UpsertIngressForService(ctx, service)
 		if err != nil {
 			return err
 		}
@@ -183,9 +190,9 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 		return fmt.Errorf("failed to activate maintenance mode: %w", err)
 	}
 
-	for _, service := range serviceList.Items {
+	for _, service := range serviceList {
 		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpsertIngressForService(ctx, &service)
+		err := scu.ingressUpdater.UpsertIngressForService(ctx, service)
 		if err != nil {
 			return err
 		}
@@ -199,13 +206,10 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 	return err
 }
 
-func (scu *maintenanceModeUpdater) rewriteServices(ctx context.Context, serviceList *v1.ServiceList, activateMaintenanceMode bool) error {
+func (scu *maintenanceModeUpdater) rewriteServices(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error {
 	var err error
-	for i := range serviceList.Items {
-		// we act on actual services in the list because we want to modify the underlying data structure (which would be
-		// copied with the range while the service list only contains services as values, not as pointers)
-		service := serviceList.Items[i]
-		rewriteErr := rewriteNonSimpleServiceRoute(ctx, scu.client, scu.eventRecorder, &service, activateMaintenanceMode)
+	for _, service := range serviceList {
+		rewriteErr := rewriteNonSimpleServiceRoute(ctx, scu.client, scu.eventRecorder, service, activateMaintenanceMode)
 		if rewriteErr != nil {
 			err = multierror.Append(err, rewriteErr)
 		}
