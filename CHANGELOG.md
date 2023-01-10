@@ -5,8 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- [#16] add/update label for consistent mass deletion of CES K8s resources
+  - select any k8s-service-discovery related resources like this: `kubectl get deploy,pod,... -l app=ces,app.kubernetes.io/name=k8s-service-discovery`
+  - select all CES components like this: `kubectl get deploy,pod,... -l app=ces`
 
 ## [v0.7.0] - 2022-12-05
+### Changed
+- [#14] Write important events on dogu resources
+- Update RBAC permissions to apply only a minimum set of privileges 
 
 ## [v0.6.0] - 2022-11-15
 ### Added
