@@ -6,7 +6,8 @@ kind: ConfigMap
 metadata:
   name: k8s-ces-warp-config
   labels:
-    app: cloudogu-ecosystem
+    app: ces
+    app.kubernetes.io/name: k8s-service-discovery
 data:
   warp: |
     sources:
