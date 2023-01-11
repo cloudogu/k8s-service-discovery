@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -62,7 +63,8 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	ingressClassResource := &networking.IngressClass{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: icc.className,
+			Name:   icc.className,
+			Labels: map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"},
 		},
 		Spec: networking.IngressClassSpec{
 			Controller: "k8s.io/nginx-ingress",
