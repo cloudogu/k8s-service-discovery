@@ -194,6 +194,8 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{
+		// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
+		// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
 		ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
 	}
 
