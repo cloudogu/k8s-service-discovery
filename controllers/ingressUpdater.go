@@ -21,11 +21,12 @@ import (
 )
 
 const (
-	staticContentBackendName           = "nginx-static"
-	staticContentBackendPort           = 80
-	staticContentBackendRewrite        = "/errors/503.html"
-	staticContentDoguIsStartingRewrite = "/errors/starting.html"
-	ingressRewriteTargetAnnotation     = "nginx.ingress.kubernetes.io/rewrite-target"
+	staticContentBackendName              = "nginx-static"
+	staticContentBackendPort              = 80
+	staticContentBackendRewrite           = "/errors/503.html"
+	staticContentDoguIsStartingRewrite    = "/errors/starting.html"
+	ingressRewriteTargetAnnotation        = "nginx.ingress.kubernetes.io/rewrite-target"
+	ingressConfigurationSnippetAnnotation = "nginx.ingress.kubernetes.io/configuration-snippet"
 )
 
 const (
@@ -192,7 +193,9 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
-	annotations := map[string]string{}
+	annotations := map[string]string{
+		ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+	}
 
 	if cesService.Pass != cesService.Location {
 		annotations[ingressRewriteTargetAnnotation] = cesService.Pass

@@ -329,7 +329,10 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
-		assert.Equal(t, cesServiceWithOneWebapp.Pass, ingressResource.Annotations[ingressRewriteTargetAnnotation])
+		assert.Equal(t, map[string]string{
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
+		}, ingressResource.Annotations)
 	})
 	t.Run("Create default ingress for nginx-static dogu even when maintenance mode is active", func(t *testing.T) {
 		doguName := "nginx-static"
@@ -382,7 +385,10 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
-		assert.Equal(t, cesServiceWithOneWebapp.Pass, ingressResource.Annotations[ingressRewriteTargetAnnotation])
+		assert.Equal(t, map[string]string{
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
+		}, ingressResource.Annotations)
 	})
 	t.Run("Create ingress resource for a single ces service while maintenance mode is active", func(t *testing.T) {
 		// given
@@ -428,7 +434,9 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
 		assert.Equal(t, "nginx-static", ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(80), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
-		assert.Equal(t, "/errors/503.html", ingressResource.Annotations[ingressRewriteTargetAnnotation])
+		assert.Equal(t, map[string]string{
+			ingressRewriteTargetAnnotation: "/errors/503.html",
+		}, ingressResource.Annotations)
 	})
 	t.Run("Failed to wait for deployment to be ready -> stuck at dogu is staring ingress object", func(t *testing.T) {
 		// given
@@ -478,7 +486,9 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
 		assert.Equal(t, "nginx-static", ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(80), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
-		assert.Equal(t, "/errors/starting.html", ingressResource.Annotations[ingressRewriteTargetAnnotation])
+		assert.Equal(t, map[string]string{
+			ingressRewriteTargetAnnotation: "/errors/starting.html",
+		}, ingressResource.Annotations)
 	})
 	t.Run("Update an existing ingress object with new ces service data", func(t *testing.T) {
 		// given
@@ -557,6 +567,9 @@ func Test_ingressUpdater_updateServiceIngressObject(t *testing.T) {
 		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesService.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
-		assert.Equal(t, cesService.Pass, ingressResource.Annotations[ingressRewriteTargetAnnotation])
+		assert.Equal(t, map[string]string{
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressRewriteTargetAnnotation:        cesService.Pass,
+		}, ingressResource.Annotations)
 	})
 }
