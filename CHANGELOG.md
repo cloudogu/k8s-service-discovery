@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.9.0] - 2023-02-10
+### Changed
+- [#17] add `Accept-Encoding: "identity"` header to requests proxied by nginx-ingress
+
 ## [v0.8.0] - 2023-01-11
 ### Changed
 - [#16] add/update label for consistent mass deletion of CES K8s resources
