@@ -3,14 +3,13 @@ package controllers
 import (
 	"context"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/util/retry"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/tools/record"
 
 	"github.com/cloudogu/cesapp-lib/registry"
-	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
-
 	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,22 +39,17 @@ type sslCertificateUpdater struct {
 }
 
 // NewSslCertificateUpdater creates a new updater.
-func NewSslCertificateUpdater(client client.Client, namespace string, recorder record.EventRecorder) (*sslCertificateUpdater, error) {
-	reg, err := cesregistry.Create(namespace)
-	if err != nil {
-		return nil, err
-	}
-
+func NewSslCertificateUpdater(client client.Client, namespace string, cesRegistry registry.Registry, recorder record.EventRecorder) *sslCertificateUpdater {
 	return &sslCertificateUpdater{
 		client:        client,
 		namespace:     namespace,
-		registry:      reg,
+		registry:      cesRegistry,
 		eventRecorder: recorder,
-	}, nil
+	}
 }
 
 // Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
-func (scu sslCertificateUpdater) Start(ctx context.Context) error {
+func (scu *sslCertificateUpdater) Start(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Starting ssl updater...")
 	return scu.startEtcdWatch(ctx, scu.registry.RootConfig())
@@ -64,10 +58,10 @@ func (scu sslCertificateUpdater) Start(ctx context.Context) error {
 func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg registry.WatchConfigurationContext) error {
 	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on certificate keys")
 
-	warpChannel := make(chan *etcdclient.Response)
+	sslChannel := make(chan *etcdclient.Response)
 	go func() {
 		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
-		reg.Watch(ctx, serverCertificatePath, true, warpChannel)
+		reg.Watch(ctx, serverCertificatePath, true, sslChannel)
 		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
 	}()
 
@@ -75,7 +69,7 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg regist
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-warpChannel:
+		case <-sslChannel:
 			ctrl.Log.Info(fmt.Sprintf("Context: [%+v]", ctx))
 			err := scu.handleSslChange(ctx)
 			if err != nil {
@@ -97,31 +91,46 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 		return err
 	}
 
-	sslSecret, ok, err := scu.getSslSecret(ctx)
-	if err != nil {
-		return err
-	}
-
-	if ok {
-		ctrl.LoggerFrom(ctx).Info("Found old ssl secret. Deleting it before recreation...")
-		err = scu.deleteSslSecret(ctx, sslSecret)
-		if err != nil {
-			return fmt.Errorf("failed to create ssl secret: %w", err)
-		}
-	}
-
-	ctrl.LoggerFrom(ctx).Info("Creating new ssl secret...")
-	err = scu.createSslSecret(ctx, cert, key)
-	if err != nil {
-		return fmt.Errorf("failed to create ssl secret: %w", err)
-	}
-
 	deployment := &appsv1.Deployment{}
 	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
 	if err != nil {
-		return fmt.Errorf("ssl changed: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
+		return fmt.Errorf("ssl handling: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
-	scu.eventRecorder.Event(deployment, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
+
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		sslSecret, ok, err := scu.getSslSecret(ctx)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			ctrl.LoggerFrom(ctx).Info("Creating new ssl secret...")
+			err = scu.createSslSecret(ctx, cert, key)
+			if err != nil {
+				return fmt.Errorf("failed to create ssl secret: %w", err)
+			}
+			scu.eventRecorder.Event(deployment, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret created.")
+			return nil
+		}
+
+		sslSecret.StringData = map[string]string{
+			v1.TLSCertKey:       cert,
+			v1.TLSPrivateKeyKey: key,
+		}
+
+		ctrl.LoggerFrom(ctx).Info("Update ssl secret...")
+		err = scu.client.Update(ctx, sslSecret)
+		if err != nil {
+			return fmt.Errorf("failed to update ssl secret: %w", err)
+		}
+		scu.eventRecorder.Event(deployment, v1.EventTypeNormal, certificateChangeEventReason, "SSL secret changed.")
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timout during ssl secret update: %w", err)
+	}
 
 	return nil
 }
@@ -174,15 +183,6 @@ func (scu *sslCertificateUpdater) createSslSecret(ctx context.Context, cert stri
 	err := scu.client.Create(ctx, sslSecret)
 	if err != nil {
 		return fmt.Errorf("failed to create secret [%s/%s]: %w", scu.namespace, certificateSecretName, err)
-	}
-
-	return nil
-}
-
-func (scu *sslCertificateUpdater) deleteSslSecret(ctx context.Context, secret *v1.Secret) error {
-	err := scu.client.Delete(ctx, secret)
-	if err != nil {
-		return fmt.Errorf("failed to delete secret [%s/%s]: %w", scu.namespace, certificateSecretName, err)
 	}
 
 	return nil

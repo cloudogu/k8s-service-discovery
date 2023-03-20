@@ -9,6 +9,7 @@ import (
 	"fmt"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
+	etcdclient "go.etcd.io/etcd/client/v2"
 	"k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -240,6 +241,30 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
 			Expect(expectedIngress.Items[1].Annotations[ingressRewriteTargetAnnotation]).Should(Equal("/nexus/repository/docker-registry/v2"))
+		})
+
+		It("Should create ssl cert", func() {
+			By("Create test data")
+			createSelfDeployment(k8sClient)
+
+			By("Trigger channel")
+			SSLChannel <- &etcdclient.Response{}
+
+			By("Expect ssl secret")
+			Eventually(func() bool {
+				secret := &corev1.Secret{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: "ecosystem-certificate", Namespace: myNamespace}, secret)
+				if err != nil {
+					return false
+				}
+
+				data := secret.StringData
+				if data[corev1.TLSCertKey] == "mycert" && data[corev1.TLSPrivateKeyKey] == "mykey" {
+					return true
+				}
+
+				return true
+			}, timeoutInterval, pollingInterval).Should(BeTrue())
 		})
 	})
 })

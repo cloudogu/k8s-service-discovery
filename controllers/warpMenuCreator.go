@@ -40,7 +40,5 @@ func (wmc warpMenuCreator) CreateWarpMenu(ctx context.Context) error {
 		return fmt.Errorf("failed to create warp menu watcher: %w", err)
 	}
 
-	warpWatcher.Run(ctx)
-
-	return nil
+	return warpWatcher.Run(ctx)
 }

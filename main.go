@@ -3,6 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	ginlogrus "github.com/toorop/gin-logrus"
 	"os"
 
 	"k8s.io/client-go/tools/record"
@@ -28,11 +32,12 @@ import (
 
 const (
 	IngressClassName = "k8s-ecosystem-ces-service"
+	apiPort          = 9090
 )
 
 var (
 	scheme               = runtime.NewScheme()
-	setupLog             = ctrl.Log.WithName("setup")
+	logger               = ctrl.Log.WithName("k8s-service-discovery")
 	metricsAddr          string
 	enableLeaderElection bool
 	probeAddr            string
@@ -48,20 +53,20 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 
 	if err := logging.ConfigureLogger(); err != nil {
-		setupLog.Error(err, "unable configure logger")
+		logger.Error(err, "unable configure logger")
 		os.Exit(1)
 	}
 }
 
 func main() {
 	if err := startManager(); err != nil {
-		setupLog.Error(err, "unable to start manager")
+		logger.Error(err, "manager produced an error")
 		os.Exit(1)
 	}
 }
 
 func startManager() error {
-	setupLog.Info("Starting k8s-service-discovery...")
+	logger.Info("Starting k8s-service-discovery...")
 
 	options, err := getK8sManagerOptions()
 	if err != nil {
@@ -84,11 +89,19 @@ func startManager() error {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
 
+	go func() {
+		router := createRouter(reg)
+		err = router.Run(fmt.Sprintf(":%d", apiPort))
+		if err != nil {
+			logger.Error(fmt.Errorf("failed to start gin router %w", err), "SSL api error")
+		}
+	}()
+
 	if err = handleWarpMenuCreation(k8sManager, reg, options.Namespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err = handleSslUpdates(k8sManager, options.Namespace, eventRecorder); err != nil {
+	if err = handleSslUpdates(k8sManager, options.Namespace, reg, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
@@ -106,7 +119,7 @@ func startManager() error {
 	}
 
 	if err = startK8sManager(k8sManager); err != nil {
-		return fmt.Errorf("failed to start service discovery manager: %w", err)
+		return fmt.Errorf("failure at service discovery manager: %w", err)
 	}
 
 	return nil
@@ -148,13 +161,13 @@ func getK8sManagerOptions() (manager.Options, error) {
 		return manager.Options{}, fmt.Errorf("failed to read namespace to watch from environment variable [%s], please set the variable and try again", namespaceEnvVar)
 	}
 	options.Namespace = watchNamespace
-	setupLog.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
+	logger.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
 
 	return options, nil
 }
 
 func startK8sManager(k8sManager manager.Manager) error {
-	setupLog.Info("starting service discovery manager")
+	logger.Info("starting service discovery manager")
 
 	err := k8sManager.Start(ctrl.SetupSignalHandler())
 	if err != nil {
@@ -184,13 +197,10 @@ func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Regist
 	return nil
 }
 
-func handleSslUpdates(k8sManager manager.Manager, namespace string, recorder record.EventRecorder) error {
-	sslUpdater, err := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace, recorder)
-	if err != nil {
-		return fmt.Errorf("failed to create new ssl certificate updater: %w", err)
-	}
+func handleSslUpdates(k8sManager manager.Manager, namespace string, reg registry.Registry, recorder record.EventRecorder) error {
+	sslUpdater := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace, reg, recorder)
 
-	if err = k8sManager.Add(sslUpdater); err != nil {
+	if err := k8sManager.Add(sslUpdater); err != nil {
 		return fmt.Errorf("failed to add ssl certificate updater as runnable to the manager: %w", err)
 	}
 
@@ -234,4 +244,12 @@ func addChecks(mgr manager.Manager) error {
 	}
 
 	return nil
+}
+
+func createRouter(etcdRegistry registry.Registry) *gin.Engine {
+	router := gin.New()
+	router.Use(ginlogrus.Logger(logrus.StandardLogger()), gin.Recovery())
+	logger.Info("Setup ssl api")
+	ssl.SetupAPI(router, etcdRegistry)
+	return router
 }

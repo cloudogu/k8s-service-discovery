@@ -91,7 +91,7 @@ func Test_sslCertificateUpdater_Start(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret created.")
 
 		namespace := "myTestNamespace"
 		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
@@ -228,6 +228,30 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("should return error if the deployment does not exist", func(t *testing.T) {
+		// given
+		regMock := mocks.NewRegistry(t)
+		globalConfigMock := mocks.NewConfigurationContext(t)
+		globalConfigMock.On("Get", "certificate/server.crt").Return("mycert", nil)
+		globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
+		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
+		namespace := "myTestNamespace"
+		sslUpdater := &sslCertificateUpdater{
+			client:    clientMock,
+			namespace: namespace,
+			registry:  regMock,
+		}
+
+		// when
+		err := sslUpdater.handleSslChange(context.Background())
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "ssl handling: failed to get deployment")
+	})
+
 	t.Run("successfully handle ssl change with existing ssl secret", func(t *testing.T) {
 		// given
 		regMock := mocks.NewRegistry(t)
@@ -285,7 +309,7 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
 
 		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret changed.")
+		recorderMock.On("Event", mock.IsType(&appsv1.Deployment{}), "Normal", "Certificate", "SSL secret created.")
 
 		namespace := "myTestNamespace"
 		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
@@ -310,5 +334,15 @@ func Test_sslCertificateUpdater_handleSslChange(t *testing.T) {
 
 		assert.Equal(t, "mycert", sslSecret.StringData[v1.TLSCertKey])
 		assert.Equal(t, "mykey", sslSecret.StringData[v1.TLSPrivateKeyKey])
+	})
+}
+
+func TestNewSslCertificateUpdater(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		// when
+		result := NewSslCertificateUpdater(nil, "nil", nil, nil)
+
+		// then
+		require.NotNil(t, result)
 	})
 }
