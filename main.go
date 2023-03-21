@@ -254,6 +254,6 @@ func createRouter(etcdRegistry registry.Registry) *gin.Engine {
 	router := gin.New()
 	router.Use(ginlogrus.Logger(logrus.StandardLogger()), gin.Recovery())
 	logger.Info("Setup ssl api")
-	ssl.SetupAPI(router, etcdRegistry)
+	ssl.SetupAPI(router, etcdRegistry.GlobalConfig())
 	return router
 }
