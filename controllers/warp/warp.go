@@ -30,7 +30,7 @@ type Watcher struct {
 	k8sClient       client.Client
 	ConfigReader    Reader
 	namespace       string
-	eventRecorder   record.EventRecorder
+	eventRecorder   eventRecorder
 }
 
 type eventRecorder interface {
@@ -51,7 +51,7 @@ type Reader interface {
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, registry cesRegistry, namespace string, recorder record.EventRecorder) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, registry cesRegistry, namespace string, recorder eventRecorder) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)

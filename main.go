@@ -129,7 +129,7 @@ func startManager() error {
 	return nil
 }
 
-func configureManager(k8sManager manager.Manager, updater controllers.IngressUpdater) error {
+func configureManager(k8sManager k8sManager, updater controllers.IngressUpdater) error {
 	if err := configureReconciler(k8sManager, updater); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
@@ -170,7 +170,7 @@ func getK8sManagerOptions() (manager.Options, error) {
 	return options, nil
 }
 
-func startK8sManager(k8sManager manager.Manager) error {
+func startK8sManager(k8sManager k8sManager) error {
 	logger.Info("starting service discovery manager")
 
 	err := k8sManager.Start(ctrl.SetupSignalHandler())
@@ -181,7 +181,7 @@ func startK8sManager(k8sManager manager.Manager) error {
 	return nil
 }
 
-func handleIngressClassCreation(k8sManager manager.Manager, namespace string, recorder record.EventRecorder) error {
+func handleIngressClassCreation(k8sManager k8sManager, namespace string, recorder record.EventRecorder) error {
 	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName, namespace, recorder)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
@@ -191,7 +191,7 @@ func handleIngressClassCreation(k8sManager manager.Manager, namespace string, re
 	return nil
 }
 
-func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Registry, namespace string, recorder record.EventRecorder) error {
+func handleWarpMenuCreation(k8sManager k8sManager, registry registry.Registry, namespace string, recorder record.EventRecorder) error {
 	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), registry, namespace, recorder)
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
@@ -201,7 +201,7 @@ func handleWarpMenuCreation(k8sManager manager.Manager, registry registry.Regist
 	return nil
 }
 
-func handleSslUpdates(k8sManager manager.Manager, namespace string, reg registry.Registry, recorder record.EventRecorder) error {
+func handleSslUpdates(k8sManager k8sManager, namespace string, reg registry.Registry, recorder record.EventRecorder) error {
 	sslUpdater := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace, reg, recorder)
 
 	if err := k8sManager.Add(sslUpdater); err != nil {
@@ -211,7 +211,7 @@ func handleSslUpdates(k8sManager manager.Manager, namespace string, reg registry
 	return nil
 }
 
-func handleMaintenanceMode(k8sManager manager.Manager, namespace string, updater controllers.IngressUpdater, recorder record.EventRecorder) error {
+func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater controllers.IngressUpdater, recorder record.EventRecorder) error {
 	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater, recorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new maintenance updater: %w", err)
@@ -224,7 +224,7 @@ func handleMaintenanceMode(k8sManager manager.Manager, namespace string, updater
 	return nil
 }
 
-func configureReconciler(k8sManager manager.Manager, ingressUpdater controllers.IngressUpdater) error {
+func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater) error {
 	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
@@ -238,7 +238,7 @@ func configureReconciler(k8sManager manager.Manager, ingressUpdater controllers.
 	return nil
 }
 
-func addChecks(mgr manager.Manager) error {
+func addChecks(mgr k8sManager) error {
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return fmt.Errorf("failed to add healthz check: %w", err)
 	}
