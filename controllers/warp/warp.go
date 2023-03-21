@@ -33,13 +33,25 @@ type Watcher struct {
 	eventRecorder   record.EventRecorder
 }
 
+type eventRecorder interface {
+	record.EventRecorder
+}
+
+type cesRegistry interface {
+	registry.Registry
+}
+
+type watchConfigurationContext interface {
+	registry.WatchConfigurationContext
+}
+
 // Reader is used to fetch warp categories with a configuration
 type Reader interface {
 	Read(configuration *config.Configuration) (types.Categories, error)
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.Registry, namespace string, recorder record.EventRecorder) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, registry cesRegistry, namespace string, recorder record.EventRecorder) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)

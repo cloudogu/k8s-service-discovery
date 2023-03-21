@@ -1,8 +1,6 @@
-package ssl_test
+package ssl
 
 import (
-	"github.com/cloudogu/cesapp-lib/registry/mocks"
-	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -14,11 +12,12 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		// given
-		globalConfig := &mocks.ConfigurationContext{}
-		globalConfig.On("Set", "certificate/type", "self-signed").Return(nil)
-		globalConfig.On("Set", "certificate/server.crt", "cert").Return(nil)
-		globalConfig.On("Set", "certificate/server.key", "key").Return(nil)
-		writer := ssl.NewSSLWriter(globalConfig)
+		globalConfig := newMockSetConfigurationContext(t)
+		setExpect := globalConfig.EXPECT().Set
+		setExpect("certificate/type", "self-signed").Return(nil)
+		setExpect("certificate/server.crt", "cert").Return(nil)
+		setExpect("certificate/server.key", "key").Return(nil)
+		writer := NewSSLWriter(globalConfig)
 
 		// when
 		err := writer.WriteCertificate("self-signed", "cert", "key")
@@ -30,9 +29,9 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("failed to write type", func(t *testing.T) {
 		// given
-		globalConfig := &mocks.ConfigurationContext{}
-		globalConfig.On("Set", "certificate/type", "self-signed").Return(assert.AnError)
-		writer := ssl.NewSSLWriter(globalConfig)
+		globalConfig := newMockSetConfigurationContext(t)
+		globalConfig.EXPECT().Set("certificate/type", "self-signed").Return(assert.AnError)
+		writer := NewSSLWriter(globalConfig)
 
 		// when
 		err := writer.WriteCertificate("self-signed", "cert", "key")
@@ -45,10 +44,11 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("failed to write certificate", func(t *testing.T) {
 		// given
-		globalConfig := &mocks.ConfigurationContext{}
-		globalConfig.On("Set", "certificate/type", "self-signed").Return(nil)
-		globalConfig.On("Set", "certificate/server.crt", "cert").Return(assert.AnError)
-		writer := ssl.NewSSLWriter(globalConfig)
+		globalConfig := newMockSetConfigurationContext(t)
+		setExpect := globalConfig.EXPECT().Set
+		setExpect("certificate/type", "self-signed").Return(nil)
+		setExpect("certificate/server.crt", "cert").Return(assert.AnError)
+		writer := NewSSLWriter(globalConfig)
 
 		// when
 		err := writer.WriteCertificate("self-signed", "cert", "key")
@@ -61,11 +61,12 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("failed to write certificate key", func(t *testing.T) {
 		// given
-		globalConfig := &mocks.ConfigurationContext{}
-		globalConfig.On("Set", "certificate/type", "self-signed").Return(nil)
-		globalConfig.On("Set", "certificate/server.crt", "cert").Return(nil)
-		globalConfig.On("Set", "certificate/server.key", "key").Return(assert.AnError)
-		writer := ssl.NewSSLWriter(globalConfig)
+		globalConfig := newMockSetConfigurationContext(t)
+		setExpect := globalConfig.EXPECT().Set
+		setExpect("certificate/type", "self-signed").Return(nil)
+		setExpect("certificate/server.crt", "cert").Return(nil)
+		setExpect("certificate/server.key", "key").Return(assert.AnError)
+		writer := NewSSLWriter(globalConfig)
 
 		// when
 		err := writer.WriteCertificate("self-signed", "cert", "key")

@@ -3,9 +3,6 @@ package warp
 import (
 	"context"
 	_ "embed"
-	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
-	mocks2 "github.com/cloudogu/k8s-service-discovery/controllers/mocks"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,14 +47,14 @@ func TestNewWatcher(t *testing.T) {
 		err := client.Create(ctx, &k8sConfig)
 		require.NoError(t, err)
 		namespace := "test"
-		mockRegistry := cesmocks.NewRegistry(t)
-		watchRegistry := cesmocks.NewWatchConfigurationContext(t)
-		mockRegistry.On("RootConfig").Return(watchRegistry)
+		mockRegistry := newMockCesRegistry(t)
+		watchRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().RootConfig().Return(watchRegistry)
 		err = os.Unsetenv("STAGE")
 		require.NoError(t, err)
 
 		// when
-		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, mocks2.NewEventRecorder(t))
+		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, newMockEventRecorder(t))
 
 		// then
 		require.NoError(t, err)
@@ -77,7 +74,7 @@ func TestNewWatcher(t *testing.T) {
 		client := fake.NewClientBuilder().Build()
 
 		// when
-		_, err = NewWatcher(context.TODO(), client, nil, "test", mocks2.NewEventRecorder(t))
+		_, err = NewWatcher(context.TODO(), client, nil, "test", newMockEventRecorder(t))
 
 		// then
 		require.Error(t, err)
@@ -107,17 +104,16 @@ func TestWatcher_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// prepare mocks
-		mockRegistry := cesmocks.NewRegistry(t)
-		watchRegistry := cesmocks.NewWatchConfigurationContext(t)
+		mockRegistry := newMockCesRegistry(t)
+		watchRegistry := newMockWatchConfigurationContext(t)
 		watchEvent := &etcdclient.Response{}
-		mockRegistry.On("RootConfig").Return(watchRegistry)
-		watchRegistry.On("Watch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			warpChannel := args.Get(3).(chan *etcdclient.Response)
-			warpChannel <- watchEvent
+		mockRegistry.EXPECT().RootConfig().Return(watchRegistry)
+		watchRegistry.EXPECT().Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ context.Context, _ string, _ bool, eventChannel chan *etcdclient.Response) {
+			eventChannel <- watchEvent
 		}).Times(3)
 
-		recorderMock := mocks2.NewEventRecorder(t)
-		recorderMock.On("Event", mock.IsType(&v1.Deployment{}), "Normal", "WarpMenu", "Warp menu updated.")
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Event(mock.IsType(&v1.Deployment{}), "Normal", "WarpMenu", "Warp menu updated.")
 
 		watcher, err := NewWatcher(ctx, client, mockRegistry, namespace, recorderMock)
 		require.NoError(t, err)
@@ -138,15 +134,14 @@ func TestWatcher_Run(t *testing.T) {
 		expectedCategories := types.Categories{expectedCategory}
 		expectedMenuJSON := "[{\"Title\":\"Development Apps\",\"Order\":100,\"Entries\":[{\"DisplayName\":\"Redmine\",\"Href\":\"/redmine\",\"Title\":\"Redmine\",\"Target\":\"self\"}]}]"
 
-		readerMock := &mocks.Reader{}
-		readerMock.On("Read", mock.Anything).Return(expectedCategories, nil)
+		readerMock := NewMockReader(t)
+		readerMock.EXPECT().Read(mock.Anything).Return(expectedCategories, nil)
 		watcher.ConfigReader = readerMock
 
 		// when
 		watcher.Run(ctx)
 
 		// then
-		mock.AssertExpectationsForObjects(t, mockRegistry, watchRegistry, readerMock)
 		menuCm := &corev1.ConfigMap{}
 		err = client.Get(ctx, client2.ObjectKey{Name: "k8s-ces-menu-json", Namespace: "test"}, menuCm)
 		require.NoError(t, err)

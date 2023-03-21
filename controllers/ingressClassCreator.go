@@ -3,10 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/record"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -22,16 +22,20 @@ const (
 	ingressClassCreationEventReason = "IngressClassCreation"
 )
 
+type eventRecorder interface {
+	record.EventRecorder
+}
+
 // ingressClassCreator is responsible to create a cluster wide ingress class in the cluster.
 type ingressClassCreator struct {
 	client        client.Client
 	className     string
 	namespace     string
-	eventRecorder record.EventRecorder
+	eventRecorder eventRecorder
 }
 
 // NewIngressClassCreator creates a new ingress class creator.
-func NewIngressClassCreator(client client.Client, className string, namespace string, recorder record.EventRecorder) *ingressClassCreator {
+func NewIngressClassCreator(client client.Client, className string, namespace string, recorder eventRecorder) *ingressClassCreator {
 	return &ingressClassCreator{
 		client:        client,
 		className:     className,

@@ -47,6 +47,10 @@ var (
 	namespaceEnvVar = "WATCH_NAMESPACE"
 )
 
+type k8sManager interface {
+	manager.Manager
+}
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
@@ -105,7 +109,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg, options.Namespace, IngressClassName, eventRecorder)
+	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg.GlobalConfig(), options.Namespace, IngressClassName, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new ingress updater: %w", err)
 	}

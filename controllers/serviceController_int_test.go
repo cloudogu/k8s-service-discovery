@@ -97,20 +97,20 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 		It("Should do nothing if service without annotations", func() {
 			By("Create dogu")
 			dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
-			Expect(k8sClient.Create(context.Background(), dogu)).Should(Succeed())
+			Expect(k8sApiClient.Create(context.Background(), dogu)).Should(Succeed())
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: "nexus", Namespace: myNamespace}, &doguv1.Dogu{})
+				err := k8sApiClient.Get(ctx, types.NamespacedName{Name: "nexus", Namespace: myNamespace}, &doguv1.Dogu{})
 				return err == nil
 			}, timeoutInterval, pollingInterval).Should(BeTrue())
 
 			By("Creating service with no annotations")
-			Expect(k8sClient.Create(ctx, serviceNoAnnotations)).Should(Succeed())
+			Expect(k8sApiClient.Create(ctx, serviceNoAnnotations)).Should(Succeed())
 
 			By("Expect no ingress resource")
 			expectedIngress := &networking.IngressList{}
 
 			Eventually(func() bool {
-				err := k8sClient.List(ctx, expectedIngress)
+				err := k8sApiClient.List(ctx, expectedIngress)
 				return err == nil
 			}, timeoutInterval, pollingInterval).Should(BeTrue())
 
@@ -119,16 +119,16 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 		It("Should create ingress object for simple webapp service", func() {
 			By("Create deployment for service (which is not ready)")
-			Expect(k8sClient.Create(ctx, serviceDeployment)).Should(Succeed())
+			Expect(k8sApiClient.Create(ctx, serviceDeployment)).Should(Succeed())
 
 			By("Creating service with ces annotations")
-			Expect(k8sClient.Create(ctx, serviceWebApp)).Should(Succeed())
+			Expect(k8sApiClient.Create(ctx, serviceWebApp)).Should(Succeed())
 
 			By("Expect exactly one ingress resource for the dogu is starting ingress object")
 			expectedIngress := &networking.IngressList{}
 
 			Eventually(func() bool {
-				err := k8sClient.List(ctx, expectedIngress)
+				err := k8sApiClient.List(ctx, expectedIngress)
 				if err != nil {
 					_ = fmt.Errorf("%w", err)
 					return false
@@ -152,7 +152,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			By("Wait for deployment to become ready")
 			serviceDeployment.Status.ReadyReplicas = 1
 			serviceDeployment.Status.Replicas = 1
-			err := k8sClient.Status().Update(ctx, serviceDeployment)
+			err := k8sApiClient.Status().Update(ctx, serviceDeployment)
 			Expect(err).NotTo(HaveOccurred())
 
 			client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
@@ -168,7 +168,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			By("Expect exactly one ingress resource for the service")
 			expectedIngress = &networking.IngressList{}
 			Eventually(func() bool {
-				err := k8sClient.List(ctx, expectedIngress)
+				err := k8sApiClient.List(ctx, expectedIngress)
 				if err != nil {
 					_ = fmt.Errorf("%w", err)
 					return false
@@ -191,12 +191,12 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 		It("Should create ingress object for multiple ces services", func() {
 			By("Create deployment for service (which is not ready)")
-			Expect(k8sClient.Create(ctx, serviceDeployment)).Should(Succeed())
+			Expect(k8sApiClient.Create(ctx, serviceDeployment)).Should(Succeed())
 
 			By("Wait for deployment to become ready")
 			serviceDeployment.Status.ReadyReplicas = 1
 			serviceDeployment.Status.Replicas = 1
-			err := k8sClient.Status().Update(ctx, serviceDeployment)
+			err := k8sApiClient.Status().Update(ctx, serviceDeployment)
 			Expect(err).NotTo(HaveOccurred())
 
 			client, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
@@ -207,13 +207,13 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating service with multiple ces services")
-			Expect(k8sClient.Create(ctx, serviceAdditional)).Should(Succeed())
+			Expect(k8sApiClient.Create(ctx, serviceAdditional)).Should(Succeed())
 
 			By("Expect exactly two ingress resource for the service")
 			expectedIngress := &networking.IngressList{}
 
 			Eventually(func() bool {
-				err := k8sClient.List(ctx, expectedIngress)
+				err := k8sApiClient.List(ctx, expectedIngress)
 				if err != nil {
 					_ = fmt.Errorf("%w", err)
 					return false
@@ -245,7 +245,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 		It("Should create ssl cert", func() {
 			By("Create test data")
-			createSelfDeployment(k8sClient)
+			createSelfDeployment(k8sApiClient)
 
 			By("Trigger channel")
 			SSLChannel <- &etcdclient.Response{}
@@ -253,7 +253,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			By("Expect ssl secret")
 			Eventually(func() bool {
 				secret := &corev1.Secret{}
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: "ecosystem-certificate", Namespace: myNamespace}, secret)
+				err := k8sApiClient.Get(ctx, types.NamespacedName{Name: "ecosystem-certificate", Namespace: myNamespace}, secret)
 				if err != nil {
 					return false
 				}
@@ -280,7 +280,7 @@ var _ = Describe("Ingress class should be created automatically", func() {
 			expectedIngressClass := &networking.IngressClass{}
 
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, ingressClassID, expectedIngressClass)
+				err := k8sApiClient.Get(ctx, ingressClassID, expectedIngressClass)
 				if err != nil {
 					return false
 				}
@@ -298,13 +298,13 @@ func cleanup() {
 	By("Cleanup all ingresses")
 	ingressesList := &networking.IngressList{}
 	Eventually(func() bool {
-		err := k8sClient.List(ctx, ingressesList)
+		err := k8sApiClient.List(ctx, ingressesList)
 		if err != nil {
 			return false
 		}
 
 		for _, ingress := range ingressesList.Items {
-			err = k8sClient.Delete(ctx, &ingress)
+			err = k8sApiClient.Delete(ctx, &ingress)
 			if err != nil {
 				return false
 			}
@@ -316,13 +316,13 @@ func cleanup() {
 	By("Cleanup all services")
 	servicesList := &corev1.ServiceList{}
 	Eventually(func() bool {
-		err := k8sClient.List(ctx, servicesList)
+		err := k8sApiClient.List(ctx, servicesList)
 		if err != nil {
 			return false
 		}
 
 		for _, service := range servicesList.Items {
-			err = k8sClient.Delete(ctx, &service)
+			err = k8sApiClient.Delete(ctx, &service)
 			if err != nil {
 				return false
 			}
@@ -334,13 +334,13 @@ func cleanup() {
 	By("Cleanup all deployments")
 	deploymentList := &v1.DeploymentList{}
 	Eventually(func() bool {
-		err := k8sClient.List(ctx, deploymentList)
+		err := k8sApiClient.List(ctx, deploymentList)
 		if err != nil {
 			return false
 		}
 
 		for _, deployment := range deploymentList.Items {
-			err = k8sClient.Delete(ctx, &deployment)
+			err = k8sApiClient.Delete(ctx, &deployment)
 			if err != nil {
 				return false
 			}

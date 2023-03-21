@@ -10,7 +10,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -48,15 +47,15 @@ type CesService struct {
 type ingressUpdater struct {
 	// client used to communicate with k8s.
 	client client.Client
-	// registry is used to read from the etcd.
-	registry registry.Registry
+	// globalConfig is used to read the global config from the etcd.
+	globalConfig configurationContext
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
 	ingressClassName string
 	// deploymentReadyChecker checks whether dogu are ready (healthy).
 	deploymentReadyChecker DeploymentReadyChecker
-	eventRecorder          record.EventRecorder
+	eventRecorder          eventRecorder
 }
 
 // DeploymentReadyChecker checks the readiness from deployments.
@@ -65,8 +64,12 @@ type DeploymentReadyChecker interface {
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
 }
 
+type configurationContext interface {
+	registry.ConfigurationContext
+}
+
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(client client.Client, registry registry.Registry, namespace string, ingressClassName string, recorder record.EventRecorder) (*ingressUpdater, error) {
+func NewIngressUpdater(client client.Client, globalConfig configurationContext, namespace string, ingressClassName string, recorder eventRecorder) (*ingressUpdater, error) {
 	restConfig, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster config: %w", err)
@@ -80,7 +83,7 @@ func NewIngressUpdater(client client.Client, registry registry.Registry, namespa
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
 	return &ingressUpdater{
 		client:                 client,
-		registry:               registry,
+		globalConfig:           globalConfig,
 		namespace:              namespace,
 		ingressClassName:       ingressClassName,
 		deploymentReadyChecker: deploymentReadyChecker,
@@ -90,7 +93,7 @@ func NewIngressUpdater(client client.Client, registry registry.Registry, namespa
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := isMaintenanceModeActive(i.registry)
+	isMaintenanceMode, err := isMaintenanceModeActive(i.globalConfig)
 	if err != nil {
 		return err
 	}
@@ -259,8 +262,8 @@ func (i *ingressUpdater) upsertIngressObject(
 	return nil
 }
 
-func isMaintenanceModeActive(r registry.Registry) (bool, error) {
-	_, err := r.GlobalConfig().Get(maintenanceModeGlobalKey)
+func isMaintenanceModeActive(g configurationContext) (bool, error) {
+	_, err := g.Get(maintenanceModeGlobalKey)
 	if registry.IsKeyNotFoundError(err) {
 		return false, nil
 	} else if err != nil {

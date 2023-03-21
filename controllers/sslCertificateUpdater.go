@@ -7,8 +7,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"strings"
 
-	"k8s.io/client-go/tools/record"
-
 	"github.com/cloudogu/cesapp-lib/registry"
 	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
@@ -34,12 +32,20 @@ const (
 type sslCertificateUpdater struct {
 	client        client.Client
 	namespace     string
-	registry      registry.Registry
-	eventRecorder record.EventRecorder
+	registry      cesRegistry
+	eventRecorder eventRecorder
+}
+
+type cesRegistry interface {
+	registry.Registry
+}
+
+type watchConfigurationContext interface {
+	registry.WatchConfigurationContext
 }
 
 // NewSslCertificateUpdater creates a new updater.
-func NewSslCertificateUpdater(client client.Client, namespace string, cesRegistry registry.Registry, recorder record.EventRecorder) *sslCertificateUpdater {
+func NewSslCertificateUpdater(client client.Client, namespace string, cesRegistry cesRegistry, recorder eventRecorder) *sslCertificateUpdater {
 	return &sslCertificateUpdater{
 		client:        client,
 		namespace:     namespace,
@@ -55,7 +61,7 @@ func (scu *sslCertificateUpdater) Start(ctx context.Context) error {
 	return scu.startEtcdWatch(ctx, scu.registry.RootConfig())
 }
 
-func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg registry.WatchConfigurationContext) error {
+func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg watchConfigurationContext) error {
 	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on certificate keys")
 
 	sslChannel := make(chan *etcdclient.Response)

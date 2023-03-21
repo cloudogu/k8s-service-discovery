@@ -17,8 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
-
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -29,8 +27,8 @@ type mockDefinition struct {
 	ReturnValue interface{}
 }
 
-func getNewMockManager(t *testing.T, expectedErrorOnNewManager error, definitions map[string]mockDefinition) *mocks.Manager {
-	k8sManager := mocks.NewManager(t)
+func getNewMockManager(t *testing.T, expectedErrorOnNewManager error, definitions map[string]mockDefinition) k8sManager {
+	k8sManager := newMockK8sManager(t)
 	ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 		for key, value := range definitions {
 			k8sManager.Mock.On(key, value.Arguments...).Return(value.ReturnValue)

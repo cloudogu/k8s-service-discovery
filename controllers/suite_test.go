@@ -34,7 +34,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var _ *rest.Config
-var k8sClient client.Client
+var k8sApiClient client.Client
 var cancel context.CancelFunc
 var testEnv *envtest.Environment
 
@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName, eventRecorder)
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), globalConfigMock, myNamespace, myIngressClassName, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
 
 	serviceReconciler := &serviceReconciler{
@@ -165,9 +165,9 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
+	k8sApiClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
+	Expect(k8sApiClient).NotTo(BeNil())
 
 }, 60)
 

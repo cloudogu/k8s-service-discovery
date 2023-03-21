@@ -2,15 +2,19 @@ package ssl
 
 import (
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/registry"
 )
 
 type sslWriter struct {
-	globalConfig registry.ConfigurationContext
+	globalConfig setConfigurationContext
+}
+
+type setConfigurationContext interface {
+	// Set sets a configuration value in current context
+	Set(key, value string) error
 }
 
 // NewSSLWriter creates a new sslWriter instance to write certificate information in the global config
-func NewSSLWriter(globalConfig registry.ConfigurationContext) *sslWriter {
+func NewSSLWriter(globalConfig setConfigurationContext) *sslWriter {
 	return &sslWriter{globalConfig: globalConfig}
 }
 
