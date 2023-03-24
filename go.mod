@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
-	github.com/cloudogu/cesapp-lib v0.0.0-20230320094653-047dd0caca2e
+	github.com/cloudogu/cesapp-lib v0.12.0
 	github.com/cloudogu/k8s-dogu-operator v0.20.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-logr/logr v1.2.3

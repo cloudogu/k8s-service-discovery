@@ -118,6 +118,8 @@ github.com/cloudogu/cesapp-lib v0.0.0-20230320094653-047dd0caca2e h1:J9YD5tBYg9x
 github.com/cloudogu/cesapp-lib v0.0.0-20230320094653-047dd0caca2e/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
 github.com/cloudogu/cesapp-lib v0.9.0 h1:0yT7jpLKtu2X6qKG5s2UdgIojsQoyluidPRG2TwJASQ=
 github.com/cloudogu/cesapp-lib v0.9.0/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
+github.com/cloudogu/cesapp-lib v0.12.0 h1:+yRVk65DljGtJj/gNpgBRhvIJHfGy7kr4/iEw1LJugg=
+github.com/cloudogu/cesapp-lib v0.12.0/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
 github.com/cloudogu/k8s-apply-lib v0.4.0 h1:4jYj0gTDSvW0qs9d5yM5w8aOsMu5Sx+PBCwJwa5sMss=
 github.com/cloudogu/k8s-apply-lib v0.4.0/go.mod h1:WHCe588o8e1vzNdLGV6N4E0g7BarbPXPpW4y8U0/lxE=
 github.com/cloudogu/k8s-ces-setup v0.3.0 h1:xg9DnIveyfD6UE4mb32eIOiv4MbFyg8azKTL0a2r2Ks=
