@@ -18,12 +18,16 @@ type doguEntry struct {
 	Tags        []string
 }
 
+type WatchConfigurationContext interface {
+	registry.WatchConfigurationContext
+}
+
 // DoguConverter converts dogus from the configuration to a warp menu category object
 type DoguConverter struct{}
 
 // ReadAndUnmarshalDogu reads the dogu from the configuration. If it has the specific tag (or no tag) it will be
 // converted to entry with a category for the warp menu
-func (dc *DoguConverter) ReadAndUnmarshalDogu(registry registry.WatchConfigurationContext, key string, tag string) (EntryWithCategory, error) {
+func (dc *DoguConverter) ReadAndUnmarshalDogu(registry WatchConfigurationContext, key string, tag string) (EntryWithCategory, error) {
 	doguBytes, err := readDoguAsBytes(registry, key)
 	if err != nil {
 		return EntryWithCategory{}, err
@@ -41,7 +45,7 @@ func (dc *DoguConverter) ReadAndUnmarshalDogu(registry registry.WatchConfigurati
 	return EntryWithCategory{}, nil
 }
 
-func readDoguAsBytes(registry registry.WatchConfigurationContext, key string) ([]byte, error) {
+func readDoguAsBytes(registry WatchConfigurationContext, key string) ([]byte, error) {
 	version, err := registry.Get(key + "/current")
 	if err != nil {
 		// the dogu seems to be unregistered

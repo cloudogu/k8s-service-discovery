@@ -1,12 +1,12 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.9.0
+VERSION=0.10.0
 
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.18.1
-MAKEFILES_VERSION=7.2.0
+MAKEFILES_VERSION=7.5.0
 LINT_VERSION?=v1.46.2
 
 ADDITIONAL_CLEAN=dist-clean
@@ -25,6 +25,7 @@ include build/make/test-unit.mk
 include build/make/static-analysis.mk
 include build/make/clean.mk
 include build/make/digital-signature.mk
+include build/make/mocks.mk
 
 K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
 PRE_COMPILE=generate

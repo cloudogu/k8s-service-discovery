@@ -3,22 +3,20 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // warpMenuCreator used to create warp menu
 type warpMenuCreator struct {
 	client        client.Client
-	registry      registry.Registry
+	registry      cesRegistry
 	namespace     string
-	eventRecorder record.EventRecorder
+	eventRecorder eventRecorder
 }
 
 // NewWarpMenuCreator initialises a creator object to start the warp menu creation
-func NewWarpMenuCreator(client client.Client, registry registry.Registry, namespace string, recorder record.EventRecorder) *warpMenuCreator {
+func NewWarpMenuCreator(client client.Client, registry cesRegistry, namespace string, recorder eventRecorder) *warpMenuCreator {
 	return &warpMenuCreator{
 		client:        client,
 		registry:      registry,
@@ -40,7 +38,5 @@ func (wmc warpMenuCreator) CreateWarpMenu(ctx context.Context) error {
 		return fmt.Errorf("failed to create warp menu watcher: %w", err)
 	}
 
-	warpWatcher.Run(ctx)
-
-	return nil
+	return warpWatcher.Run(ctx)
 }

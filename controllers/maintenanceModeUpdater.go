@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -40,18 +39,26 @@ type serviceRewriter interface {
 	rewrite(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error
 }
 
+type k8sClient interface {
+	client.Client
+}
+
+type maintenanceWatchConfigurationContext interface {
+	registry.WatchConfigurationContext
+}
+
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
-	client          client.Client
+	client          k8sClient
 	namespace       string
-	registry        registry.Registry
+	registry        cesRegistry
 	ingressUpdater  IngressUpdater
-	eventRecorder   record.EventRecorder
+	eventRecorder   eventRecorder
 	serviceRewriter serviceRewriter
 }
 
 // NewMaintenanceModeUpdater creates a new maintenance mode updater.
-func NewMaintenanceModeUpdater(client client.Client, namespace string, ingressUpdater IngressUpdater, recorder record.EventRecorder) (*maintenanceModeUpdater, error) {
+func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) (*maintenanceModeUpdater, error) {
 	reg, err := cesregistry.Create(namespace)
 	if err != nil {
 		return nil, err
@@ -75,7 +82,7 @@ func (scu maintenanceModeUpdater) Start(ctx context.Context) error {
 	return scu.startEtcdWatch(ctx, scu.registry.RootConfig())
 }
 
-func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg registry.WatchConfigurationContext) error {
+func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg maintenanceWatchConfigurationContext) error {
 	log.FromContext(ctx).Info("Start etcd watcher on maintenance key")
 
 	warpChannel := make(chan *etcdclient.Response)
@@ -101,7 +108,7 @@ func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg regis
 func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
 	log.FromContext(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := isMaintenanceModeActive(scu.registry)
+	isActive, err := isMaintenanceModeActive(scu.registry.GlobalConfig())
 	if err != nil {
 		return err
 	}
@@ -215,8 +222,8 @@ func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) 
 }
 
 type defaultServiceRewriter struct {
-	client        client.Client
-	eventRecorder record.EventRecorder
+	client        k8sClient
+	eventRecorder eventRecorder
 	namespace     string
 }
 
@@ -232,7 +239,7 @@ func (sw *defaultServiceRewriter) rewrite(ctx context.Context, serviceList v1Ser
 	return err
 }
 
-func rewriteNonSimpleServiceRoute(ctx context.Context, cli client.Client, recorder record.EventRecorder, service *v1.Service, rewriteToMaintenance bool) error {
+func rewriteNonSimpleServiceRoute(ctx context.Context, cli k8sClient, recorder eventRecorder, service *v1.Service, rewriteToMaintenance bool) error {
 	if service.Spec.Type == v1.ServiceTypeClusterIP {
 		return nil
 	}
