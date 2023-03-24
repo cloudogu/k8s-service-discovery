@@ -20,8 +20,12 @@ const (
 	debugLevel
 )
 
+type logSink interface {
+	logr.LogSink
+}
+
 type libraryLogger struct {
-	logger logr.LogSink
+	logger logSink
 	name   string
 }
 

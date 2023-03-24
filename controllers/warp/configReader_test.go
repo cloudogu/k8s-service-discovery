@@ -1,10 +1,8 @@
 package warp
 
 import (
-	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -61,8 +59,8 @@ func TestConfigReader_readSupport(t *testing.T) {
 func TestConfigReader_getDisabledSupportIdentifiers(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
 		reader := &ConfigReader{
 			configuration: &config.Configuration{Support: []config.SupportSource{}},
 			registry:      mockRegistry,
@@ -79,8 +77,8 @@ func TestConfigReader_getDisabledSupportIdentifiers(t *testing.T) {
 
 	t.Run("failed to get disabled support entries", func(t *testing.T) {
 		// given
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("", assert.AnError)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("", assert.AnError)
 		reader := &ConfigReader{
 			configuration: &config.Configuration{Support: []config.SupportSource{}},
 			registry:      mockRegistry,
@@ -97,8 +95,8 @@ func TestConfigReader_getDisabledSupportIdentifiers(t *testing.T) {
 
 	t.Run("failed to unmarshal disabled support entries", func(t *testing.T) {
 		// given
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("{\"lorem\": \"ipsum\"}", nil)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("{\"lorem\": \"ipsum\"}", nil)
 		reader := &ConfigReader{
 			configuration: &config.Configuration{Support: []config.SupportSource{}},
 			registry:      mockRegistry,
@@ -115,18 +113,18 @@ func TestConfigReader_getDisabledSupportIdentifiers(t *testing.T) {
 }
 
 func TestConfigReader_readFromConfig(t *testing.T) {
-	mockRegistry := &cesmocks.WatchConfigurationContext{}
-	mockRegistry.On("GetChildrenPaths", "/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-	mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
+	mockRegistry := newMockWatchConfigurationContext(t)
+	mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
+	mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
 	testSources := []config.Source{{Path: "/path/to/etcd/key", Type: "externals", Tag: "tag"}, {Path: "/path", Type: "disabled_support_entries"}}
 	testSupportSoureces := []config.SupportSource{{Identifier: "supportSrc", External: true, Href: "path/to/external"}}
-	mockDoguConverter := &mocks.DoguConverter{}
+	mockDoguConverter := NewMockDoguConverter(t)
 
 	t.Run("success with one external and support link", func(t *testing.T) {
 		// given
 		cloudoguEntryWithCategory := getEntryWithCategory("Cloudogu", "www.cloudogu.com", "Cloudogu", "External", types.TARGET_EXTERNAL)
-		mockExternalConverter := &mocks.ExternalConverter{}
-		mockExternalConverter.On("ReadAndUnmarshalExternal", mockRegistry, mock.Anything).Return(cloudoguEntryWithCategory, nil)
+		mockExternalConverter := NewMockExternalConverter(t)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(cloudoguEntryWithCategory, nil)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
 			registry:          mockRegistry,
@@ -146,16 +144,16 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 	t.Run("success with one dogu and support link", func(t *testing.T) {
 		// given
-		mockDoguConverter := &mocks.DoguConverter{}
-		mockExternalConverter := &mocks.ExternalConverter{}
+		mockDoguConverter := NewMockDoguConverter(t)
+		mockExternalConverter := NewMockExternalConverter(t)
 		doguSource := config.Source{
 			Path: "/dogu",
 			Type: "dogus",
 			Tag:  "warp",
 		}
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("GetChildrenPaths", mock.Anything).Return([]string{}, nil)
-		mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().GetChildrenPaths(mock.Anything).Return([]string{}, nil)
+		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
 			registry:          mockRegistry,
@@ -175,8 +173,8 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 	t.Run("error during external Read should not result in an error", func(t *testing.T) {
 		// given
-		mockExternalConverter := &mocks.ExternalConverter{}
-		mockExternalConverter.On("ReadAndUnmarshalExternal", mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
+		mockExternalConverter := NewMockExternalConverter(t)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
 			registry:          mockRegistry,
@@ -196,11 +194,11 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 	t.Run("error during support Read should not result in an error", func(t *testing.T) {
 		// given
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("GetChildrenPaths", "/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-		mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", assert.AnError)
-		mockExternalConverter := &mocks.ExternalConverter{}
-		mockExternalConverter.On("ReadAndUnmarshalExternal", mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
+		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", assert.AnError)
+		mockExternalConverter := NewMockExternalConverter(t)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
 			registry:          mockRegistry,
@@ -220,11 +218,11 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 	t.Run("empty support category should not result in an error", func(t *testing.T) {
 		// given
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("GetChildrenPaths", "/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-		mockRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("[]", nil)
-		mockExternalConverter := &mocks.ExternalConverter{}
-		mockExternalConverter.On("ReadAndUnmarshalExternal", mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
+		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[]", nil)
+		mockExternalConverter := NewMockExternalConverter(t)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
 			registry:          mockRegistry,
@@ -265,13 +263,13 @@ func TestConfigReader_dogusReader(t *testing.T) {
 			Type: "dogus",
 			Tag:  "warp",
 		}
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("GetChildrenPaths", "/dogu").Return([]string{"/dogu/redmine", "/dogu/jenkins"}, nil)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().GetChildrenPaths("/dogu").Return([]string{"/dogu/redmine", "/dogu/jenkins"}, nil)
 		redmineEntryWithCategory := getEntryWithCategory("Redmine", "/redmine", "Redmine", "Development Apps", types.TARGET_SELF)
 		jenkinsEntryWithCategory := getEntryWithCategory("Jenkins", "/jenkins", "Jenkins", "Development Apps", types.TARGET_SELF)
-		mockDoguConverter := &mocks.DoguConverter{}
-		mockDoguConverter.On("ReadAndUnmarshalDogu", mockRegistry, "/dogu/redmine", "warp").Return(redmineEntryWithCategory, nil)
-		mockDoguConverter.On("ReadAndUnmarshalDogu", mockRegistry, "/dogu/jenkins", "warp").Return(jenkinsEntryWithCategory, nil)
+		mockDoguConverter := NewMockDoguConverter(t)
+		mockDoguConverter.EXPECT().ReadAndUnmarshalDogu(mockRegistry, "/dogu/redmine", "warp").Return(redmineEntryWithCategory, nil)
+		mockDoguConverter.EXPECT().ReadAndUnmarshalDogu(mockRegistry, "/dogu/jenkins", "warp").Return(jenkinsEntryWithCategory, nil)
 		reader := &ConfigReader{
 			configuration: &config.Configuration{Support: []config.SupportSource{}},
 			registry:      mockRegistry,
@@ -295,8 +293,8 @@ func TestConfigReader_dogusReader(t *testing.T) {
 			Type: "dogus",
 			Tag:  "warp",
 		}
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("GetChildrenPaths", "/dogu").Return([]string{}, assert.AnError)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().GetChildrenPaths("/dogu").Return([]string{}, assert.AnError)
 		reader := &ConfigReader{
 			configuration: &config.Configuration{Support: []config.SupportSource{}},
 			registry:      mockRegistry,
@@ -328,8 +326,8 @@ func TestConfigReader_externalsReader(t *testing.T) {
 			Path: "/path",
 			Type: "externals",
 		}
-		mockRegistry := &cesmocks.WatchConfigurationContext{}
-		mockRegistry.On("GetChildrenPaths", "/path").Return([]string{}, assert.AnError)
+		mockRegistry := newMockWatchConfigurationContext(t)
+		mockRegistry.EXPECT().GetChildrenPaths("/path").Return([]string{}, assert.AnError)
 		reader := &ConfigReader{
 			configuration: &config.Configuration{Support: []config.SupportSource{}},
 			registry:      mockRegistry,

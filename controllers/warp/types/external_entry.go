@@ -3,8 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/registry"
-
 	"github.com/pkg/errors"
 )
 
@@ -25,7 +23,7 @@ type EntryWithCategory struct {
 type ExternalConverter struct{}
 
 // ReadAndUnmarshalExternal reads a specific external link from the configuration and converts it to an entry with a category.
-func (ec *ExternalConverter) ReadAndUnmarshalExternal(registry registry.WatchConfigurationContext, key string) (EntryWithCategory, error) {
+func (ec *ExternalConverter) ReadAndUnmarshalExternal(registry WatchConfigurationContext, key string) (EntryWithCategory, error) {
 	externalBytes, err := readExternalAsBytes(registry, key)
 	if err != nil {
 		return EntryWithCategory{}, nil
@@ -34,7 +32,7 @@ func (ec *ExternalConverter) ReadAndUnmarshalExternal(registry registry.WatchCon
 	return unmarshalExternal(externalBytes)
 }
 
-func readExternalAsBytes(registry registry.WatchConfigurationContext, key string) ([]byte, error) {
+func readExternalAsBytes(registry WatchConfigurationContext, key string) ([]byte, error) {
 	resp, err := registry.Get(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key %s from etcd: %w", key, err)

@@ -54,7 +54,7 @@ rules:
       - watch
       - get
       - create
-      - delete
+      - update
   - apiGroups:
       - "k8s.cloudogu.com"
     resources:

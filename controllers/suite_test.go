@@ -34,7 +34,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var _ *rest.Config
-var k8sClient client.Client
+var k8sApiClient client.Client
 var cancel context.CancelFunc
 var testEnv *envtest.Environment
 
@@ -45,6 +45,8 @@ var stage string
 
 const myNamespace = "my-test-namespace"
 const myIngressClassName = "my-ingress-class-name"
+
+var SSLChannel chan *etcdclient.Response
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -100,7 +102,7 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), myRegistry, myNamespace, myIngressClassName, eventRecorder)
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), globalConfigMock, myNamespace, myIngressClassName, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
 
 	serviceReconciler := &serviceReconciler{
@@ -122,9 +124,18 @@ var _ = BeforeSuite(func() {
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 
+	watchRegistry := &cesmocks.WatchConfigurationContext{}
+	myRegistry.On("RootConfig").Return(watchRegistry)
+
+	globalConfigMock.On("Get", "certificate/server.crt").Return("mycrt", nil)
+	globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
+
 	// create ssl updater class
-	sslUpdater, err := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, eventRecorder)
-	Expect(err).ToNot(HaveOccurred())
+	watchRegistry.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Run(func(args mock.Arguments) {
+		SSLChannel = args.Get(3).(chan *etcdclient.Response)
+	})
+
+	sslUpdater := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, myRegistry, eventRecorder)
 	err = k8sManager.Add(sslUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -133,13 +144,9 @@ var _ = BeforeSuite(func() {
 	err = os.Unsetenv("STAGE")
 	Expect(err).NotTo(HaveOccurred())
 
-	watchRegistry := &cesmocks.WatchConfigurationContext{}
-	watchEvent := &etcdclient.Response{}
-	myRegistry.On("RootConfig").Return(watchRegistry)
-	watchRegistry.On("Watch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		warpChannel := args.Get(3).(chan *etcdclient.Response)
-		warpChannel <- watchEvent
-	}).Times(3)
+	watchRegistry.On("Watch", mock.Anything, "/dogu", mock.Anything, mock.Anything)
+	watchRegistry.On("Watch", mock.Anything, "/config/nginx/externals", mock.Anything, mock.Anything)
+	watchRegistry.On("Watch", mock.Anything, "/config/_global/disabled_warpmenu_support_entries", mock.Anything, mock.Anything)
 
 	warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace, eventRecorder)
 	err = k8sManager.Add(warpMenuCreator)
@@ -158,9 +165,9 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
+	k8sApiClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
+	Expect(k8sApiClient).NotTo(BeNil())
 
 }, 60)
 

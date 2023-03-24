@@ -1,9 +1,7 @@
 package types
 
 import (
-	"github.com/cloudogu/cesapp-lib/registry/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -73,8 +71,8 @@ func Test_mapExternalEntry(t *testing.T) {
 func Test_readExternalAsBytes(t *testing.T) {
 	t.Run("fail on registry get", func(t *testing.T) {
 		// given
-		registryMock := &mocks.WatchConfigurationContext{}
-		registryMock.On("Get", "/key").Return("", assert.AnError)
+		registryMock := NewMockWatchConfigurationContext(t)
+		registryMock.EXPECT().Get("/key").Return("", assert.AnError)
 
 		// when
 		_, err := readExternalAsBytes(registryMock, "/key")
@@ -82,7 +80,6 @@ func Test_readExternalAsBytes(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read key /key from etcd")
-		mock.AssertExpectationsForObjects(t, registryMock)
 	})
 }
 
@@ -90,8 +87,8 @@ func Test_readAndUnmarshalExternal(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		entryStr := "{\n  \"DisplayName\": \"display\",\n  \"URL\": \"url\",\n  \"Description\": \"desc\",\n  \"Category\": \"category\"\n}"
-		registryMock := &mocks.WatchConfigurationContext{}
-		registryMock.On("Get", "key").Return(entryStr, nil)
+		registryMock := NewMockWatchConfigurationContext(t)
+		registryMock.EXPECT().Get("key").Return(entryStr, nil)
 		expectedEntryWithCategory := EntryWithCategory{
 			Entry: Entry{
 				DisplayName: "display",
@@ -109,13 +106,12 @@ func Test_readAndUnmarshalExternal(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, expectedEntryWithCategory, result)
-		mock.AssertExpectationsForObjects(t, registryMock)
 	})
 
 	t.Run("return empty category on error", func(t *testing.T) {
 		// given
-		registryMock := &mocks.WatchConfigurationContext{}
-		registryMock.On("Get", "/key").Return("", assert.AnError)
+		registryMock := NewMockWatchConfigurationContext(t)
+		registryMock.EXPECT().Get("/key").Return("", assert.AnError)
 		converter := ExternalConverter{}
 
 		// when
@@ -124,7 +120,6 @@ func Test_readAndUnmarshalExternal(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, EntryWithCategory{}, entryWithCategory)
-		mock.AssertExpectationsForObjects(t, registryMock)
 	})
 }
 
