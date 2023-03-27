@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -16,19 +15,19 @@ import (
 // ConfigReader reads the configuration for the warp menu from etcd
 type ConfigReader struct {
 	configuration     *config.Configuration
-	registry          registry.WatchConfigurationContext
+	registry          watchConfigurationContext
 	doguConverter     DoguConverter
 	externalConverter ExternalConverter
 }
 
 // DoguConverter is used to Read dogus from the registry and convert them to objects fitting in the warp menu
 type DoguConverter interface {
-	ReadAndUnmarshalDogu(registry registry.WatchConfigurationContext, key string, tag string) (types.EntryWithCategory, error)
+	ReadAndUnmarshalDogu(registry types.WatchConfigurationContext, key string, tag string) (types.EntryWithCategory, error)
 }
 
 // ExternalConverter is used to Read external links from the registry and convert them to objects fitting in the warp menu
 type ExternalConverter interface {
-	ReadAndUnmarshalExternal(registry registry.WatchConfigurationContext, key string) (types.EntryWithCategory, error)
+	ReadAndUnmarshalExternal(registry types.WatchConfigurationContext, key string) (types.EntryWithCategory, error)
 }
 
 const disableWarpSupportEntriesConfigurationKey = "/config/_global/disabled_warpmenu_support_entries"

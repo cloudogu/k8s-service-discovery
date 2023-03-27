@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.10.0] - 2023-03-24
+### Added
+- [#22] Add ssl api to renew the selfsigned certificate of the Cloudogu Ecosystem.
+
+### Changed
+- Update makefiles to 7.5.0
+
 ## [v0.9.0] - 2023-02-10
 ### Changed
 - [#17] add `Accept-Encoding: "identity"` header to requests proxied by nginx-ingress

@@ -12,12 +12,8 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
-	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 )
 
 var testCtx = context.Background()
@@ -25,7 +21,7 @@ var testCtx = context.Background()
 func TestNewMaintenanceModeUpdater(t *testing.T) {
 	t.Run("failed to create registry", func(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, err := NewMaintenanceModeUpdater(clientMock, "%!%*Ä'%'!%'", &mocks.IngressUpdater{}, mocks.NewEventRecorder(t))
+		creator, err := NewMaintenanceModeUpdater(clientMock, "%!%*Ä'%'!%'", NewMockIngressUpdater(t), newMockEventRecorder(t))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create etcd client")
@@ -34,7 +30,7 @@ func TestNewMaintenanceModeUpdater(t *testing.T) {
 
 	t.Run("successfully create updater", func(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, err := NewMaintenanceModeUpdater(clientMock, "test", &mocks.IngressUpdater{}, mocks.NewEventRecorder(t))
+		creator, err := NewMaintenanceModeUpdater(clientMock, "test", NewMockIngressUpdater(t), newMockEventRecorder(t))
 
 		require.NoError(t, err)
 		require.NotNil(t, creator)
@@ -44,28 +40,23 @@ func TestNewMaintenanceModeUpdater(t *testing.T) {
 func Test_maintenanceModeUpdater_Start(t *testing.T) {
 	t.Run("error on maintenance update", func(t *testing.T) {
 		// given
-		regMock := cesmocks.NewRegistry(t)
-		watchContextMock := cesmocks.NewWatchConfigurationContext(t)
-		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
-			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *etcdclient.Response)
-
-			if ok {
-				testResponse := &etcdclient.Response{}
-				sendChannel <- testResponse
-			}
+		regMock := newMockCesRegistry(t)
+		watchContextMock := newMockWatchConfig(t)
+		watchContextMock.EXPECT().Watch(mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(_ context.Context, _ string, _ bool, eventChannel chan *etcdclient.Response) {
+			testResponse := &etcdclient.Response{}
+			eventChannel <- testResponse
 		}).Return()
 
-		globalConfigMock := cesmocks.NewConfigurationContext(t)
-		globalConfigMock.On("Get", "maintenance").Return("", assert.AnError)
-		regMock.On("RootConfig").Return(watchContextMock, nil)
-		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+		globalConfigMock := newMockConfigurationContext(t)
+		globalConfigMock.EXPECT().Get("maintenance").Return("", assert.AnError)
+		regMock.EXPECT().RootConfig().Return(watchContextMock)
+		regMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-		ingressUpdater := &mocks.IngressUpdater{}
+		ingressUpdater := NewMockIngressUpdater(t)
 
 		namespace := "myTestNamespace"
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects().Build()
-		svcRewriter := &NoopServiceRewriter{}
+		svcRewriter := newMockServiceRewriter(t)
 
 		maintenanceUpdater := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -88,28 +79,24 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 	t.Run("fail to get deployment", func(t *testing.T) {
 		// given
-		regMock := cesmocks.NewRegistry(t)
-		watchContextMock := cesmocks.NewWatchConfigurationContext(t)
-		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
-			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *etcdclient.Response)
-
-			if ok {
-				testResponse := &etcdclient.Response{}
-				sendChannel <- testResponse
-			}
+		regMock := newMockCesRegistry(t)
+		watchContextMock := newMockWatchConfigurationContext(t)
+		watchContextMock.EXPECT().Watch(mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(_ context.Context, _ string, _ bool, eventChannel chan *etcdclient.Response) {
+			testResponse := &etcdclient.Response{}
+			eventChannel <- testResponse
 		}).Return()
 
-		globalConfigMock := cesmocks.NewConfigurationContext(t)
-		globalConfigMock.On("Get", "maintenance").Return("false", nil)
-		regMock.On("RootConfig").Return(watchContextMock, nil)
-		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+		globalConfigMock := newMockConfigurationContext(t)
+		globalConfigMock.EXPECT().Get("maintenance").Return("false", nil)
+		regMock.EXPECT().RootConfig().Return(watchContextMock)
+		regMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-		ingressUpdater := &mocks.IngressUpdater{}
+		ingressUpdater := NewMockIngressUpdater(t)
 
 		namespace := "myTestNamespace"
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects().Build()
-		svcRewriter := &NoopServiceRewriter{}
+		svcRewriter := newMockServiceRewriter(t)
+		svcRewriter.EXPECT().rewrite(mock.Anything, mock.Anything, true).Return(nil)
 
 		maintenanceUpdater := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -132,32 +119,28 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 	t.Run("run and terminate without any problems", func(t *testing.T) {
 		// given
-		regMock := cesmocks.NewRegistry(t)
-		watchContextMock := cesmocks.NewWatchConfigurationContext(t)
-		watchContextMock.On("Watch", mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(args mock.Arguments) {
-			channelobject := args.Get(3)
-			sendChannel, ok := channelobject.(chan *etcdclient.Response)
-
-			if ok {
-				testResponse := &etcdclient.Response{}
-				sendChannel <- testResponse
-			}
+		regMock := newMockCesRegistry(t)
+		watchContextMock := newMockWatchConfigurationContext(t)
+		watchContextMock.EXPECT().Watch(mock.Anything, "/config/_global/maintenance", true, mock.Anything).Run(func(_ context.Context, _ string, _ bool, eventChannel chan *etcdclient.Response) {
+			testResponse := &etcdclient.Response{}
+			eventChannel <- testResponse
 		}).Return()
 
-		globalConfigMock := cesmocks.NewConfigurationContext(t)
-		globalConfigMock.On("Get", "maintenance").Return("false", nil)
-		regMock.On("RootConfig").Return(watchContextMock, nil)
-		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+		globalConfigMock := newMockConfigurationContext(t)
+		globalConfigMock.EXPECT().Get("maintenance").Return("false", nil)
+		regMock.EXPECT().RootConfig().Return(watchContextMock)
+		regMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-		ingressUpdater := &mocks.IngressUpdater{}
+		ingressUpdater := NewMockIngressUpdater(t)
 
 		namespace := "myTestNamespace"
 		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
 
-		eventRecorderMock := mocks.NewEventRecorder(t)
-		eventRecorderMock.On("Eventf", mock.IsType(deployment), "Normal", "Maintenance", "Maintenance mode changed to %t.", true)
-		svcRewriter := &NoopServiceRewriter{}
+		eventRecorderMock := newMockEventRecorder(t)
+		eventRecorderMock.EXPECT().Eventf(mock.IsType(deployment), "Normal", "Maintenance", "Maintenance mode changed to %t.", true)
+		svcRewriter := newMockServiceRewriter(t)
+		svcRewriter.EXPECT().rewrite(mock.Anything, mock.Anything, true).Return(nil)
 
 		maintenanceUpdater := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -182,13 +165,13 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 	t.Run("activate maintenance mode with error", func(t *testing.T) {
 		// given
-		regMock := cesmocks.NewRegistry(t)
-		globalConfigMock := cesmocks.NewConfigurationContext(t)
-		globalConfigMock.On("Get", "maintenance").Return("true", nil)
-		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+		regMock := newMockCesRegistry(t)
+		globalConfigMock := newMockConfigurationContext(t)
+		globalConfigMock.EXPECT().Get("maintenance").Return("true", nil)
+		regMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-		ingressUpdater := mocks.NewIngressUpdater(t)
-		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
+		ingressUpdater := NewMockIngressUpdater(t)
+		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
@@ -211,15 +194,15 @@ func Test_maintenanceModeUpdater_handleMaintenanceModeUpdate(t *testing.T) {
 
 	t.Run("deactivate maintenance mode with error", func(t *testing.T) {
 		// given
-		regMock := cesmocks.NewRegistry(t)
-		globalConfigMock := cesmocks.NewConfigurationContext(t)
+		regMock := newMockCesRegistry(t)
+		globalConfigMock := newMockConfigurationContext(t)
 
 		keyNotFoundErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
-		globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
-		regMock.On("GlobalConfig").Return(globalConfigMock, nil)
+		globalConfigMock.EXPECT().Get("maintenance").Return("", keyNotFoundErr)
+		regMock.EXPECT().GlobalConfig().Return(globalConfigMock)
 
-		ingressUpdater := mocks.NewIngressUpdater(t)
-		ingressUpdater.On("UpsertIngressForService", mock.Anything, mock.Anything).Return(assert.AnError)
+		ingressUpdater := NewMockIngressUpdater(t)
+		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
@@ -271,8 +254,8 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 			},
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nexus"}},
 		}
-		mockRecorder := mocks.NewEventRecorder(t)
-		mockRecorder.On("Eventf", svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was activated, rewriting exposed service %s", "nexus")
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Eventf(svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was activated, rewriting exposed service %s", "nexus")
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(svc).Build()
 
 		// when
@@ -312,8 +295,8 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 			},
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
 		}
-		mockRecorder := mocks.NewEventRecorder(t)
-		mockRecorder.On("Eventf", svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Eventf(svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(svc).Build()
 
 		// when
@@ -353,10 +336,10 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 			},
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
 		}
-		mockRecorder := mocks.NewEventRecorder(t)
-		mockRecorder.On("Eventf", svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
-		clientMock := mocks.NewClient(t)
-		clientMock.On("Update", testCtx, svc).Return(assert.AnError)
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Eventf(svc, corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().Update(testCtx, svc).Return(assert.AnError)
 
 		// when
 		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
@@ -376,8 +359,8 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 			},
 			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
 		}
-		mockRecorder := mocks.NewEventRecorder(t)
-		clientMock := mocks.NewClient(t)
+		mockRecorder := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
 
 		// when
 		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
@@ -394,8 +377,8 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 				Labels:    map[string]string{"a-fun-label": "goes-here"},
 			},
 		}
-		mockRecorder := mocks.NewEventRecorder(t)
-		clientMock := mocks.NewClient(t)
+		mockRecorder := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
 
 		// when
 		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
@@ -413,8 +396,8 @@ func Test_rewriteNonSimpleServiceRoute(t *testing.T) {
 			},
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nginx-ingress"}},
 		}
-		mockRecorder := mocks.NewEventRecorder(t)
-		clientMock := mocks.NewClient(t)
+		mockRecorder := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
 
 		// when
 		err := rewriteNonSimpleServiceRoute(testCtx, clientMock, mockRecorder, svc, false)
@@ -435,10 +418,10 @@ func Test_defaultServiceRewriter_rewrite(t *testing.T) {
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "deactivatedDuringMaintenance"}},
 		}
 		internalSvcList := []*corev1.Service{&svc}
-		mockRecorder := mocks.NewEventRecorder(t)
-		mockRecorder.On("Eventf", mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
-		clientMock := mocks.NewClient(t)
-		clientMock.On("Update", testCtx, &svc).Return(assert.AnError)
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Eventf(mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was deactivated, restoring exposed service %s", "nexus")
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().Update(testCtx, &svc).Return(assert.AnError)
 
 		sut := &defaultServiceRewriter{
 			client:        clientMock,
@@ -464,10 +447,10 @@ func Test_defaultServiceRewriter_rewrite(t *testing.T) {
 			Spec: corev1.ServiceSpec{Selector: map[string]string{"dogu.name": "nexus"}},
 		}
 		internalSvcList := []*corev1.Service{&svc}
-		mockRecorder := mocks.NewEventRecorder(t)
-		mockRecorder.On("Eventf", mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was activated, rewriting exposed service %s", "nexus")
-		clientMock := mocks.NewClient(t)
-		clientMock.On("Update", testCtx, &svc).Return(assert.AnError)
+		mockRecorder := newMockEventRecorder(t)
+		mockRecorder.EXPECT().Eventf(mock.AnythingOfType("*v1.Service"), corev1.EventTypeNormal, "Maintenance", "Maintenance mode was activated, rewriting exposed service %s", "nexus")
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().Update(testCtx, &svc).Return(assert.AnError)
 
 		sut := &defaultServiceRewriter{
 			client:        clientMock,
@@ -488,8 +471,8 @@ func Test_defaultServiceRewriter_rewrite(t *testing.T) {
 func Test_maintenanceModeUpdater_getAllServices(t *testing.T) {
 	t.Run("should return error from the API", func(t *testing.T) {
 		// given
-		clientMock := mocks.NewClient(t)
-		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
 
 		sut := &maintenanceModeUpdater{
 			client:    clientMock,
@@ -509,11 +492,11 @@ func Test_maintenanceModeUpdater_getAllServices(t *testing.T) {
 func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
 	t.Run("should error on listing services", func(t *testing.T) {
 		// given
-		noopRec := &NoopEventRecorder{}
-		clientMock := mocks.NewClient(t)
-		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
-		updateMock := mocks.NewIngressUpdater(t)
-		svcRewriter := NewServiceRewriter(t)
+		noopRec := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		updateMock := NewMockIngressUpdater(t)
+		svcRewriter := newMockServiceRewriter(t)
 
 		sut := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -533,12 +516,12 @@ func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
 	})
 	t.Run("should error on rewriting service", func(t *testing.T) {
 		// given
-		noopRec := &NoopEventRecorder{}
-		clientMock := mocks.NewClient(t)
-		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(nil)
-		updateMock := mocks.NewIngressUpdater(t)
-		svcRewriter := NewServiceRewriter(t)
-		svcRewriter.On("rewrite", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		noopRec := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(nil)
+		updateMock := NewMockIngressUpdater(t)
+		svcRewriter := newMockServiceRewriter(t)
+		svcRewriter.EXPECT().rewrite(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
 
 		sut := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -561,11 +544,11 @@ func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
 func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
 	t.Run("should error on listing services", func(t *testing.T) {
 		// given
-		noopRec := &NoopEventRecorder{}
-		clientMock := mocks.NewClient(t)
-		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
-		updateMock := mocks.NewIngressUpdater(t)
-		svcRewriter := NewServiceRewriter(t)
+		noopRec := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		updateMock := NewMockIngressUpdater(t)
+		svcRewriter := newMockServiceRewriter(t)
 
 		sut := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -585,12 +568,12 @@ func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
 	})
 	t.Run("should error on rewriting service", func(t *testing.T) {
 		// given
-		noopRec := &NoopEventRecorder{}
-		clientMock := mocks.NewClient(t)
-		clientMock.On("List", testCtx, mock.Anything, mock.Anything).Return(nil)
-		updateMock := mocks.NewIngressUpdater(t)
-		svcRewriter := NewServiceRewriter(t)
-		svcRewriter.On("rewrite", testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+		noopRec := newMockEventRecorder(t)
+		clientMock := newMockK8sClient(t)
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(nil)
+		updateMock := NewMockIngressUpdater(t)
+		svcRewriter := newMockServiceRewriter(t)
+		svcRewriter.EXPECT().rewrite(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
 
 		sut := &maintenanceModeUpdater{
 			client:          clientMock,
@@ -609,14 +592,3 @@ func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to rewrite services during maintenance mode activation")
 	})
 }
-
-type NoopEventRecorder struct{}
-
-func (n *NoopEventRecorder) Event(_ runtime.Object, _, _, _ string)                    {}
-func (n *NoopEventRecorder) Eventf(_ runtime.Object, _, _, _ string, _ ...interface{}) {}
-func (n *NoopEventRecorder) AnnotatedEventf(_ runtime.Object, _ map[string]string, _, _, _ string, _ ...interface{}) {
-}
-
-type NoopServiceRewriter struct{}
-
-func (n *NoopServiceRewriter) rewrite(_ context.Context, _ v1ServiceList, _ bool) error { return nil }

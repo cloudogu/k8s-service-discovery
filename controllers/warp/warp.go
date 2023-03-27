@@ -6,7 +6,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	types2 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/cloudogu/cesapp-lib/registry"
@@ -31,7 +30,19 @@ type Watcher struct {
 	k8sClient       client.Client
 	ConfigReader    Reader
 	namespace       string
-	eventRecorder   record.EventRecorder
+	eventRecorder   eventRecorder
+}
+
+type eventRecorder interface {
+	record.EventRecorder
+}
+
+type cesRegistry interface {
+	registry.Registry
+}
+
+type watchConfigurationContext interface {
+	registry.WatchConfigurationContext
 }
 
 // Reader is used to fetch warp categories with a configuration
@@ -40,7 +51,7 @@ type Reader interface {
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.Registry, namespace string, recorder record.EventRecorder) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, registry cesRegistry, namespace string, recorder eventRecorder) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)
@@ -64,7 +75,7 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, registry registry.
 }
 
 // Run creates the warp menu and update the menu whenever a relevant etcd key was changed
-func (w *Watcher) Run(ctx context.Context) {
+func (w *Watcher) Run(ctx context.Context) error {
 	warpChannel := make(chan *etcdclient.Response)
 
 	for _, source := range w.configuration.Sources {
@@ -78,35 +89,36 @@ func (w *Watcher) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-warpChannel:
-			w.execute()
+			err := w.execute()
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
 
-func (w *Watcher) execute() {
+func (w *Watcher) execute() error {
 	deployment := &appsv1.Deployment{}
 	err := w.k8sClient.Get(context.Background(), types2.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: w.namespace}, deployment)
 	if err != nil {
-		ctrl.Log.Error(err, "warp update: failed to get deployment [%s]", "k8s-service-discovery-controller-manager")
-		return
+		return fmt.Errorf("warp update: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
 
 	categories, err := w.ConfigReader.Read(w.configuration)
 	if err != nil {
 		w.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
-		ctrl.Log.Info("Error during Read:", err)
-		return
+		return fmt.Errorf("error during read: %w", err)
 	}
 	ctrl.Log.Info(fmt.Sprintf("All found Categories: %v", categories))
 	err = w.jsonWriter(categories)
 	if err != nil {
 		w.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
-		ctrl.Log.Info(fmt.Sprintf("failed to write warp menu as json: %s", err.Error()))
-		return
+		return fmt.Errorf("failed to write warp menu as json: %w", err)
 	}
 	w.eventRecorder.Event(deployment, corev1.EventTypeNormal, warpMenuUpdateEventReason, "Warp menu updated.")
+	return nil
 }
 
 func (w *Watcher) jsonWriter(data interface{}) error {

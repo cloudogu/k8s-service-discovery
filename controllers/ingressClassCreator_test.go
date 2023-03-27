@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-service-discovery/controllers/mocks"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/apps/v1"
 	"testing"
@@ -17,7 +16,7 @@ import (
 func TestNewIngressClassCreator(t *testing.T) {
 	namespace := "test"
 	clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-	creator := NewIngressClassCreator(clientMock, "my-ingress-class", namespace, mocks.NewEventRecorder(t))
+	creator := NewIngressClassCreator(clientMock, "my-ingress-class", namespace, newMockEventRecorder(t))
 
 	require.NotNil(t, creator)
 }
@@ -44,8 +43,9 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 		// given
 		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
-		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(deployment), "Normal", "IngressClassCreation", "Ingress class [%s] created.", "my-ingress-class")
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Eventf(mock.IsType(deployment), "Normal", "IngressClassCreation",
+			"Ingress class [%s] created.", "my-ingress-class")
 		creator := NewIngressClassCreator(clientMock, "my-ingress-class", namespace, recorderMock)
 
 		// when
@@ -71,8 +71,9 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 		}
 		deployment := &v1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(ingressClass, deployment).Build()
-		recorderMock := mocks.NewEventRecorder(t)
-		recorderMock.On("Eventf", mock.IsType(deployment), "Normal", "IngressClassCreation", "Ingress class [%s] already exists.", "my-ingress-class")
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Eventf(mock.IsType(deployment), "Normal", "IngressClassCreation",
+			"Ingress class [%s] already exists.", "my-ingress-class")
 		creator := NewIngressClassCreator(clientMock, "my-ingress-class", namespace, recorderMock)
 
 		// when
