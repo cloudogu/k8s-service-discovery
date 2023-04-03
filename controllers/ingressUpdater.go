@@ -160,7 +160,7 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		}
 	}
 
-	err = i.upsertDoguIngressObject(ctx, cesService, service)
+	err = i.upsertDoguIngressObject(ctx, cesService, service, dogu.Spec.AdditionalIngressAnnotations)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 	return nil
 }
 
-func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
+func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, additionalAnnotations map[string]string) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{
 		// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
@@ -204,6 +204,10 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 
 	if cesService.Pass != cesService.Location {
 		annotations[ingressRewriteTargetAnnotation] = cesService.Pass
+	}
+
+	for key, value := range additionalAnnotations {
+		annotations[key] = value
 	}
 
 	err := i.upsertIngressObject(ctx, service, cesService, service.GetName(), int32(cesService.Port), annotations)
