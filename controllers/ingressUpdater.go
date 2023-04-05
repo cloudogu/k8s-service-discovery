@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudogu/cesapp-lib/registry"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 )
 
@@ -160,13 +161,31 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		}
 	}
 
-	err = i.upsertDoguIngressObject(ctx, cesService, service, dogu.Spec.AdditionalIngressAnnotations)
+	additionalIngressAnnotations, err := getAdditionalIngressAnnotations(service)
+	if err != nil {
+		return err
+	}
+
+	err = i.upsertDoguIngressObject(ctx, cesService, service, additionalIngressAnnotations)
 	if err != nil {
 		return err
 	}
 
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Created regular ingress for service [%s].", cesService.Name)
 	return err
+}
+
+func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv1.IngressAnnotations, error) {
+	annotations := doguv1.IngressAnnotations(nil)
+	annotationsJson, exists := doguService.Annotations[annotation.AdditionalIngressAnnotationsAnnotation]
+	if exists {
+		err := json.Unmarshal([]byte(annotationsJson), &annotations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get addtional ingress annotations from dogu service '%s': %w", doguService.Name, err)
+		}
+	}
+
+	return annotations, nil
 }
 
 func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv1.Dogu) error {

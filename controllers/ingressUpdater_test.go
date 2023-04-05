@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	v1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -341,14 +342,13 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: myNamespace,
-				Labels:    map[string]string{"dogu.name": "test"}},
+				Labels:    map[string]string{"dogu.name": "test"},
+				Annotations: map[string]string{
+					annotation.AdditionalIngressAnnotationsAnnotation: "{\"nginx.org/client-max-body-size\":\"100m\",\"example-annotation\":\"example-value\"}",
+				},
+			},
 		}
-		dogu := &v1.Dogu{
-			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace},
-			Spec: v1.DoguSpec{AdditionalIngressAnnotations: map[string]string{
-				"nginx.org/client-max-body-size": "100m",
-				"example-annotation":             "example-value",
-			}}}
+		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
@@ -389,6 +389,41 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			"nginx.org/client-max-body-size":      "100m",
 			"example-annotation":                  "example-value",
 		}, ingressResource.Annotations)
+	})
+	t.Run("Fail to create ingress resource for a single ces service with invalid additional ingress annotations", func(t *testing.T) {
+		// given
+		cesServiceWithOneWebapp := CesService{
+			Name:     "test",
+			Port:     12345,
+			Location: "/myLocation",
+			Pass:     "/myPass",
+		}
+		service := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: myNamespace,
+				Labels:    map[string]string{"dogu.name": "test"},
+				Annotations: map[string]string{
+					annotation.AdditionalIngressAnnotationsAnnotation: "{{{{\"nginx.org/client-max-body-size\":\"100m\",\"example-annotation\":\"example-value\"}",
+				},
+			},
+		}
+		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
+
+		creator, creationError := NewIngressUpdater(clientMock, nil, myNamespace, myIngressClass, nil)
+		require.NoError(t, creationError)
+
+		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
+		deploymentReadyChecker.EXPECT().IsReady(ctx, "test").Return(true, nil)
+		creator.deploymentReadyChecker = deploymentReadyChecker
+
+		// when
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, false)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to get addtional ingress annotations from dogu service 'test': invalid character '{' looking for beginning of object key string")
 	})
 	t.Run("Create default ingress for nginx-static dogu even when maintenance mode is active", func(t *testing.T) {
 		doguName := "nginx-static"

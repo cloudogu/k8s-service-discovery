@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- [#24] Apply additional ingress annotations from dogu resource to ingress object.
+- [#24] Apply additional ingress annotations from dogu service to ingress object.
 
 ## [v0.10.0] - 2023-03-24
 ### Added
