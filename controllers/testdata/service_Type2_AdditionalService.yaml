@@ -7,6 +7,7 @@ metadata:
     dogu: nexus
   annotations:
     k8s-dogu-operator.cloudogu.com/ces-services: '[{"name":"nexus", "port":8082, "location":"/nexus", "pass": "/nexus"}, {"name":"nexus-docker-registry", "port":8082, "location": "/v2", "pass": "/nexus/repository/docker-registry/v2"}]'
+    k8s-dogu-operator.cloudogu.com/additional-ingress-annotations: '{"example-key":"example-value"}'
 spec:
   selector:
     app: nexus
