@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
 	github.com/cloudogu/cesapp-lib v0.12.0
-	github.com/cloudogu/k8s-dogu-operator v0.0.0-20230405074114-92ce6ec2f01e // TODO: set to release version
+	github.com/cloudogu/k8s-dogu-operator v0.29.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-logr/logr v1.2.4
 	github.com/hashicorp/go-multierror v1.1.1
