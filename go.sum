@@ -16,8 +16,8 @@ github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 h1:qSGYFH7+jGhD
 github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311/go.mod h1:b583jCggY9gE99b6G5LEC39OIiVsWj+R97kbl5odCEk=
 github.com/cloudogu/cesapp-lib v0.12.0 h1:+yRVk65DljGtJj/gNpgBRhvIJHfGy7kr4/iEw1LJugg=
 github.com/cloudogu/cesapp-lib v0.12.0/go.mod h1:PTQqI3xs1ReJMXYE6BGTF33yAfmS4J7P8UiE4AwDMDY=
-github.com/cloudogu/k8s-dogu-operator v0.0.0-20230405074114-92ce6ec2f01e h1:FYiD2/1nbGpr/qyuDEIIeXEkk1YaG8xAo7R2Wi7YqgQ=
-github.com/cloudogu/k8s-dogu-operator v0.0.0-20230405074114-92ce6ec2f01e/go.mod h1:l7XtjlgBFun2iMyhtLpLSnzA6g2csmMs68JttudkFq8=
+github.com/cloudogu/k8s-dogu-operator v0.29.0 h1:rzvcZe0LADKX/adGWijImdwlGTVi9OkS8h3++3/eGr4=
+github.com/cloudogu/k8s-dogu-operator v0.29.0/go.mod h1:l7XtjlgBFun2iMyhtLpLSnzA6g2csmMs68JttudkFq8=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/coreos/go-semver v0.3.1 h1:yi21YpKnrx1gt5R+la8n5WgS0kCrsPp33dmEyHReZr4=
 github.com/coreos/go-semver v0.3.1/go.mod h1:irMmmIw/7yzSRPWryHsK7EYSg09caPQL03VsM8rvUec=
