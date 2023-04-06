@@ -203,13 +203,20 @@ func (_c *mockK8sClient_DeleteAllOf_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// Get provides a mock function with given fields: ctx, key, obj
-func (_m *mockK8sClient) Get(ctx context.Context, key types.NamespacedName, obj client.Object) error {
-	ret := _m.Called(ctx, key, obj)
+// Get provides a mock function with given fields: ctx, key, obj, opts
+func (_m *mockK8sClient) Get(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) error {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, key, obj)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.NamespacedName, client.Object) error); ok {
-		r0 = rf(ctx, key, obj)
+	if rf, ok := ret.Get(0).(func(context.Context, types.NamespacedName, client.Object, ...client.GetOption) error); ok {
+		r0 = rf(ctx, key, obj, opts...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -226,13 +233,21 @@ type mockK8sClient_Get_Call struct {
 //   - ctx context.Context
 //   - key types.NamespacedName
 //   - obj client.Object
-func (_e *mockK8sClient_Expecter) Get(ctx interface{}, key interface{}, obj interface{}) *mockK8sClient_Get_Call {
-	return &mockK8sClient_Get_Call{Call: _e.mock.On("Get", ctx, key, obj)}
+//   - opts ...client.GetOption
+func (_e *mockK8sClient_Expecter) Get(ctx interface{}, key interface{}, obj interface{}, opts ...interface{}) *mockK8sClient_Get_Call {
+	return &mockK8sClient_Get_Call{Call: _e.mock.On("Get",
+		append([]interface{}{ctx, key, obj}, opts...)...)}
 }
 
-func (_c *mockK8sClient_Get_Call) Run(run func(ctx context.Context, key types.NamespacedName, obj client.Object)) *mockK8sClient_Get_Call {
+func (_c *mockK8sClient_Get_Call) Run(run func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption)) *mockK8sClient_Get_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.NamespacedName), args[2].(client.Object))
+		variadicArgs := make([]client.GetOption, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(client.GetOption)
+			}
+		}
+		run(args[0].(context.Context), args[1].(types.NamespacedName), args[2].(client.Object), variadicArgs...)
 	})
 	return _c
 }
@@ -242,7 +257,7 @@ func (_c *mockK8sClient_Get_Call) Return(_a0 error) *mockK8sClient_Get_Call {
 	return _c
 }
 
-func (_c *mockK8sClient_Get_Call) RunAndReturn(run func(context.Context, types.NamespacedName, client.Object) error) *mockK8sClient_Get_Call {
+func (_c *mockK8sClient_Get_Call) RunAndReturn(run func(context.Context, types.NamespacedName, client.Object, ...client.GetOption) error) *mockK8sClient_Get_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -451,15 +466,15 @@ func (_c *mockK8sClient_Scheme_Call) RunAndReturn(run func() *runtime.Scheme) *m
 }
 
 // Status provides a mock function with given fields:
-func (_m *mockK8sClient) Status() client.StatusWriter {
+func (_m *mockK8sClient) Status() client.SubResourceWriter {
 	ret := _m.Called()
 
-	var r0 client.StatusWriter
-	if rf, ok := ret.Get(0).(func() client.StatusWriter); ok {
+	var r0 client.SubResourceWriter
+	if rf, ok := ret.Get(0).(func() client.SubResourceWriter); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(client.StatusWriter)
+			r0 = ret.Get(0).(client.SubResourceWriter)
 		}
 	}
 
@@ -483,12 +498,56 @@ func (_c *mockK8sClient_Status_Call) Run(run func()) *mockK8sClient_Status_Call 
 	return _c
 }
 
-func (_c *mockK8sClient_Status_Call) Return(_a0 client.StatusWriter) *mockK8sClient_Status_Call {
+func (_c *mockK8sClient_Status_Call) Return(_a0 client.SubResourceWriter) *mockK8sClient_Status_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockK8sClient_Status_Call) RunAndReturn(run func() client.StatusWriter) *mockK8sClient_Status_Call {
+func (_c *mockK8sClient_Status_Call) RunAndReturn(run func() client.SubResourceWriter) *mockK8sClient_Status_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SubResource provides a mock function with given fields: subResource
+func (_m *mockK8sClient) SubResource(subResource string) client.SubResourceClient {
+	ret := _m.Called(subResource)
+
+	var r0 client.SubResourceClient
+	if rf, ok := ret.Get(0).(func(string) client.SubResourceClient); ok {
+		r0 = rf(subResource)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(client.SubResourceClient)
+		}
+	}
+
+	return r0
+}
+
+// mockK8sClient_SubResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SubResource'
+type mockK8sClient_SubResource_Call struct {
+	*mock.Call
+}
+
+// SubResource is a helper method to define mock.On call
+//   - subResource string
+func (_e *mockK8sClient_Expecter) SubResource(subResource interface{}) *mockK8sClient_SubResource_Call {
+	return &mockK8sClient_SubResource_Call{Call: _e.mock.On("SubResource", subResource)}
+}
+
+func (_c *mockK8sClient_SubResource_Call) Run(run func(subResource string)) *mockK8sClient_SubResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *mockK8sClient_SubResource_Call) Return(_a0 client.SubResourceClient) *mockK8sClient_SubResource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockK8sClient_SubResource_Call) RunAndReturn(run func(string) client.SubResourceClient) *mockK8sClient_SubResource_Call {
 	_c.Call.Return(run)
 	return _c
 }

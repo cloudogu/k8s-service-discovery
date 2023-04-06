@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudogu/cesapp-lib/registry"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 )
 
@@ -169,6 +170,19 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 	return err
 }
 
+func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv1.IngressAnnotations, error) {
+	annotations := doguv1.IngressAnnotations(nil)
+	annotationsJson, exists := doguService.Annotations[annotation.AdditionalIngressAnnotationsAnnotation]
+	if exists {
+		err := json.Unmarshal([]byte(annotationsJson), &annotations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get addtional ingress annotations from dogu service '%s': %w", doguService.Name, err)
+		}
+	}
+
+	return annotations, nil
+}
+
 func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv1.Dogu) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
@@ -206,7 +220,16 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 		annotations[ingressRewriteTargetAnnotation] = cesService.Pass
 	}
 
-	err := i.upsertIngressObject(ctx, service, cesService, service.GetName(), int32(cesService.Port), annotations)
+	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
+	if err != nil {
+		return err
+	}
+
+	for key, value := range additionalAnnotations {
+		annotations[key] = value
+	}
+
+	err = i.upsertIngressObject(ctx, service, cesService, service.GetName(), int32(cesService.Port), annotations)
 	if err != nil {
 		return fmt.Errorf("failed to update ingress object: %w", err)
 	}

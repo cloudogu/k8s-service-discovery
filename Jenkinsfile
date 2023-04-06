@@ -40,7 +40,7 @@ node('docker') {
         }
 
         docker
-                .image('golang:1.18.1')
+                .image('golang:1.20.2')
                 .mountJenkinsUser()
                 .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                         {
