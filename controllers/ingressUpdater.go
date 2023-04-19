@@ -54,7 +54,7 @@ type serviceRewrite struct {
 }
 
 func (sr *serviceRewrite) generate() string {
-	return fmt.Sprintf("^/%s(/|$)(.*) %s/$2 break;", sr.Pattern, sr.Rewrite)
+	return fmt.Sprintf("rewrite ^/%s(/|$)(.*) %s/$2 break;", sr.Pattern, sr.Rewrite)
 }
 
 type ingressUpdater struct {
