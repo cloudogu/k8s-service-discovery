@@ -330,6 +330,61 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
 		}, ingressResource.Annotations)
 	})
+	t.Run("Create ingress resource for a single ces service with rewrite", func(t *testing.T) {
+		// given
+		cesServiceWithOneWebapp := CesService{
+			Name:     "test",
+			Port:     12345,
+			Location: "/myLocation",
+			Pass:     "/myPass",
+			Rewrite:  "{\"pattern\":\"myPattern\",\"rewrite\":\"\"}",
+		}
+		service := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: myNamespace,
+				Labels:    map[string]string{"dogu.name": "test"}},
+		}
+		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Eventf(mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
+
+		creator, creationError := NewIngressUpdater(clientMock, nil, myNamespace, myIngressClass, recorderMock)
+		require.NoError(t, creationError)
+
+		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
+		deploymentReadyChecker.EXPECT().IsReady(ctx, "test").Return(true, nil)
+		creator.deploymentReadyChecker = deploymentReadyChecker
+
+		// when
+		err := creator.upsertIngressForCesService(ctx, cesServiceWithOneWebapp, &service, false)
+
+		// then
+		require.NoError(t, err)
+		ingressResource := &networking.Ingress{}
+		ingressResourceKey := types.NamespacedName{
+			Namespace: myNamespace,
+			Name:      cesServiceWithOneWebapp.Name,
+		}
+
+		err = clientMock.Get(ctx, ingressResourceKey, ingressResource)
+		require.NoError(t, err)
+
+		assert.Equal(t, myNamespace, ingressResource.Namespace)
+		assert.Equal(t, "Service", ingressResource.OwnerReferences[0].Kind)
+		assert.Equal(t, service.GetName(), ingressResource.OwnerReferences[0].Name)
+		assert.Equal(t, cesServiceWithOneWebapp.Name, ingressResource.Name)
+		assert.Equal(t, myIngressClass, *ingressResource.Spec.IngressClassName)
+		assert.Equal(t, cesServiceWithOneWebapp.Location, ingressResource.Spec.Rules[0].HTTP.Paths[0].Path)
+		assert.Equal(t, networking.PathTypePrefix, *ingressResource.Spec.Rules[0].HTTP.Paths[0].PathType)
+		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
+		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
+		assert.Equal(t, map[string]string{
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";\nrewrite ^/myPattern(/|$)(.*) /$2 break;",
+			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
+		}, ingressResource.Annotations)
+	})
 	t.Run("Create ingress resource for a single ces service with additional ingress annotations", func(t *testing.T) {
 		// given
 		cesServiceWithOneWebapp := CesService{
@@ -663,4 +718,39 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			ingressRewriteTargetAnnotation:        cesService.Pass,
 		}, ingressResource.Annotations)
 	})
+}
+
+func TestCesService_generateRewriteConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		rewrite string
+		want    string
+		wantErr func(t *testing.T, err error)
+	}{
+		{
+			name:    "should fail to unmarshal invalid rewrite",
+			rewrite: "{\"pattern\": \"portainer\", \"rewrite\": \"\"",
+			want:    "",
+			wantErr: func(t *testing.T, err error) {
+				assert.ErrorContains(t, err, "failed to read service rewrite from ces service: unexpected end of JSON input")
+			},
+		},
+		{
+			name:    "should succeed to generate rewrite config",
+			rewrite: "{\"pattern\": \"portainer\", \"rewrite\": \"p\"}",
+			want:    "rewrite ^/portainer(/|$)(.*) p/$2 break;",
+			wantErr: func(t *testing.T, err error) { require.NoError(t, err) },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			cs := CesService{Rewrite: tt.rewrite}
+			// when
+			got, err := cs.generateRewriteConfig()
+			// then
+			tt.wantErr(t, err)
+			assert.Equalf(t, tt.want, got, "generateRewriteConfig()")
+		})
+	}
 }
