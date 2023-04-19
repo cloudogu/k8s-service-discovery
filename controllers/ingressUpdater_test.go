@@ -180,7 +180,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		err := creator.UpsertIngressForService(ctx, &service)
 
 		// then
-		assert.ErrorContains(t, err, "failed to create ingress object for ces service [{Name:test Port:55 Location:/myLocation Pass:/myPass}]")
+		assert.ErrorContains(t, err, "failed to create ingress object for ces service [{Name:test Port:55 Location:/myLocation Pass:/myPass Rewrite:}]")
 		assert.ErrorContains(t, err, "not found")
 	})
 	t.Run("error when updating service ingress object", func(t *testing.T) {
@@ -326,7 +326,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
 		assert.Equal(t, map[string]string{
-			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";\n",
 			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
 		}, ingressResource.Annotations)
 	})
@@ -384,7 +384,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
 		assert.Equal(t, map[string]string{
-			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";\n",
 			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
 			"nginx.org/client-max-body-size":      "100m",
 			"example-annotation":                  "example-value",
@@ -477,7 +477,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesServiceWithOneWebapp.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
 		assert.Equal(t, map[string]string{
-			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";\n",
 			ingressRewriteTargetAnnotation:        cesServiceWithOneWebapp.Pass,
 		}, ingressResource.Annotations)
 	})
@@ -659,7 +659,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		assert.Equal(t, service.GetName(), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name)
 		assert.Equal(t, int32(cesService.Port), ingressResource.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number)
 		assert.Equal(t, map[string]string{
-			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+			ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";\n",
 			ingressRewriteTargetAnnotation:        cesService.Pass,
 		}, ingressResource.Annotations)
 	})

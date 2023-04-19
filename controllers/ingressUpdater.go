@@ -45,7 +45,7 @@ type CesService struct {
 	Pass string `json:"pass"`
 	// Rewrite that should be applied to the ingress configuration.
 	// Is a marshalled `serviceRewrite`. Useful if Dogus do not support sub-paths.
-	Rewrite string `json:"rewrite"`
+	Rewrite string `json:"rewrite,omitempty"`
 }
 
 type serviceRewrite struct {
