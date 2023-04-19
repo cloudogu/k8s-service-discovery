@@ -43,6 +43,18 @@ type CesService struct {
 	Location string `json:"location"`
 	// Pass of the ces service defining the target path inside the service's pod.
 	Pass string `json:"pass"`
+	// Rewrite that should be applied to the ingress configuration.
+	// Is a marshalled `serviceRewrite`. Useful if Dogus do not support sub-paths.
+	Rewrite string `json:"rewrite"`
+}
+
+type serviceRewrite struct {
+	Pattern string `json:"pattern"`
+	Rewrite string `json:"rewrite"`
+}
+
+func (sr *serviceRewrite) generate() string {
+	return fmt.Sprintf("^/%s(/|$)(.*) %s/$2 break;", sr.Pattern, sr.Rewrite)
 }
 
 type ingressUpdater struct {
@@ -210,10 +222,17 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
+	serviceRewrite, err := generateServiceRewrite(cesService)
+	if err != nil {
+		return err
+	}
+
+	// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
+	// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
+	encodingOverwrite := "proxy_set_header Accept-Encoding \"identity\";"
+
 	annotations := map[string]string{
-		// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
-		// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
-		ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+		ingressConfigurationSnippetAnnotation: fmt.Sprintf("%s\n%s", encodingOverwrite, serviceRewrite),
 	}
 
 	if cesService.Pass != cesService.Location {
@@ -235,6 +254,20 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	}
 
 	return nil
+}
+
+func generateServiceRewrite(cesService CesService) (string, error) {
+	if cesService.Rewrite == "" {
+		return "", nil
+	}
+
+	serviceRewrite := &serviceRewrite{}
+	err := json.Unmarshal([]byte(cesService.Rewrite), serviceRewrite)
+	if err != nil {
+		return "", fmt.Errorf("failed to read service rewrite from ces service: %w", err)
+	}
+
+	return serviceRewrite.generate(), nil
 }
 
 func (i *ingressUpdater) upsertIngressObject(
