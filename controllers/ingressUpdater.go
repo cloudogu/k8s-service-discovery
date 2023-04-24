@@ -245,8 +245,12 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
 	encodingOverwrite := "proxy_set_header Accept-Encoding \"identity\";"
 
+	configurationSnippet := fmt.Sprintf("%s", encodingOverwrite)
+	if serviceRewrite != "" {
+		configurationSnippet = fmt.Sprintf("%s\n%s", encodingOverwrite, serviceRewrite)
+	}
 	annotations := map[string]string{
-		ingressConfigurationSnippetAnnotation: fmt.Sprintf("%s\n%s", encodingOverwrite, serviceRewrite),
+		ingressConfigurationSnippetAnnotation: configurationSnippet,
 	}
 
 	if cesService.Pass != cesService.Location {

@@ -229,7 +229,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(*expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].PathType).Should(Equal(networking.PathTypePrefix))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[0].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
-			Expect(expectedIngress.Items[0].Annotations).Should(HaveKeyWithValue(ingressConfigurationSnippetAnnotation, "proxy_set_header Accept-Encoding \"identity\";\n"))
+			Expect(expectedIngress.Items[0].Annotations).Should(HaveKeyWithValue(ingressConfigurationSnippetAnnotation, "proxy_set_header Accept-Encoding \"identity\";"))
 			Expect(expectedIngress.Items[0].Annotations).Should(HaveKeyWithValue("example-key", "example-value"))
 			Expect(expectedIngress.Items[0].Annotations).Should(Not(HaveKey(ingressRewriteTargetAnnotation)))
 
@@ -241,7 +241,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name).Should(Equal("nexus"))
 			Expect(expectedIngress.Items[1].Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number).Should(Equal(int32(8082)))
 			Expect(expectedIngress.Items[1].Annotations).Should(HaveKeyWithValue(ingressRewriteTargetAnnotation, "/nexus/repository/docker-registry/v2"))
-			Expect(expectedIngress.Items[1].Annotations).Should(HaveKeyWithValue(ingressConfigurationSnippetAnnotation, "proxy_set_header Accept-Encoding \"identity\";\n"))
+			Expect(expectedIngress.Items[1].Annotations).Should(HaveKeyWithValue(ingressConfigurationSnippetAnnotation, "proxy_set_header Accept-Encoding \"identity\";"))
 			Expect(expectedIngress.Items[1].Annotations).Should(HaveKeyWithValue("example-key", "example-value"))
 		})
 
