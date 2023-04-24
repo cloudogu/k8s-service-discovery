@@ -43,6 +43,32 @@ type CesService struct {
 	Location string `json:"location"`
 	// Pass of the ces service defining the target path inside the service's pod.
 	Pass string `json:"pass"`
+	// Rewrite that should be applied to the ingress configuration.
+	// Is a json-marshalled `serviceRewrite`. Useful if Dogus do not support sub-paths.
+	Rewrite string `json:"rewrite,omitempty"`
+}
+
+func (cs CesService) generateRewriteConfig() (string, error) {
+	if cs.Rewrite == "" {
+		return "", nil
+	}
+
+	serviceRewrite := &serviceRewrite{}
+	err := json.Unmarshal([]byte(cs.Rewrite), serviceRewrite)
+	if err != nil {
+		return "", fmt.Errorf("failed to read service rewrite from ces service: %w", err)
+	}
+
+	return serviceRewrite.generateConfig(), nil
+}
+
+type serviceRewrite struct {
+	Pattern string `json:"pattern"`
+	Rewrite string `json:"rewrite"`
+}
+
+func (sr *serviceRewrite) generateConfig() string {
+	return fmt.Sprintf("rewrite ^/%s(/|$)(.*) %s/$2 break;", sr.Pattern, sr.Rewrite)
 }
 
 type ingressUpdater struct {
@@ -210,10 +236,21 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
+	serviceRewrite, err := cesService.generateRewriteConfig()
+	if err != nil {
+		return err
+	}
+
+	// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
+	// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
+	encodingOverwrite := "proxy_set_header Accept-Encoding \"identity\";"
+
+	configurationSnippet := encodingOverwrite
+	if serviceRewrite != "" {
+		configurationSnippet = fmt.Sprintf("%s\n%s", encodingOverwrite, serviceRewrite)
+	}
 	annotations := map[string]string{
-		// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
-		// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
-		ingressConfigurationSnippetAnnotation: "proxy_set_header Accept-Encoding \"identity\";",
+		ingressConfigurationSnippetAnnotation: configurationSnippet,
 	}
 
 	if cesService.Pass != cesService.Location {

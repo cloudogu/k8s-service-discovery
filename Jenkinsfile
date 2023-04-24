@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/ces-build-lib@1.62.0'])
+@Library(['github.com/cloudogu/ces-build-lib@1.64.2'])
 import com.cloudogu.ces.cesbuildlib.*
 
 // Creating necessary git objects
@@ -35,12 +35,12 @@ node('docker') {
         }
 
         stage('Check Markdown Links') {
-            Markdown markdown = new Markdown(this)
+            Markdown markdown = new Markdown(this, "3.11.0")
             markdown.check()
         }
 
         docker
-                .image('golang:1.20.2')
+                .image('golang:1.20.3')
                 .mountJenkinsUser()
                 .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                         {
