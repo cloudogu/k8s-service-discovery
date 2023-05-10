@@ -13,6 +13,7 @@ const endpointPostGenerateSSL = "/api/v1/ssl"
 var logger = ctrl.Log.WithName("k8s-service-discovery")
 
 type selfSignedCertificateCreator interface {
+	// CreateAndSafeCertificate generates and writes the type, cert and key to the global config.
 	CreateAndSafeCertificate(certExpireDays int, country string,
 		province string, locality string, altDNSNames []string) error
 }

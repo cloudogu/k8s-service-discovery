@@ -37,6 +37,7 @@ func NewCreator(globalConfig globalConfig) *creator {
 	}
 }
 
+// CreateAndSafeCertificate generates and writes the type, cert and key to the global config.
 func (c *creator) CreateAndSafeCertificate(certExpireDays int, country string,
 	province string, locality string, altDNSNames []string) error {
 
