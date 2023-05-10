@@ -15,3 +15,6 @@ The `k8s-service-discovery` provides an endpoint to renew the selfsigned certifi
 ```bash
 curl -I --request POST --url http://fqdn:9090/api/v1/ssl?days=<days> 
 ```
+
+> If the FQDN is changed and a self-signed SSL certificate is used, this is automatically regenerated and applied.
+> For FQDN changes, the Dogus must additionally be restarted to receive this change.
