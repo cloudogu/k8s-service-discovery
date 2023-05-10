@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	sslLib "github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
@@ -90,12 +91,23 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 	if certificateType == selfsignedCertificateType {
 		ctrl.LoggerFrom(ctx).Info("Certificate is selfsigned. Regenerating certificate...")
 
+		deployment := &appsv1.Deployment{}
+		err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
+		if err != nil {
+			return fmt.Errorf("selfsigned certificate handling: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
+		}
+
 		previousCertRaw, err := scu.registry.GlobalConfig().Get(serverCertificateID)
 		if err != nil {
 			return fmt.Errorf("failed to get previous certificate from global config: %w", err)
 		}
 
-		previousCert, err := x509.ParseCertificate([]byte(previousCertRaw))
+		block, _ := pem.Decode([]byte(previousCertRaw))
+		if block == nil {
+			return fmt.Errorf("failed to parse certificate PEM of previous certificate")
+		}
+
+		previousCert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			return fmt.Errorf("failed to parse previous certificate: %w", err)
 		}
@@ -109,12 +121,6 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		err = scu.certificateCreator.CreateAndSafeCertificate(int(expireDays), country, province, locality, altDnsNames)
 		if err != nil {
 			return fmt.Errorf("failed to regenerate and safe selfsigned certificate: %w", err)
-		}
-
-		deployment := &appsv1.Deployment{}
-		err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
-		if err != nil {
-			return fmt.Errorf("selfsigned certificate handling: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 		}
 
 		scu.eventRecorder.Event(deployment, v1.EventTypeNormal, fqdnChangeEventReason, "Selfsigned certificate regenerated.")
