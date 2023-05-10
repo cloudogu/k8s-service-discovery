@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - [#26] Support for service rewrite mechanism
+- [#28] Support automatic regeneration of selfsigned certificates on FQDN-change
 
 ## [v0.11.0] - 2023-04-06
 ### Added

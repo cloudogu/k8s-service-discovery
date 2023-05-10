@@ -109,6 +109,10 @@ func startManager() error {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
+	if err = handleSelfsignedCertificateUpdates(k8sManager, options.Namespace, reg, eventRecorder); err != nil {
+		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
+	}
+
 	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg.GlobalConfig(), options.Namespace, IngressClassName, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new ingress updater: %w", err)
@@ -206,6 +210,16 @@ func handleSslUpdates(k8sManager k8sManager, namespace string, reg registry.Regi
 
 	if err := k8sManager.Add(sslUpdater); err != nil {
 		return fmt.Errorf("failed to add ssl certificate updater as runnable to the manager: %w", err)
+	}
+
+	return nil
+}
+
+func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, reg registry.Registry, recorder record.EventRecorder) error {
+	selfsignedCertificateUpdater := controllers.NewSelfsignedCertificateUpdater(k8sManager.GetClient(), namespace, reg, recorder)
+
+	if err := k8sManager.Add(selfsignedCertificateUpdater); err != nil {
+		return fmt.Errorf("failed to add selfsigned certificate updater as runnable to the manager: %w", err)
 	}
 
 	return nil
