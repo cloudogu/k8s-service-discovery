@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.12.0] - 2023-05-10
+### Added
+- [#26] Support for service rewrite mechanism
+- [#28] Support automatic regeneration of selfsigned certificates on FQDN-change
+
 ## [v0.11.0] - 2023-04-06
 ### Added
 - [#24] Apply additional ingress annotations from dogu service to ingress object.

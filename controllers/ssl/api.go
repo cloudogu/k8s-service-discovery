@@ -1,7 +1,6 @@
 package ssl
 
 import (
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -13,20 +12,10 @@ const endpointPostGenerateSSL = "/api/v1/ssl"
 
 var logger = ctrl.Log.WithName("k8s-service-discovery")
 
-type globalConfig interface {
-	registry.ConfigurationContext
-}
-
-type cesSelfSignedSSLGenerator interface {
-	// GenerateSelfSignedCert generates a self-signed certificate for the ces and returns the certificate chain and the
-	// private key as string.
-	GenerateSelfSignedCert(fqdn string, domain string, certExpireDays int, country string,
-		province string, locality string, altDNSNames []string) (string, string, error)
-}
-
-type cesSSLWriter interface {
-	// WriteCertificate writes the type, cert and key to the global config
-	WriteCertificate(certType string, cert string, key string) error
+type selfSignedCertificateCreator interface {
+	// CreateAndSafeCertificate generates and writes the type, cert and key to the global config.
+	CreateAndSafeCertificate(certExpireDays int, country string,
+		province string, locality string, altDNSNames []string) error
 }
 
 type ginRouter interface {
@@ -38,11 +27,11 @@ func SetupAPI(router ginRouter, globalConfig globalConfig) {
 	logger.Info("Register endpoint [%s][%s]", http.MethodPost, endpointPostGenerateSSL)
 
 	router.POST(endpointPostGenerateSSL, func(ctx *gin.Context) {
-		handleSSLRequest(ctx, globalConfig, ssl.NewSSLGenerator(), NewSSLWriter(globalConfig))
+		handleSSLRequest(ctx, NewCreator(globalConfig))
 	})
 }
 
-func handleSSLRequest(ctx *gin.Context, globalConfig globalConfig, sslGenerator cesSelfSignedSSLGenerator, sslWriter cesSSLWriter) {
+func handleSSLRequest(ctx *gin.Context, certificateCreator selfSignedCertificateCreator) {
 	validDays := ctx.Query("days")
 	i, err := strconv.ParseInt(validDays, 10, 0)
 	if err != nil {
@@ -50,27 +39,9 @@ func handleSSLRequest(ctx *gin.Context, globalConfig globalConfig, sslGenerator 
 		return
 	}
 
-	fqdn, err := globalConfig.Get("fqdn")
+	err = certificateCreator.CreateAndSafeCertificate(int(i), ssl.Country, ssl.Province, ssl.Locality, []string{})
 	if err != nil {
-		handleError(ctx, http.StatusInternalServerError, err, "Failed to get FQDN from global config")
-		return
-	}
-
-	domain, err := globalConfig.Get("domain")
-	if err != nil {
-		handleError(ctx, http.StatusInternalServerError, err, "Failed to get DOMAIN from global config")
-		return
-	}
-
-	cert, key, err := sslGenerator.GenerateSelfSignedCert(fqdn, domain, int(i), ssl.Country, ssl.Province, ssl.Locality, []string{})
-	if err != nil {
-		handleError(ctx, http.StatusInternalServerError, err, "Failed to generate self-signed certificate and key")
-		return
-	}
-
-	err = sslWriter.WriteCertificate("selfsigned", cert, key)
-	if err != nil {
-		handleError(ctx, http.StatusInternalServerError, err, "Failed to write certificate to global config")
+		handleError(ctx, http.StatusInternalServerError, err, "Failed to create and write certificate to global config")
 		return
 	}
 
