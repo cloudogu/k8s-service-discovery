@@ -47,7 +47,7 @@ func NewIngressClassCreator(client client.Client, className string, namespace st
 // CreateIngressClass check whether the ingress class for the generator exists. If not it will be created.
 func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	log.FromContext(ctx).Info(fmt.Sprintf("checking for existing ingress class [%s]", icc.className))
-	ok, err := icc.isIngressClassAvailable()
+	ok, err := icc.isIngressClassAvailable(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to check if ingress class [%s] exists: %w", icc.className, err)
 	}
@@ -75,7 +75,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 		},
 	}
 
-	err = icc.client.Create(context.Background(), ingressClassResource)
+	err = icc.client.Create(ctx, ingressClassResource)
 	if err != nil {
 		return fmt.Errorf("cannot create ingress class [%s] with clientset: %w", icc.className, err)
 	}
@@ -85,13 +85,13 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 }
 
 // isIngressClassAvailable check whether an ingress class with the given name exists in the current namespace.
-func (icc ingressClassCreator) isIngressClassAvailable() (bool, error) {
+func (icc ingressClassCreator) isIngressClassAvailable(ctx context.Context) (bool, error) {
 	ingressClassKey := types.NamespacedName{
 		Namespace: "",
 		Name:      icc.className,
 	}
 	ingressClass := &networking.IngressClass{}
-	err := icc.client.Get(context.Background(), ingressClassKey, ingressClass)
+	err := icc.client.Get(ctx, ingressClassKey, ingressClass)
 	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
