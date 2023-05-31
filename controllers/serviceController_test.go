@@ -32,7 +32,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		valuedTestCtx := log.IntoContext(testCtx, logger)
 
 		sut := NewServiceReconciler(clientMock, ingressUpdaterMock)
-		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "my-namespace", Name: "my-service"}}
+		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
 		// when
 		actualResult, err := sut.Reconcile(valuedTestCtx, request)
@@ -46,7 +46,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		// given
 		service := &corev1.Service{
 			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: "my-namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: testNamespace},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()
 		ingressUpdaterMock := NewMockIngressUpdater(t)
@@ -54,7 +54,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 
 		sut := NewServiceReconciler(clientMock, ingressUpdaterMock)
 
-		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "my-namespace", Name: "my-service"}}
+		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
 		// when
 		_, err := sut.Reconcile(testCtx, request)
