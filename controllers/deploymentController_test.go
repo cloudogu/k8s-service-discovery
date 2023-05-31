@@ -34,8 +34,9 @@ func TestDeploymentReconciler_getDeployment(t *testing.T) {
 		// given
 		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
+		ingressUpdaterMock := NewMockIngressUpdater(t)
 
-		reconciler := NewDeploymentReconciler(clientMock, nil)
+		reconciler := NewDeploymentReconciler(clientMock, ingressUpdaterMock)
 
 		// when
 		result, err := reconciler.getDeployment(testCtx,
@@ -49,8 +50,9 @@ func TestDeploymentReconciler_getDeployment(t *testing.T) {
 	t.Run("failed to get deployment if no deployment has been created", func(t *testing.T) {
 		// given
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
+		ingressUpdaterMock := NewMockIngressUpdater(t)
 
-		reconciler := NewDeploymentReconciler(clientMock, nil)
+		reconciler := NewDeploymentReconciler(clientMock, ingressUpdaterMock)
 
 		// when
 		result, err := reconciler.getDeployment(testCtx,
