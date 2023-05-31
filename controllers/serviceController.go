@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +45,7 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	service, err := r.getService(ctx, req)
 	if err != nil {
+		logger.Info(fmt.Sprintf("failed to get service %s: %s", req.NamespacedName, err))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
