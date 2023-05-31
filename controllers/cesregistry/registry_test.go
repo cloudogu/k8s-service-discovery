@@ -6,7 +6,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	t.Run("test", func(t *testing.T) {
+	t.Run("successfully create a CES-registry", func(t *testing.T) {
 		result, err := Create("my-namespace")
 
 		assert.NoError(t, err)
