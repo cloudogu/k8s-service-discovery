@@ -289,6 +289,7 @@ func (i *ingressUpdater) upsertIngressObject(
 			Name:        cesService.Name,
 			Namespace:   i.namespace,
 			Annotations: map[string]string{},
+			Labels:      k8sCesLabels,
 		},
 	}
 

@@ -22,6 +22,8 @@ const (
 	ingressClassCreationEventReason = "IngressClassCreation"
 )
 
+var k8sCesLabels = map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"}
+
 type eventRecorder interface {
 	record.EventRecorder
 }
@@ -68,7 +70,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   icc.className,
-			Labels: map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"},
+			Labels: k8sCesLabels,
 		},
 		Spec: networking.IngressClassSpec{
 			Controller: "k8s.io/nginx-ingress",
