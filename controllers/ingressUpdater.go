@@ -32,6 +32,7 @@ const (
 const (
 	ingressCreationEventReason = "IngressCreation"
 )
+const failedIngressUpdateErrMsg = "failed to update ingress object: %w"
 
 // CesService contains information about one exposed ces service.
 type CesService struct {
@@ -215,7 +216,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
-		return fmt.Errorf("failed to update ingress object: %w", err)
+		return fmt.Errorf(failedIngressUpdateErrMsg, err)
 	}
 
 	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] has been updated to maintenance mode.", cesService.Name)
@@ -228,7 +229,7 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
-		return fmt.Errorf("failed to update ingress object: %w", err)
+		return fmt.Errorf(failedIngressUpdateErrMsg, err)
 	}
 
 	return nil
@@ -268,7 +269,7 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 
 	err = i.upsertIngressObject(ctx, service, cesService, service.GetName(), int32(cesService.Port), annotations)
 	if err != nil {
-		return fmt.Errorf("failed to update ingress object: %w", err)
+		return fmt.Errorf(failedIngressUpdateErrMsg, err)
 	}
 
 	return nil
@@ -288,6 +289,7 @@ func (i *ingressUpdater) upsertIngressObject(
 			Name:        cesService.Name,
 			Namespace:   i.namespace,
 			Annotations: map[string]string{},
+			Labels:      k8sCesLabels,
 		},
 	}
 

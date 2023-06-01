@@ -91,7 +91,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-warpChannel:
-			err := w.execute()
+			err := w.execute(ctx)
 			if err != nil {
 				return err
 			}
@@ -99,9 +99,9 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 }
 
-func (w *Watcher) execute() error {
+func (w *Watcher) execute(ctx context.Context) error {
 	deployment := &appsv1.Deployment{}
-	err := w.k8sClient.Get(context.Background(), types2.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: w.namespace}, deployment)
+	err := w.k8sClient.Get(ctx, types2.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: w.namespace}, deployment)
 	if err != nil {
 		return fmt.Errorf("warp update: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
@@ -112,7 +112,7 @@ func (w *Watcher) execute() error {
 		return fmt.Errorf("error during read: %w", err)
 	}
 	ctrl.Log.Info(fmt.Sprintf("All found Categories: %v", categories))
-	err = w.jsonWriter(categories)
+	err = w.jsonWriter(ctx, categories)
 	if err != nil {
 		w.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
 		return fmt.Errorf("failed to write warp menu as json: %w", err)
@@ -121,8 +121,8 @@ func (w *Watcher) execute() error {
 	return nil
 }
 
-func (w *Watcher) jsonWriter(data interface{}) error {
-	configmap, err := w.getMenuConfigMap()
+func (w *Watcher) jsonWriter(ctx context.Context, data interface{}) error {
+	configmap, err := w.getMenuConfigMap(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get menu json config map: %w", err)
 	}
@@ -133,8 +133,7 @@ func (w *Watcher) jsonWriter(data interface{}) error {
 	}
 
 	configmap.Data["menu.json"] = string(jsonData)
-
-	err = w.k8sClient.Update(context.Background(), configmap)
+	err = w.k8sClient.Update(ctx, configmap)
 	if err != nil {
 		return fmt.Errorf("failed to update menu json config map: %w", err)
 	}
@@ -142,10 +141,10 @@ func (w *Watcher) jsonWriter(data interface{}) error {
 	return nil
 }
 
-func (w *Watcher) getMenuConfigMap() (*corev1.ConfigMap, error) {
+func (w *Watcher) getMenuConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
 	configmap := &corev1.ConfigMap{}
 	objectKey := client.ObjectKey{Name: config.MenuConfigMap, Namespace: w.namespace}
-	err := w.k8sClient.Get(context.Background(), objectKey, configmap)
+	err := w.k8sClient.Get(ctx, objectKey, configmap)
 
 	return configmap, err
 }

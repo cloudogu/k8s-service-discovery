@@ -93,13 +93,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
 
-	go func() {
-		router := createRouter(reg)
-		err = router.Run(fmt.Sprintf(":%d", apiPort))
-		if err != nil {
-			logger.Error(fmt.Errorf("failed to start gin router %w", err), "SSL api error")
-		}
-	}()
+	provideSSLAPI(reg)
 
 	if err = handleWarpMenuCreation(k8sManager, reg, options.Namespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
@@ -131,6 +125,16 @@ func startManager() error {
 	}
 
 	return nil
+}
+
+func provideSSLAPI(reg registry.Registry) {
+	go func() {
+		router := createSSLAPIRouter(reg)
+		err := router.Run(fmt.Sprintf(":%d", apiPort))
+		if err != nil {
+			logger.Error(fmt.Errorf("failed to start gin router %w", err), "SSL api error")
+		}
+	}()
 }
 
 func configureManager(k8sManager k8sManager, updater controllers.IngressUpdater) error {
@@ -264,7 +268,7 @@ func addChecks(mgr k8sManager) error {
 	return nil
 }
 
-func createRouter(etcdRegistry registry.Registry) *gin.Engine {
+func createSSLAPIRouter(etcdRegistry registry.Registry) *gin.Engine {
 	router := gin.New()
 	router.Use(ginlogrus.Logger(logrus.StandardLogger()), gin.Recovery())
 	logger.Info("Setup ssl api")
