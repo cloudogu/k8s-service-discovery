@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"os"
@@ -59,7 +58,7 @@ func readWarpConfigFromFile(path string) (*Configuration, error) {
 		return nil, fmt.Errorf("could not find configuration at %s", path)
 	}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read configuration %s: %w", path, err)
 	}

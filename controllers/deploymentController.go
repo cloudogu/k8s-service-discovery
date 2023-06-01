@@ -40,6 +40,7 @@ func (r *deploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	deployment, err := r.getDeployment(ctx, req)
 	if err != nil {
+		logger.Info(fmt.Sprintf("failed to get deployment %s: %s", req.NamespacedName, err))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 

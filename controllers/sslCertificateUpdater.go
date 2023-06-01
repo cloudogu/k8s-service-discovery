@@ -177,7 +177,7 @@ func (scu *sslCertificateUpdater) createSslSecret(ctx context.Context, cert stri
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certificateSecretName,
 			Namespace: scu.namespace,
-			Labels:    map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"},
+			Labels:    k8sCesLabels,
 		},
 		StringData: map[string]string{
 			v1.TLSCertKey:       cert,
