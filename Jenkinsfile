@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/ces-build-lib@1.64.2'])
+@Library(['github.com/cloudogu/ces-build-lib@1.65.0'])
 import com.cloudogu.ces.cesbuildlib.*
 
 // Creating necessary git objects
@@ -12,11 +12,14 @@ github = new GitHub(this, git)
 changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
+goVersion = "1.20"
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
 repositoryName = "k8s-service-discovery"
 project = "github.com/${repositoryOwner}/${repositoryName}"
+registry = "registry.cloudogu.com"
+registry_namespace = "k8s"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -40,7 +43,7 @@ node('docker') {
         }
 
         docker
-                .image('golang:1.20.3')
+                .image("golang:${goVersion}")
                 .mountJenkinsUser()
                 .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                         {
@@ -200,6 +203,24 @@ void stageAutomaticRelease() {
 
             DoguRegistry registry = new DoguRegistry(this)
             registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
+        }
+
+        stage('Push Helm chart to Harbor') {
+            new Docker(this)
+                .image("golang:${goVersion}")
+                .mountJenkinsUser()
+                .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
+                        {
+                            make 'k8s-helm-package-release'
+
+                            Makefile makefile = new Makefile(this)
+                            String controllerVersion = makefile.getVersion()
+
+                            withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
+                                sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
+                                sh ".bin/helm push target/make/k8s/helm/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
+                            }
+                        }
         }
 
         stage('Add Github-Release') {
