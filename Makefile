@@ -29,7 +29,7 @@ include build/make/mocks.mk
 
 K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
 PRE_COMPILE=generate
-K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource template-dev-only-image-pull-policy
+K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config generate-menu-json template-dev-only-image-pull-policy
 
 include build/make/k8s-controller.mk
 
@@ -52,13 +52,13 @@ setup-etcd-port-forward:
 
 .PHONY: generate-warp-config
 generate-warp-config:
-	@echo "Add Warp-Config"
-	@cp $(K8S_WARP_CONFIG_RESOURCE_YAML) ${K8S_HELM_TARGET}/templates
+	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
+	@cat $(K8S_WARP_CONFIG_RESOURCE_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
 
 .PHONY: generate-menu-json
 generate-menu-json:
-	@echo "Add menu.json"
-	@cp $(K8S_WARP_MENU_JSON_YAML) ${K8S_HELM_TARGET}/templates
+	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
+	@cat $(K8S_WARP_MENU_JSON_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
 
 create-temporary-release-resources: $(K8S_PRE_GENERATE_TARGETS)
 
@@ -66,10 +66,3 @@ create-temporary-release-resources: $(K8S_PRE_GENERATE_TARGETS)
 template-dev-only-image-pull-policy: $(BINARY_YQ)
 	@echo "Setting pull policy to always!"
 	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)
-
-##@ Override k8s-helm-generate targets to add menu.json & warp-config
-.PHONY: k8s-helm-generate
-k8s-helm-generate: k8s-generate ${K8S_HELM_RESSOURCES}/Chart.yaml ${BINARY_HELMIFY} $(K8S_RESOURCE_TEMP_FOLDER) k8s-helm-generate-chart generate-menu-json generate-warp-config ## Generates the final helm chart with dev-urls.
-
-.PHONY: k8s-helm-generate-release
-k8s-helm-generate-release: $(K8S_PRE_GENERATE_TARGETS) ${K8S_HELM_RESSOURCES}/Chart.yaml ${BINARY_HELMIFY} $(K8S_RESOURCE_TEMP_FOLDER) k8s-helm-generate-chart generate-menu-json generate-warp-config  ## Generates the final helm chart with release urls.
