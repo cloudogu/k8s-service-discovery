@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.13.0] - 2023-07-07
+### Added
+- [#32] Add Helm chart release process to project
+
 ## [v0.12.1] - 2023-06-01
 ### Fixed
 - [#30] Add appropriate labels to generated ingress resources
