@@ -13,6 +13,7 @@ changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
 goVersion = "1.20"
+makefile = new Makefile(this)
 
 // Configuration of repository
 repositoryOwner = "cloudogu"
@@ -76,14 +77,12 @@ node('docker') {
         K3d k3d = new K3d(this, "${WORKSPACE}", "${WORKSPACE}/k3d", env.PATH)
 
         try {
-            Makefile makefile = new Makefile(this)
-            String controllerVersion = makefile.getVersion()
-
             stage('Set up k3d cluster') {
                 k3d.startK3d()
             }
 
             def imageName
+            String controllerVersion = makefile.getVersion()
             stage('Build & Push Image') {
                 imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
             }
@@ -128,14 +127,12 @@ void gitWithCredentials(String command) {
 
 void stageLintK8SResources() {
     String kubevalImage = "cytopia/kubeval:0.13"
-    Makefile makefile = new Makefile(this)
-    String controllerVersion = makefile.getVersion()
 
     docker
             .image(kubevalImage)
             .inside("-v ${WORKSPACE}/target/make/k8s:/data -t --entrypoint=")
                     {
-                        sh "kubeval /data/${repositoryName}_${controllerVersion}.yaml --ignore-missing-schemas"
+                        sh "kubeval /data/${repositoryName}_${makefile.getVersion()}.yaml --ignore-missing-schemas"
                     }
 }
 
@@ -184,6 +181,7 @@ void stageAutomaticRelease() {
     if (gitflow.isReleaseBranch()) {
         String releaseVersion = git.getSimpleBranchName()
         String dockerReleaseVersion = releaseVersion.split("v")[1]
+        String controllerVersion = makefile.getVersion()
 
         stage('Build & Push Image') {
             def dockerImage = docker.build("cloudogu/${repositoryName}:${dockerReleaseVersion}")
@@ -197,8 +195,6 @@ void stageAutomaticRelease() {
         }
 
         stage('Push to Registry') {
-            Makefile makefile = new Makefile(this)
-            String controllerVersion = makefile.getVersion()
             GString targetOperatorResourceYaml = "target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
 
             DoguRegistry registry = new DoguRegistry(this)
@@ -212,9 +208,6 @@ void stageAutomaticRelease() {
                 .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
                         {
                             make 'k8s-helm-package-release'
-
-                            Makefile makefile = new Makefile(this)
-                            String controllerVersion = makefile.getVersion()
 
                             withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
                                 sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
