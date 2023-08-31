@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.13.1] - 2023-08-31
+### Fixed
+- [#34] Add label `app: ces` for all generated Kubernetes resources
+
+### Added
+- [#36] Add "k8s-etcd" as a dependency to the helm-chart
+
 ## [v0.13.0] - 2023-07-07
 ### Added
 - [#32] Add Helm chart release process to project

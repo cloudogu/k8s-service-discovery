@@ -6,8 +6,9 @@
 namePrefix: k8s-service-discovery-
 
 # Labels to add to all resources and selectors.
-#commonLabels:
-#  someName: someValue
+commonLabels:
+  app: ces
+  app.kubernetes.io/name: k8s-service-discovery
 
 bases:
 - ../rbac
