@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- [#39] Move component-dependencies to helm-annotations
+
 ## [v0.13.1] - 2023-08-31
 ### Fixed
 - [#34] Add label `app: ces` for all generated Kubernetes resources
