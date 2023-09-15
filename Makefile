@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.14.0
+VERSION=0.14.1
 
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
@@ -11,6 +11,7 @@ LINT_VERSION?=v1.52.1
 
 ADDITIONAL_CLEAN=dist-clean
 
+STAGE?=production
 K8S_RESOURCE_DIR=${WORKDIR}/k8s
 K8S_WARP_CONFIG_RESOURCE_YAML=${K8S_RESOURCE_DIR}/k8s-ces-warp-config.yaml
 K8S_WARP_MENU_JSON_YAML=${K8S_RESOURCE_DIR}/k8s-ces-menu-json.yaml

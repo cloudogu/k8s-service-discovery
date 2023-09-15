@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.14.1] - 2023-09-15
+### Fixed
+- [#42] Set default-value for STAGE environment-variable to "production"
+
 ## [v0.14.0] - 2023-09-15
 ### Changed
 - [#39] Move component-dependencies to helm-annotations
