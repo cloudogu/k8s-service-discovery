@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- [#38] updated go dependencies
+- [#38] updated kube-rbac-proxy
+
+### Fixed
+- [#38] deprecation warning for argument `logtostderr` in kube-rbac-proxy
+
+### Removed
+- [#38] deprecated argument `logtostderr` from kube-rbac-proxy
 
 ## [v0.14.1] - 2023-09-15
 ### Fixed

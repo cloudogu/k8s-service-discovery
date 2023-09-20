@@ -3,31 +3,32 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	ginlogrus "github.com/toorop/gin-logrus"
-	"os"
-
-	"k8s.io/client-go/tools/record"
-
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 
 	"github.com/cloudogu/cesapp-lib/registry"
-	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
-
 	"github.com/cloudogu/k8s-dogu-operator/api/v1"
 
 	"github.com/cloudogu/k8s-service-discovery/controllers"
+	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
+	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
 )
 
 const (
@@ -41,11 +42,11 @@ var (
 	metricsAddr          string
 	enableLeaderElection bool
 	probeAddr            string
-	// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
-	// namespace that should be watched by the service discovery. It is a required variable and an empty value will
-	// produce an appropriate error message.
-	namespaceEnvVar = "WATCH_NAMESPACE"
 )
+
+// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
+// namespace that should be watched by the service discovery.
+const namespaceEnvVar = "WATCH_NAMESPACE"
 
 type k8sManager interface {
 	manager.Manager
@@ -72,7 +73,9 @@ func main() {
 func startManager() error {
 	logger.Info("Starting k8s-service-discovery...")
 
-	options, err := getK8sManagerOptions()
+	watchNamespace, err := readWatchNamespace()
+
+	options := getK8sManagerOptions(watchNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to get manager options: %w", err)
 	}
@@ -84,35 +87,35 @@ func startManager() error {
 
 	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	if err = handleIngressClassCreation(k8sManager, options.Namespace, eventRecorder); err != nil {
+	if err = handleIngressClassCreation(k8sManager, watchNamespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	reg, err := cesregistry.Create(options.Namespace)
+	reg, err := cesregistry.Create(watchNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
 
 	provideSSLAPI(reg)
 
-	if err = handleWarpMenuCreation(k8sManager, reg, options.Namespace, eventRecorder); err != nil {
+	if err = handleWarpMenuCreation(k8sManager, reg, watchNamespace, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err = handleSslUpdates(k8sManager, options.Namespace, reg, eventRecorder); err != nil {
+	if err = handleSslUpdates(k8sManager, watchNamespace, reg, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	if err = handleSelfsignedCertificateUpdates(k8sManager, options.Namespace, reg, eventRecorder); err != nil {
+	if err = handleSelfsignedCertificateUpdates(k8sManager, watchNamespace, reg, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
-	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg.GlobalConfig(), options.Namespace, IngressClassName, eventRecorder)
+	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), reg.GlobalConfig(), watchNamespace, IngressClassName, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to create new ingress updater: %w", err)
 	}
 
-	if err = handleMaintenanceMode(k8sManager, options.Namespace, ingressUpdater, eventRecorder); err != nil {
+	if err = handleMaintenanceMode(k8sManager, watchNamespace, ingressUpdater, eventRecorder); err != nil {
 		return err
 	}
 
@@ -125,6 +128,16 @@ func startManager() error {
 	}
 
 	return nil
+}
+
+func readWatchNamespace() (string, error) {
+	watchNamespace, found := os.LookupEnv(namespaceEnvVar)
+	if !found {
+		return "", fmt.Errorf("failed to read namespace to watch from environment variable [%s], please set the variable and try again", namespaceEnvVar)
+	}
+	logger.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
+
+	return watchNamespace, nil
 }
 
 func provideSSLAPI(reg registry.Registry) {
@@ -152,30 +165,24 @@ func configureManager(k8sManager k8sManager, updater controllers.IngressUpdater)
 	return nil
 }
 
-func getK8sManagerOptions() (manager.Options, error) {
+func getK8sManagerOptions(watchNamespace string) manager.Options {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
-	options := ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+	return ctrl.Options{
+		Scheme:  scheme,
+		Metrics: server.Options{BindAddress: metricsAddr},
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			watchNamespace: {},
+		}},
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "92a787f2.cloudogu.com",
 	}
-
-	watchNamespace, found := os.LookupEnv(namespaceEnvVar)
-	if !found {
-		return manager.Options{}, fmt.Errorf("failed to read namespace to watch from environment variable [%s], please set the variable and try again", namespaceEnvVar)
-	}
-	options.Namespace = watchNamespace
-	logger.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
-
-	return options, nil
 }
 
 func startK8sManager(k8sManager k8sManager) error {

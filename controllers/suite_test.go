@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -86,8 +87,10 @@ var _ = BeforeSuite(func() {
 
 	// +kubebuilder:scaffold:scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:    testScheme,
-		Namespace: myNamespace,
+		Scheme: testScheme,
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			myNamespace: {},
+		}},
 	})
 	Expect(err).ToNot(HaveOccurred())
 

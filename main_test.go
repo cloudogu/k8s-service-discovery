@@ -3,42 +3,22 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
-
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
-
-type mockDefinition struct {
-	Arguments   []interface{}
-	ReturnValue interface{}
-}
-
-func getNewMockManager(t *testing.T, expectedErrorOnNewManager error, definitions map[string]mockDefinition) k8sManager {
-	k8sManager := newMockK8sManager(t)
-	ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
-		for key, value := range definitions {
-			k8sManager.Mock.On(key, value.Arguments...).Return(value.ReturnValue)
-		}
-		return k8sManager, expectedErrorOnNewManager
-	}
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-
-	return k8sManager
-}
 
 func Test_startManager(t *testing.T) {
 	// override default controller method to create a new manager
@@ -78,7 +58,13 @@ func Test_startManager(t *testing.T) {
 		// given
 		err := os.Unsetenv("WATCH_NAMESPACE")
 		require.NoError(t, err)
-		getNewMockManager(t, nil, nil)
+		k8sManager := newMockK8sManager(t)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return k8sManager, nil
+		}
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err = startManager()
@@ -90,118 +76,149 @@ func Test_startManager(t *testing.T) {
 
 	t.Setenv(namespaceEnvVar, "mynamespace")
 
-	expectedError := fmt.Errorf("this is my expected error")
-
 	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given
-		getNewMockManager(t, expectedError, nil)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return nil, assert.AnError
+		}
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err := startManager()
 
 		// then
-		require.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to create new manager")
 	})
 
 	t.Run("fail setup when error on Add", func(t *testing.T) {
 		// given
-		mockDefinitions := map[string]mockDefinition{
-			"GetClient":           {ReturnValue: client},
-			"Add":                 {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
-			"GetEventRecorderFor": {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
+		k8sManager := newMockK8sManager(t)
+		k8sManager.EXPECT().GetClient().Return(client)
+		k8sManager.EXPECT().Add(mock.Anything).Return(assert.AnError)
+		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return k8sManager, nil
 		}
-		getNewMockManager(t, nil, mockDefinitions)
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err := startManager()
 
 		// then
-		require.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to create ingress class creator: failed to add ingress class creator as runnable to the manager")
 	})
 
 	t.Run("fail setup when error on AddHealthzCheck", func(t *testing.T) {
 		// given
-		mockDefinitions := map[string]mockDefinition{
-			"GetScheme":            {ReturnValue: scheme},
-			"GetClient":            {ReturnValue: client},
-			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: expectedError},
-			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
-			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
-			"GetLogger":            {ReturnValue: ctrl.Log},
+		k8sManager := newMockK8sManager(t)
+		k8sManager.EXPECT().GetClient().Return(client)
+		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
+		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetScheme().Return(scheme)
+		k8sManager.EXPECT().GetLogger().Return(logger)
+		k8sManager.EXPECT().GetCache().Return(nil)
+		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return k8sManager, nil
 		}
-		getNewMockManager(t, nil, mockDefinitions)
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err := startManager()
 
 		// then
-		require.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to configure service discovery manager: failed to configure reconciler: failed to add healthz check")
 	})
 
 	t.Run("fail setup when error on AddReadyzCheck", func(t *testing.T) {
 		// given
-		mockDefinitions := map[string]mockDefinition{
-			"GetScheme":            {ReturnValue: scheme},
-			"GetClient":            {ReturnValue: client},
-			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
-			"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: expectedError},
-			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
-			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
-			"GetLogger":            {ReturnValue: ctrl.Log},
+		k8sManager := newMockK8sManager(t)
+		k8sManager.EXPECT().GetClient().Return(client)
+		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
+		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetScheme().Return(scheme)
+		k8sManager.EXPECT().GetLogger().Return(logger)
+		k8sManager.EXPECT().GetCache().Return(nil)
+		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
+		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return k8sManager, nil
 		}
-		getNewMockManager(t, nil, mockDefinitions)
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err := startManager()
 
 		// then
-		require.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to configure service discovery manager: failed to configure reconciler: failed to add readyz check")
 	})
 
 	t.Run("fail setup when error on Start", func(t *testing.T) {
 		// given
-		mockDefinitions := map[string]mockDefinition{
-			"GetScheme":            {ReturnValue: scheme},
-			"GetClient":            {ReturnValue: client},
-			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"AddHealthzCheck":      {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
-			"AddReadyzCheck":       {Arguments: []interface{}{mock.Anything, mock.Anything}, ReturnValue: nil},
-			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
-			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
-			"GetLogger":            {ReturnValue: ctrl.Log},
-			"Start":                {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
+		k8sManager := newMockK8sManager(t)
+		k8sManager.EXPECT().GetClient().Return(client)
+		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
+		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetScheme().Return(scheme)
+		k8sManager.EXPECT().GetLogger().Return(logger)
+		k8sManager.EXPECT().GetCache().Return(nil)
+		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
+		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
+		k8sManager.EXPECT().Start(mock.Anything).Return(assert.AnError)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return k8sManager, nil
 		}
-		getNewMockManager(t, nil, mockDefinitions)
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err := startManager()
 
 		// then
-		require.ErrorIs(t, err, expectedError)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failure at service discovery manager: failed to start service discovery manager")
 	})
 
-	t.Run("fail setup when error on SetFields", func(t *testing.T) {
+	t.Run("should setup successfully", func(t *testing.T) {
 		// given
-		mockDefinitions := map[string]mockDefinition{
-			"GetScheme":            {ReturnValue: scheme},
-			"GetClient":            {ReturnValue: client},
-			"Add":                  {Arguments: []interface{}{mock.Anything}, ReturnValue: nil},
-			"GetControllerOptions": {ReturnValue: v1alpha1.ControllerConfigurationSpec{}},
-			"SetFields":            {Arguments: []interface{}{mock.Anything}, ReturnValue: expectedError},
-			"GetEventRecorderFor":  {Arguments: []interface{}{"k8s-service-discovery-controller-manager"}, ReturnValue: nil},
-			"GetLogger":            {ReturnValue: ctrl.Log},
+		k8sManager := newMockK8sManager(t)
+		k8sManager.EXPECT().GetClient().Return(client)
+		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
+		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetScheme().Return(scheme)
+		k8sManager.EXPECT().GetLogger().Return(logger)
+		k8sManager.EXPECT().GetCache().Return(nil)
+		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
+		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
+		k8sManager.EXPECT().Start(mock.Anything).Return(nil)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
+		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
+			return k8sManager, nil
 		}
-		getNewMockManager(t, nil, mockDefinitions)
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 		// when
 		err := startManager()
 
 		// then
-		require.ErrorIs(t, err, expectedError)
+		require.NoError(t, err)
 	})
 }
