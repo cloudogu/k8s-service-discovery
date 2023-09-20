@@ -59,6 +59,8 @@ func Test_startManager(t *testing.T) {
 		err := os.Unsetenv("WATCH_NAMESPACE")
 		require.NoError(t, err)
 		k8sManager := newMockK8sManager(t)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return k8sManager, nil
 		}
@@ -76,6 +78,8 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return nil, assert.AnError
 		}
@@ -95,6 +99,8 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return k8sManager, nil
 		}
@@ -119,6 +125,8 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetLogger().Return(logger)
 		k8sManager.EXPECT().GetCache().Return(nil)
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return k8sManager, nil
 		}
@@ -144,6 +152,8 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetCache().Return(nil)
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return k8sManager, nil
 		}
@@ -170,6 +180,8 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().Start(mock.Anything).Return(assert.AnError)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return k8sManager, nil
 		}
@@ -196,6 +208,8 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().Start(mock.Anything).Return(nil)
+		oldNewManger := ctrl.NewManager
+		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
 			return k8sManager, nil
 		}
