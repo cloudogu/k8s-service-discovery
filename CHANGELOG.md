@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.14.2] - 2023-09-20
+### Changed
+- [#38] updated go dependencies
+- [#38] updated kube-rbac-proxy
+
+### Fixed
+- [#38] deprecation warning for argument `logtostderr` in kube-rbac-proxy
+
+### Removed
+- [#38] deprecated argument `logtostderr` from kube-rbac-proxy
+
 ## [v0.14.1] - 2023-09-15
 ### Fixed
 - [#42] Set default-value for STAGE environment-variable to "production"
