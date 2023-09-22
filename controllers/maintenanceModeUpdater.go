@@ -167,7 +167,8 @@ func (scu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1Servic
 
 	var modifiableServiceList v1ServiceList
 	for _, svc := range serviceList.Items {
-		modifiableServiceList = append(modifiableServiceList, &svc)
+		copySvc := svc
+		modifiableServiceList = append(modifiableServiceList, &copySvc)
 	}
 
 	return modifiableServiceList, nil
