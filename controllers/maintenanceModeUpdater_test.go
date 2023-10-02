@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 	"time"
 
@@ -486,6 +487,32 @@ func Test_maintenanceModeUpdater_getAllServices(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
 		assert.ErrorContains(t, err, "failed to get list of all services in namespace [el-espacio-del-nombre]:")
+	})
+
+	t.Run("should return multiple services", func(t *testing.T) {
+		// given
+		clientMock := newMockK8sClient(t)
+		serviceA := corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "A and not equal B"}}
+		serviceB := corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "B and not equal A"}}
+		services := []corev1.Service{serviceA, serviceB}
+		serviceList := &corev1.ServiceList{Items: services}
+		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Run(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
+			c := list.(*corev1.ServiceList)
+			c.Items = serviceList.Items
+		}).Return(nil)
+
+		sut := &maintenanceModeUpdater{
+			client:    clientMock,
+			namespace: "el-espacio-del-nombre",
+		}
+
+		// when
+		result, err := sut.getAllServices(testCtx)
+
+		// then
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.NotEqual(t, result[0].Name, result[1].Name)
 	})
 }
 

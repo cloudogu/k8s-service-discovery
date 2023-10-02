@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - [#38] deprecation warning for argument `logtostderr` in kube-rbac-proxy
+- [#44] Fix a bug where the service discovery only updated one single ingress switching maintenance mode.
 
 ### Removed
 - [#38] deprecated argument `logtostderr` from kube-rbac-proxy
