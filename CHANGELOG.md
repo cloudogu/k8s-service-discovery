@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.14.3] - 2023-10-02
+### Fixed
+- [#44] Fix a bug where the service discovery only updated one single ingress switching maintenance mode.
+
 ## [v0.14.2] - 2023-09-20
 ### Changed
 - [#38] updated go dependencies

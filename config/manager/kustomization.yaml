@@ -11,4 +11,4 @@ kind: Kustomization
 images:
   - name: controller
     newName: cloudogu/k8s-service-discovery
-    newTag: 0.14.2
+    newTag: 0.14.3
