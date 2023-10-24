@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.14.3
+VERSION=0.14.4
 
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
