@@ -1,12 +1,12 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.14.3
+VERSION=0.14.4
 
 ## Image URL to use all building/pushing image targets
 IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.21
-MAKEFILES_VERSION=8.3.0
+MAKEFILES_VERSION=8.7.3
 LINT_VERSION?=v1.52.1
 
 ADDITIONAL_CLEAN=dist-clean

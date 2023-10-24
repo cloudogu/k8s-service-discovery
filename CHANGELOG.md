@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.14.4] - 2023-10-24
+### Changed
+- [#46] Update cesapp-lib to 0.12.2
+
 ## [v0.14.3] - 2023-10-02
 ### Fixed
 - [#44] Fix a bug where the service discovery only updated one single ingress switching maintenance mode.
