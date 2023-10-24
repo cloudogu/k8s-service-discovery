@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
-	github.com/cloudogu/cesapp-lib v0.12.1
+	github.com/cloudogu/cesapp-lib v0.12.2
 	github.com/cloudogu/k8s-dogu-operator v0.38.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-logr/logr v1.2.4
@@ -22,8 +22,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.16.2
 	sigs.k8s.io/yaml v1.3.0
 )
-
-replace github.com/cloudogu/cesapp-lib v0.12.1 => github.com/cloudogu/cesapp-lib v0.0.0-20231023124814-3cbe9eb94ba3
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
