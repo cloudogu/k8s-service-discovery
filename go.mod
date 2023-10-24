@@ -4,8 +4,8 @@ go 1.21
 
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
-	github.com/cloudogu/cesapp-lib v0.12.1
-	github.com/cloudogu/k8s-dogu-operator v0.38.0
+	github.com/cloudogu/cesapp-lib v0.0.0-20231023124814-3cbe9eb94ba3
+	github.com/cloudogu/k8s-dogu-operator v0.26.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-logr/logr v1.2.4
 	github.com/hashicorp/go-multierror v1.1.1
