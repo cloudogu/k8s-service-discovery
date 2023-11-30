@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "k8s-service-discovery.name" . }}-ces-warp-config
+  name: k8s-ces-warp-config
   labels:
   {{- include "k8s-service-discovery.labels" . | nindent 4 }}
 data:
