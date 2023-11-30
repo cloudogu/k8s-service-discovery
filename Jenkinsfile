@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/ces-build-lib@1.67.0'])
+@Library(['github.com/cloudogu/ces-build-lib@1.68.0'])
 import com.cloudogu.ces.cesbuildlib.*
 
 // Creating necessary git objects
@@ -21,6 +21,8 @@ repositoryName = "k8s-service-discovery"
 project = "github.com/${repositoryOwner}/${repositoryName}"
 registry = "registry.cloudogu.com"
 registry_namespace = "k8s"
+helmTargetDir = "target/k8s"
+helmChartDir = "${helmTargetDir}/helm"
 
 // Configuration of branches
 productionReleaseBranch = "main"
@@ -61,14 +63,14 @@ node('docker') {
                             }
 
                             stage('Generate k8s Resources') {
-                                make 'create-temporary-release-resources'
-                                archiveArtifacts 'target/make/k8s/*.yaml'
+                                make 'helm-generate'
+                                archiveArtifacts 'target/k8s/**/*'
+                            }
+
+                            stage("Lint helm") {
+                                make 'helm-lint'
                             }
                         }
-
-        stage("Lint k8s Resources") {
-            stageLintK8SResources()
-        }
 
         stage('SonarQube') {
             stageStaticAnalysisSonarQube()
@@ -81,26 +83,23 @@ node('docker') {
                 k3d.startK3d()
             }
 
-            def imageName
             String controllerVersion = makefile.getVersion()
+            def imageName = ""
             stage('Build & Push Image') {
-                imageName=k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
+                imageName = k3d.buildAndPushToLocalRegistry("cloudogu/${repositoryName}", controllerVersion)
             }
 
-            GString sourceDeploymentYaml="target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
-            GString sourceDeploymentYamlWithNamespace="target/make/k8s/${repositoryName}_${controllerVersion}_namespaced.yaml"
-
             stage('Update development resources') {
-                sh "cat ${sourceDeploymentYaml} | sed \"s/{{ .Namespace }}/default/\" > ${sourceDeploymentYamlWithNamespace}"
-                docker.image('mikefarah/yq:4.22.1')
+                def repository = imageName.substring(0, imageName.lastIndexOf(":"))
+                docker.image("golang:${goVersion}")
                         .mountJenkinsUser()
                         .inside("--volume ${WORKSPACE}:/workdir -w /workdir") {
-                            sh "yq -i '(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.name == \"manager\")).image=\"${imageName}\"' ${sourceDeploymentYamlWithNamespace}"
+                            sh "IMAGE_DEV=${repository} make helm-values-replace-image-repo"
                         }
             }
 
             stage('Deploy Manager') {
-                k3d.kubectl("apply -f ${sourceDeploymentYamlWithNamespace}")
+                k3d.helm("install ${repositoryName} ${helmChartDir}")
             }
 
             stage('Wait for Ready Rollout') {
@@ -123,17 +122,6 @@ void gitWithCredentials(String command) {
                 returnStdout: true
         )
     }
-}
-
-void stageLintK8SResources() {
-    String kubevalImage = "cytopia/kubeval:0.13"
-
-    docker
-            .image(kubevalImage)
-            .inside("-v ${WORKSPACE}/target/make/k8s:/data -t --entrypoint=")
-                    {
-                        sh "kubeval /data/${repositoryName}_${makefile.getVersion()}.yaml --ignore-missing-schemas"
-                    }
 }
 
 void stageStaticAnalysisReviewDog() {
@@ -190,30 +178,30 @@ void stageAutomaticRelease() {
             }
         }
 
-        stage('Finish Release') {
-            gitflow.finishRelease(releaseVersion, productionReleaseBranch)
-        }
-
-        stage('Push to Registry') {
-            GString targetOperatorResourceYaml = "target/make/k8s/${repositoryName}_${controllerVersion}.yaml"
-
-            DoguRegistry registry = new DoguRegistry(this)
-            registry.pushK8sYaml(targetOperatorResourceYaml, repositoryName, "k8s", "${controllerVersion}")
+        stage('Sign Release') {
+            gpg.createSignature()
         }
 
         stage('Push Helm chart to Harbor') {
             new Docker(this)
-                .image("golang:${goVersion}")
-                .mountJenkinsUser()
-                .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
-                        {
-                            make 'helm-package-release'
+                    .image("golang:${goVersion}")
+                    .mountJenkinsUser()
+                    .inside("--volume ${WORKSPACE}:/go/src/${project} -w /go/src/${project}")
+                            {
+                                // Package operator-chart
+                                make 'helm-package'
 
-                            withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
-                                sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
-                                sh ".bin/helm push target/make/k8s/helm/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
+                                // Push charts
+                                withCredentials([usernamePassword(credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD')]) {
+                                    sh ".bin/helm registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'"
+
+                                    sh ".bin/helm push target/k8s/helm/${repositoryName}-${controllerVersion}.tgz oci://${registry}/${registry_namespace}/"
+                                }
                             }
-                        }
+        }
+
+        stage('Finish Release') {
+            gitflow.finishRelease(releaseVersion, productionReleaseBranch)
         }
 
         stage('Add Github-Release') {
