@@ -21,7 +21,6 @@ cesWarpConfig:
       - identifier: myCloudogu
         external: true
         href: https://my.cloudogu.com/
-
 kubeRbacProxy:
   image:
     repository: gcr.io/kubebuilder/kube-rbac-proxy
@@ -33,11 +32,13 @@ kubeRbacProxy:
     requests:
       cpu: 5m
       memory: 64Mi
-
 manager:
   image:
     repository: cloudogu/k8s-service-discovery
     tag: 0.14.4
+  env:
+    logLevel: debug
+    stage: production
   resources:
     limits:
       cpu: 500m

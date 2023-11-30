@@ -2,8 +2,6 @@
 ARTIFACT_ID=k8s-service-discovery
 VERSION=0.14.4
 
-## Image URL to use all building/pushing image targets
-IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.21
 MAKEFILES_VERSION=9.0.0
@@ -46,28 +44,28 @@ helm-values-update-image-version: $(BINARY_YQ)
 
 .PHONY: helm-values-replace-image-repo
 helm-values-replace-image-repo: $(BINARY_YQ)
-	@if [[ ${STAGE} == "development" ]]; then \
+	@if [[ ${STAGE} != "production" ]]; then \
       		echo "Setting dev image repo in target values.yaml!" ;\
     		$(BINARY_YQ) -i e ".manager.image.repository=\"${IMAGE_DEV}\"" "${K8S_COMPONENT_TARGET_VALUES}" ;\
     	fi
 
 .PHONY: template-stage
 template-stage: $(BINARY_YQ)
-	@if [[ ${STAGE} == "development" ]]; then \
+	@if [[ ${STAGE} != "production" ]]; then \
   		echo "Setting STAGE env in deployment to ${STAGE}!" ;\
 		$(BINARY_YQ) -i e ".manager.env.stage=\"${STAGE}\"" ${K8S_COMPONENT_TARGET_VALUES} ;\
 	fi
 
 .PHONY: template-log-level
 template-log-level: ${BINARY_YQ}
-	@if [[ "${STAGE}" == "development" ]]; then \
+	@if [[ ${STAGE} != "production" ]]; then \
       echo "Setting LOG_LEVEL env in deployment to ${LOG_LEVEL}!" ; \
       $(BINARY_YQ) -i e ".manager.env.logLevel=\"${LOG_LEVEL}\"" "${K8S_COMPONENT_TARGET_VALUES}" ; \
     fi
 
 .PHONY: template-image-pull-policy
 template-image-pull-policy: $(BINARY_YQ)
-	@if [[ "${STAGE}" == "development" ]]; then \
+	@if [[ ${STAGE} != "production" ]]; then \
           echo "Setting pull policy to always!" ; \
           $(BINARY_YQ) -i e ".manager.imagePullPolicy=\"Always\"" "${K8S_COMPONENT_TARGET_VALUES}" ; \
     fi
