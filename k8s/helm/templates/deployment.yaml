@@ -50,12 +50,11 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: LOG_LEVEL
-          value: {{ .Values.manager.env.logLevel }}
+          value: {{ .Values.manager.env.logLevel | default "info" }}
         - name: STAGE
-          value: {{ .Values.manager.env.stage }}
-        image: {{ .Values.manager.image.repository }}:{{
-          .Values.manager.image.tag }}
-        imagePullPolicy: Always
+          value: {{ .Values.manager.env.stage | default "production" }}
+        image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
+        imagePullPolicy: {{ .Values.manager.imagePullPolicy | default "IfNotPresent" }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -69,8 +68,7 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        resources: {{- toYaml .Values.manager.resources
-          | nindent 10 }}
+        resources: {{- toYaml .Values.manager.resources | nindent 10 }}
         securityContext:
           allowPrivilegeEscalation: false
       securityContext:
