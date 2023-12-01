@@ -34,6 +34,8 @@ PRE_COMPILE=generate-deepcopy
 HELM_PRE_APPLY_TARGETS=template-stage template-log-level template-image-pull-policy
 HELM_PRE_GENERATE_TARGETS = helm-values-update-image-version
 HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo
+CHECK_VAR_TARGETS=check-all-vars
+IMAGE_IMPORT_TARGET=image-import
 
 include build/make/k8s-controller.mk
 

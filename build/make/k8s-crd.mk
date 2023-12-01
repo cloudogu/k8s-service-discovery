@@ -10,6 +10,9 @@ K8S_RESOURCE_COMPONENT_CR_TEMPLATE_YAML ?= $(BUILD_DIR)/make/k8s-component.tpl
 # CRD_POST_MANIFEST_TARGETS can be used to post-process CRD YAMLs after their creation.
 CRD_POST_MANIFEST_TARGETS ?= crd-add-labels
 
+# This can be used by external components to prevent generate and copy controller manifests by overriding with an empty value.
+CRD_HELM_MANIFEST_TARGET?=manifests
+
 ##@ K8s - CRD targets
 
 .PHONY: manifests
@@ -29,7 +32,7 @@ crd-add-labels: $(BINARY_YQ)
 	done
 
 .PHONY: crd-helm-generate ## Generates the Helm CRD chart
-crd-helm-generate: manifests validate-crd-chart ${HELM_CRD_TARGET_DIR}/Chart.yaml ${K8S_POST_CRD_HELM_GENERATE_TARGETS}
+crd-helm-generate: ${CRD_HELM_MANIFEST_TARGET} validate-crd-chart ${HELM_CRD_TARGET_DIR}/Chart.yaml ${K8S_POST_CRD_HELM_GENERATE_TARGETS}
 
 # this is phony because of it is easier this way than the makefile-single-run way
 .PHONY: ${HELM_CRD_TARGET_DIR}/Chart.yaml
@@ -78,7 +81,7 @@ ${HELM_CRD_RELEASE_TGZ}: ${BINARY_HELM} crd-helm-generate ## Generates and packa
 	@${BINARY_HELM} package ${HELM_CRD_TARGET_DIR} -d ${HELM_CRD_TARGET_DIR} ${BINARY_HELM_ADDITIONAL_PACK_ARGS}
 
 .PHONY: crd-helm-chart-import
-crd-helm-chart-import: check-all-vars check-k8s-artifact-id crd-helm-generate crd-helm-package ## Imports the currently available Helm CRD chart into the cluster-local registry.
+crd-helm-chart-import: ${CHECK_VAR_TARGETS} check-k8s-artifact-id crd-helm-generate crd-helm-package ## Imports the currently available Helm CRD chart into the cluster-local registry.
 	@if [[ ${STAGE} == "development" ]]; then \
 		echo "Import ${HELM_CRD_DEV_RELEASE_TGZ} into K8s cluster ${K3CES_REGISTRY_URL_PREFIX}..."; \
 		${BINARY_HELM} push ${HELM_CRD_DEV_RELEASE_TGZ} oci://${K3CES_REGISTRY_URL_PREFIX}/${HELM_ARTIFACT_NAMESPACE} ${BINARY_HELM_ADDITIONAL_PUSH_ARGS}; \
