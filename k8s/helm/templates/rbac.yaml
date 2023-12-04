@@ -1,0 +1,108 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-manager-clusterrolebinding
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "k8s-service-discovery.name" . }}-manager-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-manager-role
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - ingresses
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - delete
+      - update
+  - apiGroups:
+      - '*'
+    resources:
+      - pods
+    verbs:
+      - list
+      - watch
+      - get
+      - delete
+  - apiGroups:
+      - '*'
+    resources:
+      - deployments
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - '*'
+    resources:
+      - services
+    verbs:
+      - list
+      - watch
+      - get
+      - update
+  - apiGroups:
+      - '*'
+    resources:
+      - secrets
+    verbs:
+      - list
+      - watch
+      - get
+      - create
+      - update
+  - apiGroups:
+      - k8s.cloudogu.com
+    resources:
+      - dogus
+    verbs:
+      - watch
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-manager-role
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - ingressclasses
+    verbs:
+      - get
+      - create
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-manager-rolebinding
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-service-discovery.name" . }}-manager-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+    namespace: '{{ .Release.Namespace }}'

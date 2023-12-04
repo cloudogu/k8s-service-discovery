@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-ces-warp-config
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+data:
+  warp: {{ .Values.cesWarpConfig.warp | quote }}
