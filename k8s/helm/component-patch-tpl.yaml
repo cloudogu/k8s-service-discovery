@@ -1,0 +1,18 @@
+apiVersion: v1
+
+values:
+  images:
+    service-discovery: cloudogu/k8s-service-discovery:0.14.4
+    kube-rbac-proxy: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
+
+patches:
+  values.yaml:
+    additionalImages:
+    kubeRbacProxy:
+      image:
+        repository: "{{ registryFrom .images.kube-rbac-proxy }}/{{ repositoryFrom .images.kube-rbac-proxy }}"
+        tag: "{{ tagFrom .images.kube-rbac-proxy }}"
+    manager:
+      image:
+        repository: "{{ registryFrom .images.service-discovery }}/{{ repositoryFrom .images.service-discovery }}"
+        tag: "{{ tagFrom .images.service-discovery }}"
