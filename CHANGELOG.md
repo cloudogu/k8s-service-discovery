@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- [#49] Patch-template for mirroring this component and its images into airgapped environments.
 ### Changed
 - [#50] Remove kustomize and hold the operator yaml files in a single helm chart.
 
