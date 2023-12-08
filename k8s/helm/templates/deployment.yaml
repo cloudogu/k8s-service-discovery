@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-controller-manager
+  labels:
+    control-plane: controller-manager
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.manager.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+    {{- include "k8s-service-discovery.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+      {{- include "k8s-service-discovery.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --v=0
+        image: {{ .Values.kubeRbacProxy.image.repository }}:{{ .Values.kubeRbacProxy.image.tag  }}
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        resources: {{- toYaml .Values.kubeRbacProxy.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        command:
+        - /manager
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: LOG_LEVEL
+          value: {{ .Values.manager.env.logLevel | default "info" }}
+        - name: STAGE
+          value: {{ .Values.manager.env.stage | default "production" }}
+        image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
+        imagePullPolicy: {{ .Values.manager.imagePullPolicy | default "IfNotPresent" }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources: {{- toYaml .Values.manager.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: {{ include "k8s-service-discovery.name" . }}-controller-manager
+      terminationGracePeriodSeconds: 10

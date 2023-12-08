@@ -36,7 +36,7 @@ func TestReadConfiguration(t *testing.T) {
 	t.Run("read from file", func(t *testing.T) {
 		// given
 		client := fake.NewClientBuilder().Build()
-		err := os.Setenv("STAGE", "development")
+		err := os.Setenv("STAGE", "local")
 		require.NoError(t, err)
 		defer func() {
 			err := os.Unsetenv("STAGE")

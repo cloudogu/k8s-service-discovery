@@ -1,0 +1,50 @@
+cesWarpConfig:
+  warp: |
+    sources:
+      - path: /dogu
+        type: dogus
+        tag: warp
+      - path: /config/nginx/externals
+        type: externals
+      - path: /config/_global/disabled_warpmenu_support_entries
+        type: disabled_support_entries
+    target: /var/www/html/warp/menu.json
+    order:
+      Development Apps: 100
+    support:
+      - identifier: docsCloudoguComUrl
+        external: true
+        href: https://docs.cloudogu.com/
+      - identifier: aboutCloudoguToken
+        external: false
+        href: /info/about
+      - identifier: myCloudogu
+        external: true
+        href: https://my.cloudogu.com/
+kubeRbacProxy:
+  image:
+    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    tag: v0.14.1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 5m
+      memory: 64Mi
+manager:
+  image:
+    repository: cloudogu/k8s-service-discovery
+    tag: 0.15.0
+  env:
+    logLevel: info
+    stage: production
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  replicas: 1
+  imagePullPolicy: IfNotPresent

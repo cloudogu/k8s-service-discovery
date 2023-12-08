@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-controller-manager-metrics-service
+  labels:
+    control-plane: controller-manager
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    control-plane: controller-manager
+  {{- include "k8s-service-discovery.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: https

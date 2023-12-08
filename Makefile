@@ -1,12 +1,10 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.14.4
+VERSION=0.15.0
 
-## Image URL to use all building/pushing image targets
-IMAGE_DEV=${K3CES_REGISTRY_URL_PREFIX}/${ARTIFACT_ID}:${VERSION}
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.21
-MAKEFILES_VERSION=8.7.3
+MAKEFILES_VERSION=9.0.1
 LINT_VERSION?=v1.52.1
 
 ADDITIONAL_CLEAN=dist-clean
@@ -29,41 +27,53 @@ include build/make/digital-signature.mk
 include build/make/mocks.mk
 
 K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
-PRE_COMPILE=generate
-K8S_PRE_GENERATE_TARGETS=k8s-create-temporary-resource generate-warp-config generate-menu-json template-dev-only-image-pull-policy
+
+K8S_COMPONENT_SOURCE_VALUES = ${HELM_SOURCE_DIR}/values.yaml
+K8S_COMPONENT_TARGET_VALUES = ${HELM_TARGET_DIR}/values.yaml
+PRE_COMPILE=generate-deepcopy
+HELM_PRE_APPLY_TARGETS=template-stage template-log-level template-image-pull-policy
+HELM_PRE_GENERATE_TARGETS = helm-values-update-image-version
+HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo
+CHECK_VAR_TARGETS=check-all-vars
+IMAGE_IMPORT_TARGET=image-import
 
 include build/make/k8s-controller.mk
 
+.PHONY: helm-values-update-image-version
+helm-values-update-image-version: $(BINARY_YQ)
+	@echo "Updating the image version in source values.yaml to ${VERSION}..."
+	@$(BINARY_YQ) -i e ".manager.image.tag = \"${VERSION}\"" ${K8S_COMPONENT_SOURCE_VALUES}
 
-.PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	@echo "Generate manifests..."
-	@$(CONTROLLER_GEN) rbac:roleName=manager-role webhook paths="./..."
+.PHONY: helm-values-replace-image-repo
+helm-values-replace-image-repo: $(BINARY_YQ)
+	@if [[ ${STAGE} != "production" ]]; then \
+      		echo "Setting dev image repo in target values.yaml!" ;\
+    		$(BINARY_YQ) -i e ".manager.image.repository=\"${IMAGE_DEV}\"" "${K8S_COMPONENT_TARGET_VALUES}" ;\
+    	fi
 
-.PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	@echo "Auto-generate deepcopy functions..."
-	@$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+.PHONY: template-stage
+template-stage: $(BINARY_YQ)
+	@if [[ ${STAGE} != "production" ]]; then \
+  		echo "Setting STAGE env in deployment to ${STAGE}!" ;\
+		$(BINARY_YQ) -i e ".manager.env.stage=\"${STAGE}\"" ${K8S_COMPONENT_TARGET_VALUES} ;\
+	fi
+
+.PHONY: template-log-level
+template-log-level: ${BINARY_YQ}
+	@if [[ ${STAGE} != "production" ]]; then \
+      echo "Setting LOG_LEVEL env in deployment to ${LOG_LEVEL}!" ; \
+      $(BINARY_YQ) -i e ".manager.env.logLevel=\"${LOG_LEVEL}\"" "${K8S_COMPONENT_TARGET_VALUES}" ; \
+    fi
+
+.PHONY: template-image-pull-policy
+template-image-pull-policy: $(BINARY_YQ)
+	@if [[ ${STAGE} != "production" ]]; then \
+          echo "Setting pull policy to always!" ; \
+          $(BINARY_YQ) -i e ".manager.imagePullPolicy=\"Always\"" "${K8S_COMPONENT_TARGET_VALUES}" ; \
+    fi
 
 ## Local Development
 
 .PHONY: setup-etcd-port-forward
 setup-etcd-port-forward:
 	kubectl port-forward etcd-0 4001:2379 &
-
-.PHONY: generate-warp-config
-generate-warp-config:
-	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
-	@cat $(K8S_WARP_CONFIG_RESOURCE_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
-
-.PHONY: generate-menu-json
-generate-menu-json:
-	@echo "---" >> $(K8S_RESOURCE_TEMP_YAML)
-	@cat $(K8S_WARP_MENU_JSON_YAML) >> $(K8S_RESOURCE_TEMP_YAML)
-
-create-temporary-release-resources: $(K8S_PRE_GENERATE_TARGETS)
-
-.PHONY: template-dev-only-image-pull-policy
-template-dev-only-image-pull-policy: $(BINARY_YQ)
-	@echo "Setting pull policy to always!"
-	@$(BINARY_YQ) -i e "(select(.kind == \"Deployment\").spec.template.spec.containers[]|select(.image == \"*$(ARTIFACT_ID)*\").imagePullPolicy)=\"Always\"" $(K8S_RESOURCE_TEMP_YAML)

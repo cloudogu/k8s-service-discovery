@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.15.0] - 2023-12-08
+### Added
+- [#49] Patch-template for mirroring this component and its images into airgapped environments.
+### Changed
+- [#50] Remove kustomize and hold the operator yaml files in a single helm chart.
+
 ## [v0.14.4] - 2023-10-24
 ### Changed
 - [#46] Update cesapp-lib to 0.12.2

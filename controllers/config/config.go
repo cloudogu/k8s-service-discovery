@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	warpConfigMap    = "k8s-ces-warp-config"
-	MenuConfigMap    = "k8s-ces-menu-json"
-	EnvVarStage      = "STAGE"
-	StageDevelopment = "development"
-	DevConfigPath    = "k8s/dev-resources/k8s-ces-warp-config.yaml"
+	warpConfigMap = "k8s-ces-warp-config"
+	MenuConfigMap = "k8s-ces-menu-json"
+	EnvVarStage   = "STAGE"
+	StageLocal    = "local"
+	DevConfigPath = "k8s/dev-resources/k8s-ces-warp-config.yaml"
 )
 
 // Order can be used to modify ordering via configuration
@@ -46,7 +46,7 @@ type SupportSource struct {
 // ReadConfiguration reads the service discovery configuration. Either from file in development mode with environment
 // variable stage=development or from the cluster state
 func ReadConfiguration(ctx context.Context, client client.Client, namespace string) (*Configuration, error) {
-	if os.Getenv(EnvVarStage) == StageDevelopment {
+	if os.Getenv(EnvVarStage) == StageLocal {
 		return readWarpConfigFromFile(DevConfigPath)
 	}
 	return readWarpConfigFromCluster(ctx, client, namespace)
