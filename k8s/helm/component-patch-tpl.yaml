@@ -1,10 +1,8 @@
 apiVersion: v1
-
 values:
   images:
-    serviceDiscovery: cloudogu/k8s-service-discovery:0.14.4
+    serviceDiscovery: cloudogu/k8s-service-discovery:0.15.0
     kubeRbacProxy: gcr.io/kubebuilder/kube-rbac-proxy:v0.14.1
-
 patches:
   values.yaml:
     additionalImages:
