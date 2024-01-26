@@ -16,8 +16,12 @@ data:
         tag: warp
       - path: /config/nginx/externals
         type: externals
+      - path: /config/_global/block_warpmenu_support_category
+        type: support_entry_config
+      - path: /config/_global/allowed_warpmenu_support_entries
+        type: support_entry_config
       - path: /config/_global/disabled_warpmenu_support_entries
-        type: disabled_support_entries
+        type: support_entry_config
     target: /var/www/html/warp/menu.json
     order:
       Development Apps: 100
@@ -28,6 +32,6 @@ data:
       - identifier: aboutCloudoguToken
         external: false
         href: /info/about
-      - identifier: myCloudogu
+      - identifier: platform
         external: true
-        href: https://my.cloudogu.com/
+        href: https://platform.cloudogu.com

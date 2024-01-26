@@ -40,17 +40,45 @@ Externe Links müssen folgender Struktur (JSON-String) im Etcd entsprechen:
 }
 ```
 
-#### Einträge, die ausgeblendet werden sollen
+#### Konfiguration für Support-Einträge
 ```yaml
 sources:
+  - path: /config/_global/block_warpmenu_support_category
+    type: support_entry_config
+  - path: /config/_global/allowed_warpmenu_support_entries
+    type: support_entry_config
   - path: /config/_global/disabled_warpmenu_support_entries
-    type: disabled_support_entries
+    type: support_entry_config
 ```
 
-Die Konfiguration beinhaltet außerdem Support-Links, die jedoch mit dem Typ `disabled_support_entries` ausgeblendet
-werden können. Dazu muss im angegebenen Pfad ein String-Array im JSON-Format abgelegt werden. Die Einträge entsprechen
-den Keys der Links. Zum Beispiel:
-`'["docsCloudoguComUrl", "aboutCloudoguToken"]'`
+##### Alle Einträge ausblenden
+Wenn alle Support-Einträge des warp-menu nicht angezeigt werden sollen, kann dies über den etcd-Schlüssel `/config/_global/block_warpmenu_support_category` konfiguriert werden.
+```shell
+# alle Einträge ausblenden
+etcdctl set /config/_global/block_warpmenu_support_category true
+
+# keine Einträge ausblenden
+etcdctl set /config/_global/block_warpmenu_support_category false
+```
+
+##### Nur einzelne Einträge anzeigen
+Wenn alle Support-Einträge des warp-menu ausgeblendet sind, aber trotzen einzelne davon angezeigt werden sollen, kann dies über den etcd-Schlüssel `/config/_global/allowed_warpmenu_support_entries` konfiguriert werden.
+Dort muss ein JSON-Array, mit den anzuzeigenden Einträgen angegeben werden.
+```shell
+etcdctl set /config/_global/allowed_warpmenu_support_entries '["platform", "aboutCloudoguToken"]'
+```
+
+> Diese Konfiguration ist nur wirksam, wenn **alle** Einträge ausgeblendet sind (siehe [oben](#alle-einträge-ausblenden)).
+
+##### Einzelne Einträge ausblenden
+Wenn einzelne Einträge im warp-menu nicht gerendert werden sollen, kann dies über den etcd-Schlüssel `/config/_global/disabled_warpmenu_support_entries` konfiguriert werden.
+Dort muss ein JSON-Array, mit den auszublendenden Einträgen angegeben werden.
+
+```shell
+etcdctl set /config/_global/disabled_warpmenu_support_entries '["docsCloudoguComUrl", "aboutCloudoguToken"]'
+```
+
+> Diese Konfiguration ist nur wirksam, wenn **nicht** alle Einträge ausgeblendet sind (siehe [oben](#alle-einträge-ausblenden)).
 
 ### Order
 Mit der Kategorie `order` lassen sich die bestimmten Dogu-Kategorien aus der `dogu.json` im Warp-Menü sortieren.
@@ -74,8 +102,12 @@ sources:
     tag: warp
   - path: /config/nginx/externals
     type: externals
+  - path: /config/_global/block_warpmenu_support_category
+    type: support_entry_config
+  - path: /config/_global/allowed_warpmenu_support_entries
+    type: support_entry_config
   - path: /config/_global/disabled_warpmenu_support_entries
-    type: disabled_support_entries
+    type: support_entry_config
 target: /var/www/html/warp/menu.json
 order:
   Development Apps: 100
@@ -86,7 +118,7 @@ support:
   - identifier: aboutCloudoguToken
     external: false
     href: /info/about
-  - identifier: myCloudogu
+  - identifier: platform
     external: true
-    href: https://my.cloudogu.com/
+    href: https://platform.cloudogu.com
 ```

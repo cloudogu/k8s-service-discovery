@@ -39,17 +39,46 @@ External links must match the following structure (JSON-String) in the etcd:
 }
 ```
 
-#### Entries to be hidden
+#### Configuration of Support-Entries
 ```yaml
 sources:
+  - path: /config/_global/block_warpmenu_support_category
+    type: support_entry_config
+  - path: /config/_global/allowed_warpmenu_support_entries
+    type: support_entry_config
   - path: /config/_global/disabled_warpmenu_support_entries
-    type: disabled_support_entries
+    type: support_entry_config
 ```
 
-The configuration also includes support links, but these can be hidden with the `disabled_support_entries` type.
-To do this, a string array in JSON format must be stored in the specified path. The entries correspond to
-the keys of the links. For example:
-`'["docsCloudoguComUrl", "aboutCloudoguToken"]'`
+##### Hide all entries
+If all support entries of the warp-menu are not to be displayed, this can be configured via the etcd key `/config/_global/block_warpmenu_support_category`.
+```shell
+# hide all entries
+etcdctl set /config/_global/block_warpmenu_support_category true
+
+# do not hide any entries
+etcdctl set /config/_global/block_warpmenu_support_category false
+```
+
+##### Show only individual entries
+If all support entries of the warp-menu are hidden, but individual entries should still be displayed, this can be configured via the etcd key `/config/_global/allowed_warpmenu_support_entries`.
+A JSON array with the entries to be displayed must be specified there.
+
+```shell
+etcdctl set /config/_global/allowed_warpmenu_support_entries '["platform", "aboutCloudoguToken"]'
+```
+
+> This configuration is only effective if **all** entries are hidden (see [above](#hide-all-entries)).
+
+##### Hide individual entries
+If individual entries in the warp-menu are not to be rendered, this can be configured via the etcd key `/config/_global/disabled_warpmenu_support_entries`.
+A JSON array with the entries to be hidden must be specified there.
+
+```shell
+etcdctl set /config/_global/disabled_warpmenu_support_entries '["docsCloudoguComUrl", "aboutCloudoguToken"]'
+```
+
+> This configuration is only effective if **not** all entries are hidden (see [above](#hide-all-entries)).
 
 ### Order
 The `order` category can be used to sort the specific Dogu categories from the `dogu.json` in the warp menu.
@@ -73,8 +102,12 @@ sources:
     tag: warp
   - path: /config/nginx/externals
     type: externals
+  - path: /config/_global/block_warpmenu_support_category
+    type: support_entry_config
+  - path: /config/_global/allowed_warpmenu_support_entries
+    type: support_entry_config
   - path: /config/_global/disabled_warpmenu_support_entries
-    type: disabled_support_entries
+    type: support_entry_config
 target: /var/www/html/warp/menu.json
 order:
   Development Apps: 100
@@ -85,7 +118,7 @@ support:
   - identifier: aboutCloudoguToken
     external: false
     href: /info/about
-  - identifier: myCloudogu
+  - identifier: platform
     external: true
-    href: https://my.cloudogu.com/
+    href: https://platform.cloudogu.com
 ```
