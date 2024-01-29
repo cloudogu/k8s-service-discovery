@@ -76,6 +76,13 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, registry cesRegist
 
 // Run creates the warp menu and update the menu whenever a relevant etcd key was changed
 func (w *Watcher) Run(ctx context.Context) error {
+	// trigger the warp-menu creation once on startup
+	err := w.execute(ctx)
+	if err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "error creating warp-menu")
+	}
+
+	// start watches
 	warpChannel := make(chan *etcdclient.Response)
 
 	for _, source := range w.configuration.Sources {

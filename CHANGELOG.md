@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#53] New configuration (`/config/_global/block_warpmenu_support_category`) for completely blocking the support entries in the warp menu
 - [#53] New configuration (`/config/_global/allowed_warpmenu_support_entries`) for explicitly allowing support entries in the warp menu
 
+### Fixed
+- [#53] Create warp menu directly at startup to prevent an empty warp menu
+
 ## [v0.15.0] - 2023-12-08
 ### Added
 - [#49] Patch-template for mirroring this component and its images into airgapped environments.
