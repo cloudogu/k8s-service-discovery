@@ -110,7 +110,7 @@ func TestWatcher_Run(t *testing.T) {
 		mockRegistry.EXPECT().RootConfig().Return(watchRegistry)
 		watchRegistry.EXPECT().Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ context.Context, _ string, _ bool, eventChannel chan *etcdclient.Response) {
 			eventChannel <- watchEvent
-		}).Times(3)
+		}).Times(5)
 
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Event(mock.IsType(&v1.Deployment{}), "Normal", "WarpMenu", "Warp menu updated.")
