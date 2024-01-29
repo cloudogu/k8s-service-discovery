@@ -39,7 +39,7 @@ kubeRbacProxy:
 manager:
   image:
     repository: cloudogu/k8s-service-discovery
-    tag: 0.15.0
+    tag: 0.16.0
   env:
     logLevel: info
     stage: production
