@@ -51,4 +51,4 @@ manager:
       cpu: 10m
       memory: 64Mi
   replicas: 1
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
