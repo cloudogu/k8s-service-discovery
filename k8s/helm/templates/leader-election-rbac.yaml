@@ -49,5 +49,5 @@ roleRef:
   name: '{{ include "k8s-service-discovery.name" . }}-leader-election-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+  name: '{{ include "k8s-service-discovery.name" . }}-sa'
   namespace: '{{ .Release.Namespace }}'

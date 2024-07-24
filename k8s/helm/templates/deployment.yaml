@@ -71,5 +71,5 @@ spec:
           allowPrivilegeEscalation: false
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ include "k8s-service-discovery.name" . }}-controller-manager
+      serviceAccountName: {{ include "k8s-service-discovery.name" . }}-sa
       terminationGracePeriodSeconds: 10

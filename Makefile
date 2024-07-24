@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.15.0
+VERSION=0.15.0-test
 
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.21
@@ -77,3 +77,11 @@ template-image-pull-policy: $(BINARY_YQ)
 .PHONY: setup-etcd-port-forward
 setup-etcd-port-forward:
 	kubectl port-forward etcd-0 4001:2379 &
+
+.PHONY: upload-to-k8s-testing
+upload-to-k8s-testing: helm-package helm-lint compile
+	gcloud auth configure-docker europe-west3-docker.pkg.dev -q
+	helm push target/k8s/helm/$(ARTIFACT_ID)-$(VERSION).tgz oci://europe-west3-docker.pkg.dev/ces-coder-workspaces/ces-test-docker-helm-repo/charts
+	helm push target/k8s/helm/$(ARTIFACT_ID)-$(VERSION).tgz oci://registry.cloudogu.com/k8s-testing
+	docker build . -t europe-west3-docker.pkg.dev/ces-coder-workspaces/ces-test-docker-helm-repo/images/$(ARTIFACT_ID):$(VERSION)
+	docker push europe-west3-docker.pkg.dev/ces-coder-workspaces/ces-test-docker-helm-repo/images/$(ARTIFACT_ID):$(VERSION)

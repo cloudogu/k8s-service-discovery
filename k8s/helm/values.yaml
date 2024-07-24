@@ -38,8 +38,8 @@ kubeRbacProxy:
       memory: 64Mi
 manager:
   image:
-    repository: cloudogu/k8s-service-discovery
-    tag: 0.15.0
+    repository: europe-west3-docker.pkg.dev/ces-coder-workspaces/ces-test-docker-helm-repo/images/k8s-service-discovery
+    tag: 0.15.0-test
   env:
     logLevel: info
     stage: production
