@@ -79,7 +79,7 @@ setup-etcd-port-forward:
 	kubectl port-forward etcd-0 4001:2379 &
 
 .PHONY: upload-to-k8s-testing
-upload-to-k8s-testing: helm-package helm-lint compile
+upload-to-k8s-testing: clean helm-package helm-lint compile
 	gcloud auth configure-docker europe-west3-docker.pkg.dev -q
 	helm push target/k8s/helm/$(ARTIFACT_ID)-$(VERSION).tgz oci://europe-west3-docker.pkg.dev/ces-coder-workspaces/ces-test-docker-helm-repo/charts
 	helm push target/k8s/helm/$(ARTIFACT_ID)-$(VERSION).tgz oci://registry.cloudogu.com/k8s-testing

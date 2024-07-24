@@ -206,6 +206,7 @@ func createSelfDeployment(client client.Client) {
 	labels["app"] = "ces"
 	selfDeploy := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
+			//FIXME: do not hardcode deployment names
 			Name:      "k8s-service-discovery-controller-manager",
 			Namespace: myNamespace,
 			Labels:    labels,
