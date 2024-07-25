@@ -108,9 +108,12 @@ func (w *Watcher) Run(ctx context.Context) error {
 
 func (w *Watcher) execute(ctx context.Context) error {
 	deployment := &appsv1.Deployment{}
-	err := w.k8sClient.Get(ctx, types2.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: w.namespace}, deployment)
+	//FIXME: do not hardcode deployment names
+	//FIXME: Why is this even needed?
+	discoveryName := fmt.Sprintf("%s:%s", w.namespace, "k8s-service-discovery-controller-manager")
+	err := w.k8sClient.Get(ctx, types2.NamespacedName{Name: discoveryName, Namespace: w.namespace}, deployment)
 	if err != nil {
-		return fmt.Errorf("warp update: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
+		return fmt.Errorf("warp update: failed to get deployment [%s]: %w", discoveryName, err)
 	}
 
 	categories, err := w.ConfigReader.Read(w.configuration)
