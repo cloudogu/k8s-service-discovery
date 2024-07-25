@@ -110,7 +110,7 @@ func (w *Watcher) execute(ctx context.Context) error {
 	deployment := &appsv1.Deployment{}
 	//FIXME: do not hardcode deployment names
 	//FIXME: Why is this even needed?
-	discoveryName := fmt.Sprintf("%s:%s", w.namespace, "k8s-service-discovery-controller-manager")
+	discoveryName := fmt.Sprintf("%s-%s", w.namespace, "k8s-service-discovery-controller-manager")
 	err := w.k8sClient.Get(ctx, types2.NamespacedName{Name: discoveryName, Namespace: w.namespace}, deployment)
 	if err != nil {
 		return fmt.Errorf("warp update: failed to get deployment [%s]: %w", discoveryName, err)
