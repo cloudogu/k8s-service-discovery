@@ -101,6 +101,9 @@ func startManager() error {
 	}
 
 	clientset, err := getK8sClientSet(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create k8s client set: %w", err)
+	}
 	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
 	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
 	doguSpecRepo := dogu.NewSpecRepository(configMapInterface)
