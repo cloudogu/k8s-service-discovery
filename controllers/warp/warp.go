@@ -3,15 +3,14 @@ package warp
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-registry-lib/dogu"
 	appsv1 "k8s.io/api/apps/v1"
 	types2 "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strings"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
-	etcdclient "go.etcd.io/etcd/client/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,47 +25,32 @@ const (
 // build warp menu categories and writes them to a configmap.
 type Watcher struct {
 	configuration   *config.Configuration
-	registryToWatch registry.WatchConfigurationContext
+	registryToWatch DoguVersionRegistry
 	k8sClient       client.Client
 	ConfigReader    Reader
 	namespace       string
 	eventRecorder   eventRecorder
 }
 
-type eventRecorder interface {
-	record.EventRecorder
-}
-
-type cesRegistry interface {
-	registry.Registry
-}
-
-type watchConfigurationContext interface {
-	registry.WatchConfigurationContext
-}
-
-// Reader is used to fetch warp categories with a configuration
-type Reader interface {
-	Read(configuration *config.Configuration) (types.Categories, error)
-}
-
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, registry cesRegistry, namespace string, recorder eventRecorder) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistry DoguVersionRegistry, doguSpecRepo DoguSpecRepo, namespace string, recorder eventRecorder, registry watchConfigurationContext) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)
 	}
 
 	reader := &ConfigReader{
-		registry:          registry.RootConfig(),
-		configuration:     warpConfig,
-		doguConverter:     &types.DoguConverter{},
-		externalConverter: &types.ExternalConverter{},
+		registry:            registry,
+		doguVersionRegistry: doguVersionRegistry,
+		doguSpecRepo:        doguSpecRepo,
+		configuration:       warpConfig,
+		doguConverter:       &types.DoguConverter{},
+		externalConverter:   &types.ExternalConverter{},
 	}
 
 	return &Watcher{
 		configuration:   warpConfig,
-		registryToWatch: registry.RootConfig(),
+		registryToWatch: doguVersionRegistry,
 		k8sClient:       k8sClient,
 		namespace:       namespace,
 		ConfigReader:    reader,
@@ -82,25 +66,49 @@ func (w *Watcher) Run(ctx context.Context) error {
 		ctrl.LoggerFrom(ctx).Error(err, "error creating warp-menu")
 	}
 
-	// start watches
-	warpChannel := make(chan *etcdclient.Response)
-
 	for _, source := range w.configuration.Sources {
-		go func(source config.Source) {
-			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start etcd watcher for source [%s]", source))
-			w.registryToWatch.Watch(ctx, source.Path, true, warpChannel)
-			ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("stop etcd watcher for source [%s]", source))
-		}(source)
+		if strings.HasPrefix(source.Path, "/dogu") {
+			w.startVersionRegistryWatch(ctx, source.Path)
+			continue
+		}
+
+		// TODO config/_global
+
+		// TODO config/
 	}
 
+	return nil
+
+}
+
+func (w *Watcher) startVersionRegistryWatch(ctx context.Context, sourcePath string) {
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start version registry watcher for source [%s]", sourcePath))
+	versionChannel, doguVersionWatchError := w.registryToWatch.WatchAllCurrent(ctx)
+	if doguVersionWatchError != nil {
+		ctrl.LoggerFrom(ctx).Error(doguVersionWatchError, "failed to create dogu version registry watch")
+		return
+	}
+
+	w.handleDoguVersionUpdates(ctx, versionChannel.ResultChan)
+}
+
+func (w *Watcher) handleDoguVersionUpdates(ctx context.Context, versionChannel <-chan dogu.CurrentVersionsWatchResult) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-warpChannel:
+			return
+		case result, open := <-versionChannel:
+			if !open {
+				ctrl.LoggerFrom(ctx).Info("dogu version watch channel canceled. Stop watch.")
+				return
+			}
+			if result.Err != nil {
+				ctrl.LoggerFrom(ctx).Info("dogu version watch channel error. Stop watch.")
+			}
+			// Trigger refresh. Content of the result is not needed
 			err := w.execute(ctx)
 			if err != nil {
-				return err
+				ctrl.LoggerFrom(ctx).Error(err, "failed to update dogus in warp menu")
 			}
 		}
 	}
@@ -113,7 +121,7 @@ func (w *Watcher) execute(ctx context.Context) error {
 		return fmt.Errorf("warp update: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
 
-	categories, err := w.ConfigReader.Read(w.configuration)
+	categories, err := w.ConfigReader.Read(ctx, w.configuration)
 	if err != nil {
 		w.eventRecorder.Eventf(deployment, corev1.EventTypeWarning, errorOnWarpMenuUpdateEventReason, "Updating warp menu failed: %w", err)
 		return fmt.Errorf("error during read: %w", err)

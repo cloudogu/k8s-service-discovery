@@ -3,6 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-registry-lib/dogu"
+	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -96,9 +100,14 @@ func startManager() error {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
 
+	clientset, err := getK8sClientSet(k8sManager.GetConfig())
+	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
+	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
+	doguSpecRepo := dogu.NewSpecRepository(configMapInterface)
+
 	provideSSLAPI(reg)
 
-	if err = handleWarpMenuCreation(k8sManager, reg, watchNamespace, eventRecorder); err != nil {
+	if err = handleWarpMenuCreation(k8sManager, doguVersionRegistry, doguSpecRepo, watchNamespace, eventRecorder, reg.RootConfig()); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
@@ -128,6 +137,15 @@ func startManager() error {
 	}
 
 	return nil
+}
+
+func getK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
+	k8sClientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create k8s client set: %w", err)
+	}
+
+	return k8sClientSet, nil
 }
 
 func readWatchNamespace() (string, error) {
@@ -206,8 +224,8 @@ func handleIngressClassCreation(k8sManager k8sManager, namespace string, recorde
 	return nil
 }
 
-func handleWarpMenuCreation(k8sManager k8sManager, registry registry.Registry, namespace string, recorder record.EventRecorder) error {
-	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), registry, namespace, recorder)
+func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.DoguVersionRegistry, doguSpecRepo warp.DoguSpecRepo, namespace string, recorder record.EventRecorder, registry registry.WatchConfigurationContext) error {
+	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), doguVersionRegistry, doguSpecRepo, namespace, recorder, registry)
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
 		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)

@@ -1,6 +1,7 @@
 package warp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -15,20 +16,12 @@ import (
 
 // ConfigReader reads the configuration for the warp menu from etcd
 type ConfigReader struct {
-	configuration     *config.Configuration
-	registry          watchConfigurationContext
-	doguConverter     DoguConverter
-	externalConverter ExternalConverter
-}
-
-// DoguConverter is used to Read dogus from the registry and convert them to objects fitting in the warp menu
-type DoguConverter interface {
-	ReadAndUnmarshalDogu(registry types.WatchConfigurationContext, key string, tag string) (types.EntryWithCategory, error)
-}
-
-// ExternalConverter is used to Read external links from the registry and convert them to objects fitting in the warp menu
-type ExternalConverter interface {
-	ReadAndUnmarshalExternal(registry types.WatchConfigurationContext, key string) (types.EntryWithCategory, error)
+	configuration       *config.Configuration
+	registry            watchConfigurationContext
+	doguVersionRegistry DoguVersionRegistry
+	doguSpecRepo        DoguSpecRepo
+	doguConverter       DoguConverter
+	externalConverter   ExternalConverter
 }
 
 const blockWarpSupportCategoryConfigurationKey = "/config/_global/block_warpmenu_support_category"
@@ -36,7 +29,7 @@ const disabledWarpSupportEntriesConfigurationKey = "/config/_global/disabled_war
 const allowedWarpSupportEntriesConfigurationKey = "/config/_global/allowed_warpmenu_support_entries"
 
 // Read reads sources specified in a configuration and build warp menu categories for them.
-func (reader *ConfigReader) Read(configuration *config.Configuration) (types.Categories, error) {
+func (reader *ConfigReader) Read(ctx context.Context, configuration *config.Configuration) (types.Categories, error) {
 	var data types.Categories
 
 	for _, source := range configuration.Sources {
@@ -45,7 +38,7 @@ func (reader *ConfigReader) Read(configuration *config.Configuration) (types.Cat
 			continue
 		}
 
-		categories, err := reader.readSource(source)
+		categories, err := reader.readSource(ctx, source)
 		if err != nil {
 			ctrl.Log.Info(fmt.Sprintf("Error during Read: %s", err.Error()))
 		}
@@ -74,10 +67,10 @@ func (reader *ConfigReader) Read(configuration *config.Configuration) (types.Cat
 	return data, nil
 }
 
-func (reader *ConfigReader) readSource(source config.Source) (types.Categories, error) {
+func (reader *ConfigReader) readSource(ctx context.Context, source config.Source) (types.Categories, error) {
 	switch source.Type {
 	case "dogus":
-		return reader.dogusReader(source)
+		return reader.dogusReader(ctx, source)
 	case "externals":
 		return reader.externalsReader(source)
 	}
@@ -102,21 +95,32 @@ func (reader *ConfigReader) externalsReader(source config.Source) (types.Categor
 
 // dogusReader reads from etcd and converts the keys and values to a warp menu
 // conform structure
-func (reader *ConfigReader) dogusReader(source config.Source) (types.Categories, error) {
+func (reader *ConfigReader) dogusReader(ctx context.Context, source config.Source) (types.Categories, error) {
 	ctrl.Log.Info(fmt.Sprintf("Read dogus from %s for warp menu", source.Path))
-	resp, err := reader.registry.GetChildrenPaths(source.Path)
+	allCurrentDoguVersions, err := reader.doguVersionRegistry.GetCurrentOfAll(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to Read root entry %s from etcd: %w", source.Path, err)
+		return nil, fmt.Errorf("failed to get all current dogu versions: %w", err)
 	}
-	var dogus []types.EntryWithCategory
-	for _, path := range resp {
-		dogu, err := reader.doguConverter.ReadAndUnmarshalDogu(reader.registry, path, source.Tag)
-		if err == nil && dogu.Entry.Title != "" {
-			dogus = append(dogus, dogu)
+
+	if len(allCurrentDoguVersions) == 0 {
+		return []*types.Category{}, nil
+	}
+
+	allCurrentDogus, err := reader.doguSpecRepo.GetAll(ctx, allCurrentDoguVersions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all dogu specs with current versions: %w", err)
+	}
+
+	var doguCategories []types.EntryWithCategory
+	for _, currentDogu := range allCurrentDogus {
+		doguCategory, err := reader.doguConverter.CreateEntryWithCategoryFromDogu(currentDogu, source.Tag)
+		if err == nil && doguCategory.Entry.Title != "" {
+			ctrl.Log.Info(fmt.Sprintf("Add dogu %s with category %s", currentDogu.GetSimpleName(), doguCategory.Category))
+			doguCategories = append(doguCategories, doguCategory)
 		}
 	}
 
-	return reader.createCategories(dogus), nil
+	return reader.createCategories(doguCategories), nil
 }
 
 func (reader *ConfigReader) readStrings(registryKey string) ([]string, error) {

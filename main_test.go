@@ -58,7 +58,7 @@ func Test_startManager(t *testing.T) {
 		// given
 		err := os.Unsetenv("WATCH_NAMESPACE")
 		require.NoError(t, err)
-		k8sManager := newMockK8sManager(t)
+		k8sManager := NewMockManager(t)
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -95,7 +95,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("fail setup when error on Add", func(t *testing.T) {
 		// given
-		k8sManager := newMockK8sManager(t)
+		k8sManager := NewMockManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
@@ -116,7 +116,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("fail setup when error on AddHealthzCheck", func(t *testing.T) {
 		// given
-		k8sManager := newMockK8sManager(t)
+		k8sManager := NewMockManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
@@ -125,6 +125,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetLogger().Return(logger)
 		k8sManager.EXPECT().GetCache().Return(nil)
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
+		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -142,7 +143,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("fail setup when error on AddReadyzCheck", func(t *testing.T) {
 		// given
-		k8sManager := newMockK8sManager(t)
+		k8sManager := NewMockManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
@@ -152,6 +153,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetCache().Return(nil)
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
+		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -169,7 +171,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("fail setup when error on Start", func(t *testing.T) {
 		// given
-		k8sManager := newMockK8sManager(t)
+		k8sManager := NewMockManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
@@ -180,6 +182,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().Start(mock.Anything).Return(assert.AnError)
+		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -197,7 +200,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Run("should setup successfully", func(t *testing.T) {
 		// given
-		k8sManager := newMockK8sManager(t)
+		k8sManager := NewMockManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
@@ -208,6 +211,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().Start(mock.Anything).Return(nil)
+		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {

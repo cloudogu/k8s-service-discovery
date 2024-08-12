@@ -2,7 +2,11 @@ package warp
 
 import (
 	"bytes"
+	"context"
+	_ "embed"
 	"fmt"
+	"github.com/cloudogu/cesapp-lib/core"
+	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"github.com/go-logr/logr/funcr"
@@ -12,6 +16,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
 )
+
+var testCtx = context.Background()
+
+//go:embed testdata/redmine.json
+var redmineBytes []byte
+
+//go:embed testdata/jenkins.json
+var jenkinsBytes []byte
 
 func TestConfigReader_readSupport(t *testing.T) {
 	supportSources := []config.SupportSource{{Identifier: "aboutCloudoguToken", External: false, Href: "/local/href"}, {Identifier: "myCloudogu", External: true, Href: "https://ecosystem.cloudogu.com/"}, {Identifier: "docsCloudoguComUrl", External: true, Href: "https://docs.cloudogu.com/"}}
@@ -199,7 +211,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -212,6 +224,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		// given
 
 		mockDoguConverter := NewMockDoguConverter(t)
+		mockDoguConverter.EXPECT().CreateEntryWithCategoryFromDogu(readRedmineDogu(t), "warp").Return(types.EntryWithCategory{Entry: types.Entry{DisplayName: "Redmine", Title: "Redmine"}, Category: "Development Apps"}, nil)
 		mockExternalConverter := NewMockExternalConverter(t)
 		doguSource := config.Source{
 			Path: "/dogu",
@@ -219,27 +232,35 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			Tag:  "warp",
 		}
 		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths(mock.Anything).Return([]string{}, nil)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
 		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
 		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
+		versionRegistryMock := NewMockDoguVersionRegistry(t)
+		redmineVersion := parseVersion(t, "5.1.3-1")
+		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
+		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion}
+		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
+		doguSpecRepoMock := NewMockDoguSpecRepo(t)
+		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.DoguVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t)}, nil)
 
 		reader := &ConfigReader{
-			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
-			doguConverter:     mockDoguConverter,
-			externalConverter: mockExternalConverter,
+			configuration:       &config.Configuration{Support: []config.SupportSource{}},
+			registry:            mockRegistry,
+			doguConverter:       mockDoguConverter,
+			externalConverter:   mockExternalConverter,
+			doguVersionRegistry: versionRegistryMock,
+			doguSpecRepo:        doguSpecRepoMock,
 		}
 
 		// when
-		actual, err := reader.Read(&config.Configuration{Sources: []config.Source{doguSource}, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: []config.Source{doguSource}, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
 		assert.NotEmpty(t, actual)
-		assert.Equal(t, 1, len(actual))
+		assert.Equal(t, 2, len(actual))
 		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
@@ -265,7 +286,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -296,7 +317,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -326,7 +347,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		assert.Empty(t, err)
@@ -350,7 +371,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			registry:      mockRegistry,
 		}
 		// when
-		_, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		_, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
 
 		// then
 		require.NoError(t, err)
@@ -387,7 +408,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		testSources := []config.Source{{Path: "/config/externals", Type: "externals", Tag: "tag"}}
 		testSupportSoureces := []config.SupportSource{{Identifier: "supportSrc", External: true, Href: "https://support.source"}}
 
-		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
 		require.NoError(t, err)
 
 		expectedCategories := types.Categories{
@@ -429,7 +450,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			ctrl.Log = existingLog
 		}()
 
-		actual, err := reader.Read(&config.Configuration{Sources: testSources, Support: testSupportSources})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSources})
 		require.NoError(t, err)
 
 		assert.Nil(t, actual)
@@ -450,50 +471,85 @@ func TestConfigReader_dogusReader(t *testing.T) {
 			Type: "dogus",
 			Tag:  "warp",
 		}
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/dogu").Return([]string{"/dogu/redmine", "/dogu/jenkins"}, nil)
 		redmineEntryWithCategory := getEntryWithCategory("Redmine", "/redmine", "Redmine", "Development Apps", types.TARGET_SELF)
 		jenkinsEntryWithCategory := getEntryWithCategory("Jenkins", "/jenkins", "Jenkins", "Development Apps", types.TARGET_SELF)
 		mockDoguConverter := NewMockDoguConverter(t)
-		mockDoguConverter.EXPECT().ReadAndUnmarshalDogu(mockRegistry, "/dogu/redmine", "warp").Return(redmineEntryWithCategory, nil)
-		mockDoguConverter.EXPECT().ReadAndUnmarshalDogu(mockRegistry, "/dogu/jenkins", "warp").Return(jenkinsEntryWithCategory, nil)
+		mockDoguConverter.EXPECT().CreateEntryWithCategoryFromDogu(readRedmineDogu(t), "warp").Return(redmineEntryWithCategory, nil)
+		mockDoguConverter.EXPECT().CreateEntryWithCategoryFromDogu(readJenkinsDogu(t), "warp").Return(jenkinsEntryWithCategory, nil)
+		versionRegistryMock := NewMockDoguVersionRegistry(t)
+		redmineVersion := parseVersion(t, "5.1.3-1")
+		jenkinsVersion := parseVersion(t, "2.452.2-1")
+		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
+		jenkinsDoguVersion := dogu.DoguVersion{Name: "jenkins", Version: *jenkinsVersion}
+		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion, jenkinsDoguVersion}
+		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
+		doguSpecRepoMock := NewMockDoguSpecRepo(t)
+		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.DoguVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t), jenkinsDoguVersion: readJenkinsDogu(t)}, nil)
+
 		reader := &ConfigReader{
-			configuration: &config.Configuration{Support: []config.SupportSource{}},
-			registry:      mockRegistry,
-			doguConverter: mockDoguConverter,
+			configuration:       &config.Configuration{Support: []config.SupportSource{}},
+			doguConverter:       mockDoguConverter,
+			doguVersionRegistry: versionRegistryMock,
+			doguSpecRepo:        doguSpecRepoMock,
 		}
 
 		// when
-		categories, err := reader.dogusReader(source)
+		categories, err := reader.dogusReader(testCtx, source)
 
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, 1, categories.Len())
 		assert.Equal(t, 2, len(categories[0].Entries))
-		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter)
 	})
 
-	t.Run("failed to get children of /dogu path", func(t *testing.T) {
+	t.Run("failed to get all current versions", func(t *testing.T) {
 		// given
 		source := config.Source{
 			Path: "/dogu",
 			Type: "dogus",
 			Tag:  "warp",
 		}
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/dogu").Return([]string{}, assert.AnError)
+		versionRegistryMock := NewMockDoguVersionRegistry(t)
+		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(nil, assert.AnError)
 		reader := &ConfigReader{
-			configuration: &config.Configuration{Support: []config.SupportSource{}},
-			registry:      mockRegistry,
+			doguVersionRegistry: versionRegistryMock,
+			configuration:       &config.Configuration{Support: []config.SupportSource{}},
 		}
 
 		// when
-		_, err := reader.dogusReader(source)
+		_, err := reader.dogusReader(testCtx, source)
 
 		// then
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to Read root entry /dogu from etcd")
-		mock.AssertExpectationsForObjects(t, mockRegistry)
+		assert.Contains(t, err.Error(), "failed to get all current dogu versions")
+	})
+
+	t.Run("failed to get dogus of currents", func(t *testing.T) {
+		// given
+		source := config.Source{
+			Path: "/dogu",
+			Type: "dogus",
+			Tag:  "warp",
+		}
+		redmineVersion := parseVersion(t, "5.1.3-1")
+		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
+		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion}
+		versionRegistryMock := NewMockDoguVersionRegistry(t)
+		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
+		doguSpecMock := NewMockDoguSpecRepo(t)
+		doguSpecMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(nil, assert.AnError)
+		reader := &ConfigReader{
+			doguVersionRegistry: versionRegistryMock,
+			doguSpecRepo:        doguSpecMock,
+			configuration:       &config.Configuration{Support: []config.SupportSource{}},
+		}
+
+		// when
+		_, err := reader.dogusReader(testCtx, source)
+
+		// then
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get all dogu specs with current versions")
 	})
 }
 
