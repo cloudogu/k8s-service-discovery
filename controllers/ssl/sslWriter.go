@@ -27,12 +27,12 @@ func (sw *sslWriter) WriteCertificate(ctx context.Context, certType string, cert
 		return fmt.Errorf("failed to set certificate type: %w", err)
 	}
 
-	_, err = globalConfig.Set("certificate/server.crt", libconfig.Value(certType))
+	_, err = globalConfig.Set("certificate/server.crt", libconfig.Value(cert))
 	if err != nil {
 		return fmt.Errorf("failed to set certificate: %w", err)
 	}
 
-	_, err = globalConfig.Set("certificate/server.key", libconfig.Value(certType))
+	_, err = globalConfig.Set("certificate/server.key", libconfig.Value(key))
 	if err != nil {
 		return fmt.Errorf("failed to set certificate key: %w", err)
 	}
