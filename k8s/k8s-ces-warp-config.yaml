@@ -16,11 +16,11 @@ data:
         tag: warp
       - path: /config/_global/externals
         type: externals
-      - path: /config/_global/block_warpmenu_support_category
+      - path: block_warpmenu_support_category
         type: support_entry_config
-      - path: /config/_global/allowed_warpmenu_support_entries
+      - path: allowed_warpmenu_support_entries
         type: support_entry_config
-      - path: /config/_global/disabled_warpmenu_support_entries
+      - path: disabled_warpmenu_support_entries
         type: support_entry_config
     target: /var/www/html/warp/menu.json
     order:

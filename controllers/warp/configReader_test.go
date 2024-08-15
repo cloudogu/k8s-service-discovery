@@ -193,9 +193,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		mockRegistry := newMockWatchConfigurationContext(t)
 		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 
 		mockDoguConverter := NewMockDoguConverter(t)
@@ -233,9 +233,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 		mockRegistry := newMockWatchConfigurationContext(t)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		redmineVersion := parseVersion(t, "5.1.3-1")
@@ -269,9 +269,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		mockRegistry := newMockWatchConfigurationContext(t)
 		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 
 		mockDoguConverter := NewMockDoguConverter(t)
@@ -300,9 +300,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		mockRegistry := newMockWatchConfigurationContext(t)
 		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", assert.AnError)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 
 		mockExternalConverter := NewMockExternalConverter(t)
@@ -331,9 +331,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		mockRegistry := newMockWatchConfigurationContext(t)
 		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 
 		mockExternalConverter := NewMockExternalConverter(t)
@@ -360,9 +360,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		// given
 		mockRegistry := newMockWatchConfigurationContext(t)
 		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 
 		testSources := []config.Source{{Path: "/path/to/etcd/key", Type: "fjkhsdfjh", Tag: "tag"}}
@@ -379,11 +379,11 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 	t.Run("should read categories from config", func(t *testing.T) {
 		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).
 			Return("false", nil)
-		mockRegistry.EXPECT().Get(disabledWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalDisabledWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).
 			Return("[\"lorem\", \"ipsum\"]", nil)
 		mockRegistry.EXPECT().GetChildrenPaths("/config/externals").
 			Return([]string{"/config/externals/ext1"}, nil)
@@ -424,9 +424,9 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 	t.Run("should read categories from config", func(t *testing.T) {
 		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).Return("", assert.AnError)
-		mockRegistry.EXPECT().Get(disabledWarpSupportEntriesConfigurationKey).Return("", assert.AnError)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).Return("", assert.AnError)
+		mockRegistry.EXPECT().Get(globalBlockWarpSupportCategoryConfigurationKey).Return("", assert.AnError)
+		mockRegistry.EXPECT().Get(globalDisabledWarpSupportEntriesConfigurationKey).Return("", assert.AnError)
+		mockRegistry.EXPECT().Get(globalAllowedWarpSupportEntriesConfigurationKey).Return("", assert.AnError)
 		mockRegistry.EXPECT().GetChildrenPaths("/config/externals").Return(nil, assert.AnError)
 
 		mockConverter := NewMockExternalConverter(t)
