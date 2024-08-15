@@ -252,8 +252,8 @@ func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string,
 	return nil
 }
 
-func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater controllers.IngressUpdater, recorder record.EventRecorder, repo *repository.GlobalConfigRepository) error {
-	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater, recorder, repo)
+func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater controllers.IngressUpdater, recorder record.EventRecorder, globalConfigRepo *repository.GlobalConfigRepository) error {
+	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater, recorder, globalConfigRepo)
 	if err != nil {
 		return fmt.Errorf("failed to create new maintenance updater: %w", err)
 	}
