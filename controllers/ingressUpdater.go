@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
-
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -336,10 +334,5 @@ func isMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigR
 		return false, nil
 	}
 
-	parseBool, err := strconv.ParseBool(get.String())
-	if err != nil {
-		return false, fmt.Errorf("failed to maintenance mode value %q to bool: %w", get.String(), err)
-	}
-
-	return parseBool, nil
+	return true, nil
 }
