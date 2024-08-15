@@ -201,7 +201,7 @@ func (_c *mockCesRegistry_GetNode_Call) RunAndReturn(run func() (registry.Node, 
 	return _c
 }
 
-// GlobalConfig provides a mock function with given fields:
+// GlobalConfigRepository provides a mock function with given fields:
 func (_m *mockCesRegistry) GlobalConfig() registry.ConfigurationContext {
 	ret := _m.Called()
 
@@ -217,14 +217,14 @@ func (_m *mockCesRegistry) GlobalConfig() registry.ConfigurationContext {
 	return r0
 }
 
-// mockCesRegistry_GlobalConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GlobalConfig'
+// mockCesRegistry_GlobalConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GlobalConfigRepository'
 type mockCesRegistry_GlobalConfig_Call struct {
 	*mock.Call
 }
 
-// GlobalConfig is a helper method to define mock.On call
+// GlobalConfigRepository is a helper method to define mock.On call
 func (_e *mockCesRegistry_Expecter) GlobalConfig() *mockCesRegistry_GlobalConfig_Call {
-	return &mockCesRegistry_GlobalConfig_Call{Call: _e.mock.On("GlobalConfig")}
+	return &mockCesRegistry_GlobalConfig_Call{Call: _e.mock.On("GlobalConfigRepository")}
 }
 
 func (_c *mockCesRegistry_GlobalConfig_Call) Run(run func()) *mockCesRegistry_GlobalConfig_Call {

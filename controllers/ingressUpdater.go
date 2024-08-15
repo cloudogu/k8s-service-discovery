@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
@@ -76,7 +77,7 @@ type ingressUpdater struct {
 	// client used to communicate with k8s.
 	client client.Client
 	// globalConfig is used to read the global config from the etcd.
-	globalConfig configurationContext
+	globalConfigRepo GlobalConfigRepository
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
@@ -97,7 +98,7 @@ type configurationContext interface {
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(client client.Client, globalConfig configurationContext, namespace string, ingressClassName string, recorder eventRecorder) (*ingressUpdater, error) {
+func NewIngressUpdater(client client.Client, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder) (*ingressUpdater, error) {
 	restConfig, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster config: %w", err)
@@ -111,7 +112,7 @@ func NewIngressUpdater(client client.Client, globalConfig configurationContext, 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
 	return &ingressUpdater{
 		client:                 client,
-		globalConfig:           globalConfig,
+		globalConfigRepo:       globalConfigRepo,
 		namespace:              namespace,
 		ingressClassName:       ingressClassName,
 		deploymentReadyChecker: deploymentReadyChecker,
@@ -121,7 +122,7 @@ func NewIngressUpdater(client client.Client, globalConfig configurationContext, 
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := isMaintenanceModeActive(i.globalConfig)
+	isMaintenanceMode, err := isMaintenanceModeActive(ctx, i.globalConfigRepo)
 	if err != nil {
 		return err
 	}
@@ -324,13 +325,21 @@ func (i *ingressUpdater) upsertIngressObject(
 	return nil
 }
 
-func isMaintenanceModeActive(g configurationContext) (bool, error) {
-	_, err := g.Get(maintenanceModeGlobalKey)
-	if registry.IsKeyNotFoundError(err) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("failed to read the maintenance mode from the registry: %w", err)
+func isMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigRepository) (bool, error) {
+	globalConfig, err := globalConfigRepo.Get(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get global config for maintenance mode: %w", err)
 	}
 
-	return true, nil
+	get, b := globalConfig.Get(maintenanceModeGlobalKey)
+	if !b || get.String() == "" {
+		return false, nil
+	}
+
+	parseBool, err := strconv.ParseBool(get.String())
+	if err != nil {
+		return false, fmt.Errorf("failed to maintenance mode value %q to bool: %w", get.String(), err)
+	}
+
+	return parseBool, nil
 }

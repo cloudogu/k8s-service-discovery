@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
+	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"k8s.io/client-go/tools/record"
@@ -30,7 +32,7 @@ type DoguConverter interface {
 
 // ExternalConverter is used to Read external links from the registry and convert them to objects fitting in the warp menu
 type ExternalConverter interface {
-	ReadAndUnmarshalExternal(registry types.WatchConfigurationContext, key string) (types.EntryWithCategory, error)
+	ReadAndUnmarshalExternal(link string) (types.EntryWithCategory, error)
 }
 
 type DoguVersionRegistry interface {
@@ -40,4 +42,9 @@ type DoguVersionRegistry interface {
 
 type DoguSpecRepo interface {
 	GetAll(context.Context, []dogu.DoguVersion) (map[dogu.DoguVersion]*core.Dogu, error)
+}
+
+type GlobalConfigRepository interface {
+	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
+	Get(context.Context) (libconfig.GlobalConfig, error)
 }

@@ -14,7 +14,7 @@ data:
       - path: /dogu
         type: dogus
         tag: warp
-      - path: /config/nginx/externals
+      - path: /config/_global/externals
         type: externals
       - path: /config/_global/block_warpmenu_support_category
         type: support_entry_config

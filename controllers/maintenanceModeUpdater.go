@@ -3,10 +3,11 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
-	etcdclient "go.etcd.io/etcd/client/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -16,14 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
-
-	"github.com/cloudogu/k8s-service-discovery/controllers/cesregistry"
 )
 
 const (
-	maintenanceModeWatchKey  = "/config/_global/maintenance"
 	maintenanceModeGlobalKey = "maintenance"
 )
 
@@ -43,63 +40,68 @@ type k8sClient interface {
 	client.Client
 }
 
-type maintenanceWatchConfigurationContext interface {
-	registry.WatchConfigurationContext
-}
-
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
-	client          k8sClient
-	namespace       string
-	registry        cesRegistry
-	ingressUpdater  IngressUpdater
-	eventRecorder   eventRecorder
-	serviceRewriter serviceRewriter
+	client           k8sClient
+	namespace        string
+	ingressUpdater   IngressUpdater
+	eventRecorder    eventRecorder
+	serviceRewriter  serviceRewriter
+	globalConfigRepo GlobalConfigRepository
 }
 
 // NewMaintenanceModeUpdater creates a new maintenance mode updater.
-func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) (*maintenanceModeUpdater, error) {
-	reg, err := cesregistry.Create(namespace)
-	if err != nil {
-		return nil, err
-	}
-
+func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder, globalConfigRepo GlobalConfigRepository) (*maintenanceModeUpdater, error) {
 	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
 
 	return &maintenanceModeUpdater{
-		client:          client,
-		namespace:       namespace,
-		registry:        reg,
-		ingressUpdater:  ingressUpdater,
-		eventRecorder:   recorder,
-		serviceRewriter: rewriter,
+		client:           client,
+		namespace:        namespace,
+		ingressUpdater:   ingressUpdater,
+		eventRecorder:    recorder,
+		serviceRewriter:  rewriter,
+		globalConfigRepo: globalConfigRepo,
 	}, nil
 }
 
 // Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
-func (scu maintenanceModeUpdater) Start(ctx context.Context) error {
+func (scu *maintenanceModeUpdater) Start(ctx context.Context) error {
 	log.FromContext(ctx).Info("Starting maintenance mode watcher...")
-	return scu.startEtcdWatch(ctx, scu.registry.RootConfig())
+	return scu.startEtcdWatch(ctx)
 }
 
-func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg maintenanceWatchConfigurationContext) error {
+func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context) error {
 	log.FromContext(ctx).Info("Start etcd watcher on maintenance key")
 
-	warpChannel := make(chan *etcdclient.Response)
+	maintenanceWatchChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
+	if err != nil {
+		return fmt.Errorf("failed to start maintenance watch")
+	}
+
 	go func() {
-		log.FromContext(ctx).Info("Start etcd watcher for maintenance key")
-		reg.Watch(ctx, maintenanceModeWatchKey, true, warpChannel)
-		log.FromContext(ctx).Info("Stop etcd watcher for maintenance key")
+		scu.startMaintenanceWatch(ctx, maintenanceWatchChannel)
 	}()
 
+	return nil
+}
+
+func (scu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, maintenanceWatchChannel <-chan repository.GlobalConfigWatchResult) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-warpChannel:
+			return
+		case result, open := <-maintenanceWatchChannel:
+			if !open {
+				ctrl.LoggerFrom(ctx).Info("maintenance watch channel canceled. Stop watch.")
+				return
+			}
+			if result.Err != nil {
+				ctrl.LoggerFrom(ctx).Error(result.Err, "maintenance watch channel error. Stop watch.")
+			}
+
 			err := scu.handleMaintenanceModeUpdate(ctx)
 			if err != nil {
-				return err
+				ctrl.LoggerFrom(ctx).Error(err, "failed to handle maintenance update")
 			}
 		}
 	}
@@ -108,7 +110,7 @@ func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context, reg maint
 func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
 	log.FromContext(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := isMaintenanceModeActive(scu.registry.GlobalConfig())
+	isActive, err := isMaintenanceModeActive(ctx, scu.globalConfigRepo)
 	if err != nil {
 		return err
 	}

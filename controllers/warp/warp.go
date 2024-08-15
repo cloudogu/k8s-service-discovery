@@ -3,7 +3,9 @@ package warp
 import (
 	"context"
 	"fmt"
+	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/api/apps/v1"
 	types2 "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,23 +26,24 @@ const (
 // Watcher is used to watch a registry and for every change he reads from the registry a specific config path,
 // build warp menu categories and writes them to a configmap.
 type Watcher struct {
-	configuration   *config.Configuration
-	registryToWatch DoguVersionRegistry
-	k8sClient       client.Client
-	ConfigReader    Reader
-	namespace       string
-	eventRecorder   eventRecorder
+	configuration    *config.Configuration
+	registryToWatch  DoguVersionRegistry
+	globalConfigRepo GlobalConfigRepository
+	k8sClient        client.Client
+	ConfigReader     Reader
+	namespace        string
+	eventRecorder    eventRecorder
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistry DoguVersionRegistry, doguSpecRepo DoguSpecRepo, namespace string, recorder eventRecorder, registry watchConfigurationContext) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistry DoguVersionRegistry, doguSpecRepo DoguSpecRepo, namespace string, recorder eventRecorder, globalConfigRepo GlobalConfigRepository) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)
 	}
 
 	reader := &ConfigReader{
-		registry:            registry,
+		globalConfigRepo:    globalConfigRepo,
 		doguVersionRegistry: doguVersionRegistry,
 		doguSpecRepo:        doguSpecRepo,
 		configuration:       warpConfig,
@@ -49,12 +52,13 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistr
 	}
 
 	return &Watcher{
-		configuration:   warpConfig,
-		registryToWatch: doguVersionRegistry,
-		k8sClient:       k8sClient,
-		namespace:       namespace,
-		ConfigReader:    reader,
-		eventRecorder:   recorder,
+		configuration:    warpConfig,
+		registryToWatch:  doguVersionRegistry,
+		k8sClient:        k8sClient,
+		namespace:        namespace,
+		ConfigReader:     reader,
+		eventRecorder:    recorder,
+		globalConfigRepo: globalConfigRepo,
 	}, nil
 }
 
@@ -67,18 +71,54 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 
 	for _, source := range w.configuration.Sources {
-		if strings.HasPrefix(source.Path, "/dogu") {
+		if strings.HasPrefix(source.Path, "/dogu") || strings.HasPrefix(source.Path, "dogu") {
 			w.startVersionRegistryWatch(ctx, source.Path)
 			continue
 		}
 
-		// TODO config/_global
-
-		// TODO config/
+		if strings.HasPrefix(source.Path, "/config/_global") || strings.HasPrefix(source.Path, "config/_global") {
+			w.startGlobalConfigWatch(ctx, source.Path)
+			continue
+		}
 	}
 
 	return nil
+}
 
+func (w *Watcher) startGlobalConfigWatch(ctx context.Context, sourcePath string) {
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start global config watcher for source [%s]", sourcePath))
+	filter := libconfig.KeyFilter(libconfig.Key(sourcePath))
+	globalConfigWatchChannel, err := w.globalConfigRepo.Watch(ctx, filter)
+	if err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "failed to create global config watch for path %q", sourcePath)
+		return
+	}
+
+	go func() {
+		w.handleGlobalConfigUpdates(ctx, globalConfigWatchChannel)
+	}()
+}
+
+func (w *Watcher) handleGlobalConfigUpdates(ctx context.Context, globalConfigWatchChannel <-chan repository.GlobalConfigWatchResult) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case result, open := <-globalConfigWatchChannel:
+			if !open {
+				ctrl.LoggerFrom(ctx).Info("global config watch channel canceled. Stop watch.")
+				return
+			}
+			if result.Err != nil {
+				ctrl.LoggerFrom(ctx).Error(result.Err, "global config watch channel error. Stop watch.")
+			}
+			// Trigger refresh. Content of the result is not needed
+			err := w.execute(ctx)
+			if err != nil {
+				ctrl.LoggerFrom(ctx).Error(err, "failed to update entries from global config in warp menu")
+			}
+		}
+	}
 }
 
 func (w *Watcher) startVersionRegistryWatch(ctx context.Context, sourcePath string) {
@@ -89,7 +129,10 @@ func (w *Watcher) startVersionRegistryWatch(ctx context.Context, sourcePath stri
 		return
 	}
 
-	w.handleDoguVersionUpdates(ctx, versionChannel.ResultChan)
+	go func() {
+		w.handleDoguVersionUpdates(ctx, versionChannel.ResultChan)
+	}()
+
 }
 
 func (w *Watcher) handleDoguVersionUpdates(ctx context.Context, versionChannel <-chan dogu.CurrentVersionsWatchResult) {
@@ -103,7 +146,7 @@ func (w *Watcher) handleDoguVersionUpdates(ctx context.Context, versionChannel <
 				return
 			}
 			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Info("dogu version watch channel error. Stop watch.")
+				ctrl.LoggerFrom(ctx).Error(result.Err, "dogu version watch channel error. Stop watch.")
 			}
 			// Trigger refresh. Content of the result is not needed
 			err := w.execute(ctx)

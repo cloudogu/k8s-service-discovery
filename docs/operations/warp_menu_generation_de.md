@@ -23,21 +23,18 @@ sources:
 #### Externe Links
 ```yaml
 sources:
-  - path: /config/nginx/externals
+  - path: /config/_global/externals
     type: externals
 ```
 
-Externe Links müssen folgender Struktur (JSON-String) im Etcd entsprechen:
+Externe Links müssen folgender Struktur (YAML-String) in der Konfiguration entsprechen:
 
-```
-{
-  "cloudogu": "{
-  \"DisplayName\": \"Cloudogu\",
-  \"Description\": \"Beschreibungstext für Cloudogu Webseite\",
-  \"Category\": \"External Links\",
-  \"URL\": \"https://www.cloudogu.com/\"
-}"
-}
+```yaml
+cloudogu: |
+  DisplayName: Cloudogu
+  Description: Beschreibungstext für Cloudogu Webseite
+  Category: External Links
+  URL: https://www.cloudogu.com
 ```
 
 #### Konfiguration für Support-Einträge

@@ -26,17 +26,14 @@ sources:
     type: externals
 ```
 
-External links must match the following structure (JSON-String) in the etcd:
+External links must match the following structure (YAML-String) in the configuration:
 
-```
-{
-  "cloudogu": "{
-  \"DisplayName\": \"Cloudogu\",
-  \"Description\": \"Beschreibungstext für Cloudogu Webseite\",
-  \"Category\": \"External Links\",
-  \"URL\": \"https://www.cloudogu.com/\"
-}"
-}
+```yaml
+cloudogu: |
+  DisplayName: Cloudogu
+  Description: Beschreibungstext für Cloudogu Webseite
+  Category: External Links
+  URL: https://www.cloudogu.com
 ```
 
 #### Configuration of Support-Entries
