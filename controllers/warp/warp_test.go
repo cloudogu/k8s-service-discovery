@@ -42,7 +42,7 @@ func TestNewWatcher(t *testing.T) {
 		namespace := "test"
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
-		doguSpecRepoMock := NewMockDoguSpecRepo(t)
+		doguSpecRepoMock := NewMockLocalDoguRepo(t)
 		err = os.Unsetenv("STAGE")
 		require.NoError(t, err)
 

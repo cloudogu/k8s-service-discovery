@@ -35,7 +35,7 @@ type DoguVersionRegistry interface {
 	GetCurrentOfAll(context.Context) ([]dogu.DoguVersion, error)
 }
 
-type DoguSpecRepo interface {
+type LocalDoguRepo interface {
 	GetAll(context.Context, []dogu.DoguVersion) (map[dogu.DoguVersion]*core.Dogu, error)
 }
 

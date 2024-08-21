@@ -114,13 +114,15 @@ func Test_startManager(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to create ingress class creator: failed to add ingress class creator as runnable to the manager")
 	})
 
+	skipNameValidation := true
+
 	t.Run("fail setup when error on AddHealthzCheck", func(t *testing.T) {
 		// given
 		k8sManager := NewMockManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
-		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
 		k8sManager.EXPECT().GetCache().Return(nil)
@@ -147,7 +149,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
-		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
 		k8sManager.EXPECT().GetCache().Return(nil)
@@ -175,7 +177,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
-		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
 		k8sManager.EXPECT().GetCache().Return(nil)
@@ -204,7 +206,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
-		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{})
+		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
 		k8sManager.EXPECT().GetCache().Return(nil)

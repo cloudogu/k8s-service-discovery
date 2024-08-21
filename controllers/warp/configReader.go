@@ -21,7 +21,7 @@ type ConfigReader struct {
 	configuration       *config.Configuration
 	globalConfigRepo    GlobalConfigRepository
 	doguVersionRegistry DoguVersionRegistry
-	doguSpecRepo        DoguSpecRepo
+	localDoguRepo       LocalDoguRepo
 	doguConverter       DoguConverter
 	externalConverter   ExternalConverter
 }
@@ -127,7 +127,7 @@ func (reader *ConfigReader) dogusReader(ctx context.Context, source config.Sourc
 		return []*types.Category{}, nil
 	}
 
-	allCurrentDogus, err := reader.doguSpecRepo.GetAll(ctx, allCurrentDoguVersions)
+	allCurrentDogus, err := reader.localDoguRepo.GetAll(ctx, allCurrentDoguVersions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all dogu specs with current versions: %w", err)
 	}
