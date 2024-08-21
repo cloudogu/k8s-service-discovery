@@ -59,17 +59,14 @@ func (scu *selfsignedCertificateUpdater) Start(ctx context.Context) error {
 }
 
 func (scu *selfsignedCertificateUpdater) startEtcdWatch(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on fqdn")
-
+	ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
 	fqdnChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(globalFqdnPath))
 	if err != nil {
 		return fmt.Errorf("failed to create fqdn watch: %w", err)
 	}
 
 	go func() {
-		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
 		scu.startFQDNWatch(ctx, fqdnChannel)
-		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
 	}()
 
 	return nil
@@ -79,14 +76,16 @@ func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqd
 	for {
 		select {
 		case <-ctx.Done():
+			ctrl.LoggerFrom(ctx).Info("context done - stop etcd watcher for ssl certificates")
 			return
 		case result, open := <-fqdnWatchChannel:
 			if !open {
-				ctrl.LoggerFrom(ctx).Info("fqdn watch channel canceled. Stop watch.")
+				ctrl.LoggerFrom(ctx).Info("fqdn watch channel was closed - stop watch")
 				return
 			}
 			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Error(result.Err, "fqdn watch channel error. Stop watch.")
+				ctrl.LoggerFrom(ctx).Error(result.Err, "fqdn watch channel error")
+				continue
 			}
 
 			err := scu.handleFqdnChange(ctx)
@@ -104,8 +103,8 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		return fmt.Errorf("failed to get global config for ssl read: %w", err)
 	}
 
-	certType, exists := globalConfig.Get(serverCertificateTypePath)
-	if !exists || certType.String() == "" {
+	certType, typeExists := globalConfig.Get(serverCertificateTypePath)
+	if !typeExists || certType.String() == "" {
 		return fmt.Errorf("%q is empty or doesn't exists: %w", serverCertificateTypePath, err)
 	}
 
@@ -118,9 +117,9 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 			return fmt.Errorf("selfsigned certificate handling: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 		}
 
-		previousCertRaw, exists := globalConfig.Get(serverCertificateID)
-		if !exists || certType.String() == "" {
-			return fmt.Errorf("%q is empty or doesn't exists: %w", serverCertificateID, err)
+		previousCertRaw, certExists := globalConfig.Get(serverCertificateID)
+		if !certExists || previousCertRaw.String() == "" {
+			return fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
 		}
 
 		block, _ := pem.Decode([]byte(previousCertRaw))

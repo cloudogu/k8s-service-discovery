@@ -80,6 +80,7 @@ func (scu *sslCertificateUpdater) startSSLWatch(ctx context.Context, sslWatchCha
 			}
 			if result.Err != nil {
 				ctrl.LoggerFrom(ctx).Error(result.Err, "ssl watch channel error. Stop watch.")
+				continue
 			}
 
 			err := scu.handleSslChange(ctx)
@@ -150,12 +151,12 @@ func (scu *sslCertificateUpdater) readCertificateFromRegistry(ctx context.Contex
 
 	cert, exists := globalConfig.Get(serverCertificateID)
 	if !exists || cert.String() == "" {
-		return "", "", fmt.Errorf("%q is empty or doesn't exists: %w", serverCertificateID, err)
+		return "", "", fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
 	}
 
 	key, exists := globalConfig.Get(serverCertificateKeyID)
-	if !exists || cert.String() == "" {
-		return "", "", fmt.Errorf("%q is empty or doesn't exists: %w", serverCertificateKeyID, err)
+	if !exists || key.String() == "" {
+		return "", "", fmt.Errorf("%q is empty or doesn't exists", serverCertificateKeyID)
 	}
 
 	return cert.String(), key.String(), nil

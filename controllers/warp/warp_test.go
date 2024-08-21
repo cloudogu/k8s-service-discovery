@@ -40,14 +40,14 @@ func TestNewWatcher(t *testing.T) {
 		err := client.Create(ctx, &k8sConfig)
 		require.NoError(t, err)
 		namespace := "test"
-		watchRegistry := newMockWatchConfigurationContext(t)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		doguSpecRepoMock := NewMockDoguSpecRepo(t)
 		err = os.Unsetenv("STAGE")
 		require.NoError(t, err)
 
 		// when
-		watcher, err := NewWatcher(ctx, client, versionRegistryMock, doguSpecRepoMock, namespace, newMockEventRecorder(t), watchRegistry)
+		watcher, err := NewWatcher(ctx, client, versionRegistryMock, doguSpecRepoMock, namespace, newMockEventRecorder(t), mockGlobalConfigRepo)
 
 		// then
 		require.NoError(t, err)

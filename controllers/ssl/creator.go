@@ -43,11 +43,11 @@ func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays i
 
 	fqdn, exists := globalConfig.Get("fqdn")
 	if !exists || fqdn.String() == "" {
-		return fmt.Errorf("fqdn is empty or doesn't exists: %w", err)
+		return fmt.Errorf("fqdn is empty or doesn't exists")
 	}
 
 	domain, exists := globalConfig.Get("domain")
-	if !exists || fqdn.String() == "" {
+	if !exists || domain.String() == "" {
 		return fmt.Errorf("domain is empty or doesn't exists: %w", err)
 	}
 

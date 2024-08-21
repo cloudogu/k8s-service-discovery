@@ -3,7 +3,6 @@ package warp
 import (
 	"context"
 	"github.com/cloudogu/cesapp-lib/core"
-	"github.com/cloudogu/cesapp-lib/registry"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -19,10 +18,6 @@ type Reader interface {
 
 type eventRecorder interface {
 	record.EventRecorder
-}
-
-type watchConfigurationContext interface {
-	registry.WatchConfigurationContext
 }
 
 // DoguConverter is used to Read dogus from the registry and convert them to objects fitting in the warp menu

@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/cloudogu/cesapp-lib/registry"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
@@ -89,10 +88,6 @@ type ingressUpdater struct {
 type DeploymentReadyChecker interface {
 	// IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
-}
-
-type configurationContext interface {
-	registry.ConfigurationContext
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
