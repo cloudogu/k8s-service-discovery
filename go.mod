@@ -19,6 +19,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/toorop/gin-logrus v0.0.0-20210225092905-2c785434f26f
 	go.etcd.io/etcd/client/v2 v2.305.15
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0
@@ -105,7 +106,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240816214639-573285566f34 // indirect

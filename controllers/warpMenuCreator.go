@@ -18,7 +18,7 @@ type warpMenuCreator struct {
 }
 
 // NewWarpMenuCreator initialises a creator object to start the warp menu creation
-func NewWarpMenuCreator(client client.Client, doguVersionRegistry warp.DoguVersionRegistry, localDoguRepo warp.LocalDoguRepo, namespace string, recorder eventRecorder, registry watchConfigurationContext, globalConfig warp.GlobalConfigRepository) *warpMenuCreator {
+func NewWarpMenuCreator(client client.Client, doguVersionRegistry warp.DoguVersionRegistry, localDoguRepo warp.LocalDoguRepo, namespace string, recorder eventRecorder, globalConfig warp.GlobalConfigRepository) *warpMenuCreator {
 	return &warpMenuCreator{
 		client:              client,
 		doguVersionRegistry: doguVersionRegistry,
