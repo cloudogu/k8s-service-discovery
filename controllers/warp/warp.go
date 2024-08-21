@@ -33,7 +33,7 @@ type Watcher struct {
 }
 
 // NewWatcher creates a new Watcher instance to build the warp menu
-func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistry DoguVersionRegistry, doguSpecRepo DoguSpecRepo, namespace string, recorder eventRecorder, registry watchConfigurationContext) (*Watcher, error) {
+func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistry DoguVersionRegistry, localDoguRepo LocalDoguRepo, namespace string, recorder eventRecorder, registry watchConfigurationContext) (*Watcher, error) {
 	warpConfig, err := config.ReadConfiguration(ctx, k8sClient, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Read configuration: %w", err)
@@ -42,7 +42,7 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistr
 	reader := &ConfigReader{
 		registry:            registry,
 		doguVersionRegistry: doguVersionRegistry,
-		doguSpecRepo:        doguSpecRepo,
+		localDoguRepo:       localDoguRepo,
 		configuration:       warpConfig,
 		doguConverter:       &types.DoguConverter{},
 		externalConverter:   &types.ExternalConverter{},

@@ -242,7 +242,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
 		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion}
 		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
-		doguSpecRepoMock := NewMockDoguSpecRepo(t)
+		doguSpecRepoMock := NewMockLocalDoguRepo(t)
 		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.DoguVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t)}, nil)
 
 		reader := &ConfigReader{
@@ -251,7 +251,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			doguConverter:       mockDoguConverter,
 			externalConverter:   mockExternalConverter,
 			doguVersionRegistry: versionRegistryMock,
-			doguSpecRepo:        doguSpecRepoMock,
+			localDoguRepo:       doguSpecRepoMock,
 		}
 
 		// when
@@ -483,14 +483,14 @@ func TestConfigReader_dogusReader(t *testing.T) {
 		jenkinsDoguVersion := dogu.DoguVersion{Name: "jenkins", Version: *jenkinsVersion}
 		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion, jenkinsDoguVersion}
 		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
-		doguSpecRepoMock := NewMockDoguSpecRepo(t)
+		doguSpecRepoMock := NewMockLocalDoguRepo(t)
 		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.DoguVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t), jenkinsDoguVersion: readJenkinsDogu(t)}, nil)
 
 		reader := &ConfigReader{
 			configuration:       &config.Configuration{Support: []config.SupportSource{}},
 			doguConverter:       mockDoguConverter,
 			doguVersionRegistry: versionRegistryMock,
-			doguSpecRepo:        doguSpecRepoMock,
+			localDoguRepo:       doguSpecRepoMock,
 		}
 
 		// when
@@ -536,11 +536,11 @@ func TestConfigReader_dogusReader(t *testing.T) {
 		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion}
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
-		doguSpecMock := NewMockDoguSpecRepo(t)
+		doguSpecMock := NewMockLocalDoguRepo(t)
 		doguSpecMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(nil, assert.AnError)
 		reader := &ConfigReader{
 			doguVersionRegistry: versionRegistryMock,
-			doguSpecRepo:        doguSpecMock,
+			localDoguRepo:       doguSpecMock,
 			configuration:       &config.Configuration{Support: []config.SupportSource{}},
 		}
 

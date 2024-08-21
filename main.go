@@ -106,11 +106,11 @@ func startManager() error {
 	}
 	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
 	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
-	doguSpecRepo := dogu.NewSpecRepository(configMapInterface)
+	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
 
 	provideSSLAPI(reg)
 
-	if err = handleWarpMenuCreation(k8sManager, doguVersionRegistry, doguSpecRepo, watchNamespace, eventRecorder, reg.RootConfig()); err != nil {
+	if err = handleWarpMenuCreation(k8sManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, reg.RootConfig()); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
@@ -227,8 +227,8 @@ func handleIngressClassCreation(k8sManager k8sManager, namespace string, recorde
 	return nil
 }
 
-func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.DoguVersionRegistry, doguSpecRepo warp.DoguSpecRepo, namespace string, recorder record.EventRecorder, registry registry.WatchConfigurationContext) error {
-	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), doguVersionRegistry, doguSpecRepo, namespace, recorder, registry)
+func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.DoguVersionRegistry, localDoguRepo warp.LocalDoguRepo, namespace string, recorder record.EventRecorder, registry registry.WatchConfigurationContext) error {
+	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), doguVersionRegistry, localDoguRepo, namespace, recorder, registry)
 
 	if err := k8sManager.Add(warpMenuCreator); err != nil {
 		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
