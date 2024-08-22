@@ -72,14 +72,15 @@ func (scu *sslCertificateUpdater) startSSLWatch(ctx context.Context, sslWatchCha
 	for {
 		select {
 		case <-ctx.Done():
+			ctrl.LoggerFrom(ctx).Info("context done - stop global config watcher for ssl certificate changes")
 			return
 		case result, open := <-sslWatchChannel:
 			if !open {
-				ctrl.LoggerFrom(ctx).Info("ssl watch channel canceled. Stop watch.")
+				ctrl.LoggerFrom(ctx).Info("ssl watch channel canceled - stop watch")
 				return
 			}
 			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Error(result.Err, "ssl watch channel error. Stop watch.")
+				ctrl.LoggerFrom(ctx).Error(result.Err, "ssl watch channel error")
 				continue
 			}
 

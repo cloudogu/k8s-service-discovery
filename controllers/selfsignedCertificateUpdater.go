@@ -76,7 +76,7 @@ func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqd
 	for {
 		select {
 		case <-ctx.Done():
-			ctrl.LoggerFrom(ctx).Info("context done - stop etcd watcher for ssl certificates")
+			ctrl.LoggerFrom(ctx).Info("context done - stop global config watcher for fqdn changes")
 			return
 		case result, open := <-fqdnWatchChannel:
 			if !open {

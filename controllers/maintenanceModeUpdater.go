@@ -89,14 +89,15 @@ func (scu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, ma
 	for {
 		select {
 		case <-ctx.Done():
+			ctrl.LoggerFrom(ctx).Info("context done - stop global config watcher for maintenance")
 			return
 		case result, open := <-maintenanceWatchChannel:
 			if !open {
-				ctrl.LoggerFrom(ctx).Info("maintenance watch channel canceled. Stop watch.")
+				ctrl.LoggerFrom(ctx).Info("maintenance watch channel canceled - stop watch")
 				return
 			}
 			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Error(result.Err, "maintenance watch channel error. Stop watch.")
+				ctrl.LoggerFrom(ctx).Error(result.Err, "maintenance watch channel error")
 				continue
 			}
 

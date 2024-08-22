@@ -367,7 +367,7 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "global config watch channel canceled. Stop watch.").Run(func(level int, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Info(0, "global config watch channel canceled - stop watch for warp generation").Run(func(level int, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
 
@@ -395,7 +395,9 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 			controllerruntime.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
-		mockLogSink.EXPECT().Error(assert.AnError, "global config watch channel error. Stop watch.").Run(func(err error, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watch for warp generation")
+		mockLogSink.EXPECT().Error(assert.AnError, "global config watch channel error for warp generation").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
 
@@ -432,6 +434,8 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 			controllerruntime.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watch for warp generation")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to update entries from global config in warp menu").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
@@ -468,7 +472,7 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "dogu version watch channel canceled. Stop watch.").Run(func(level int, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Info(0, "dogu version watch channel canceled - stop watch").Run(func(level int, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
 
@@ -496,7 +500,9 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 			controllerruntime.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
-		mockLogSink.EXPECT().Error(assert.AnError, "dogu version watch channel error. Stop watch.").Run(func(err error, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "context done - stop dogu version registry watch for warp generation")
+		mockLogSink.EXPECT().Error(assert.AnError, "dogu version watch channel error").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
 
@@ -533,6 +539,8 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 			controllerruntime.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "context done - stop dogu version registry watch for warp generation")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to update dogus in warp menu").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})

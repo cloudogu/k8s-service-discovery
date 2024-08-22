@@ -113,7 +113,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start etcd watcher for ssl certificates")
-		mockLogSink.EXPECT().Info(0, "context done - stop etcd watcher for ssl certificates")
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
 		mockLogSink.EXPECT().Error(assert.AnError, "fqdn watch channel error").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
@@ -174,7 +174,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start etcd watcher for ssl certificates")
-		mockLogSink.EXPECT().Info(0, "context done - stop etcd watcher for ssl certificates")
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
 		mockLogSink.EXPECT().Info(0, "FQDN or domain changed in registry. Checking for selfsigned certificate...")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
@@ -221,7 +221,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start etcd watcher for ssl certificates")
-		mockLogSink.EXPECT().Info(0, "context done - stop etcd watcher for ssl certificates")
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
 		mockLogSink.EXPECT().Info(0, "FQDN or domain changed in registry. Checking for selfsigned certificate...")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()

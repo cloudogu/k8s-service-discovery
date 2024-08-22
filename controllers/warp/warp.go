@@ -103,14 +103,15 @@ func (w *Watcher) handleGlobalConfigUpdates(ctx context.Context, globalConfigWat
 	for {
 		select {
 		case <-ctx.Done():
+			ctrl.LoggerFrom(ctx).Info("context done - stop global config watch for warp generation")
 			return
 		case result, open := <-globalConfigWatchChannel:
 			if !open {
-				ctrl.LoggerFrom(ctx).Info("global config watch channel canceled. Stop watch.")
+				ctrl.LoggerFrom(ctx).Info("global config watch channel canceled - stop watch for warp generation")
 				return
 			}
 			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Error(result.Err, "global config watch channel error. Stop watch.")
+				ctrl.LoggerFrom(ctx).Error(result.Err, "global config watch channel error for warp generation")
 				continue
 			}
 			// Trigger refresh. Content of the result is not needed
@@ -140,14 +141,15 @@ func (w *Watcher) handleDoguVersionUpdates(ctx context.Context, versionChannel <
 	for {
 		select {
 		case <-ctx.Done():
+			ctrl.LoggerFrom(ctx).Info("context done - stop dogu version registry watch for warp generation")
 			return
 		case result, open := <-versionChannel:
 			if !open {
-				ctrl.LoggerFrom(ctx).Info("dogu version watch channel canceled. Stop watch.")
+				ctrl.LoggerFrom(ctx).Info("dogu version watch channel canceled - stop watch")
 				return
 			}
 			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Error(result.Err, "dogu version watch channel error. Stop watch.")
+				ctrl.LoggerFrom(ctx).Error(result.Err, "dogu version watch channel error")
 				continue
 			}
 			// Trigger refresh. Content of the result is not needed
