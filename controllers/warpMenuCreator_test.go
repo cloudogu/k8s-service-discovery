@@ -11,7 +11,7 @@ func TestNewWarpMenuCreator(t *testing.T) {
 	client := fake.NewClientBuilder().Build()
 
 	// when
-	underTest := NewWarpMenuCreator(client, nil, "test", newMockEventRecorder(t))
+	underTest := NewWarpMenuCreator(client, nil, nil, "test", newMockEventRecorder(t), nil)
 
 	// then
 	require.NotNil(t, underTest)

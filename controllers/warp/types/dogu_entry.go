@@ -1,14 +1,16 @@
 package types
 
 import (
-	"encoding/json"
-	"fmt"
+	"github.com/cloudogu/cesapp-lib/core"
 	"github.com/cloudogu/cesapp-lib/registry"
-	"go.etcd.io/etcd/client/v2"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+type WatchConfigurationContext interface {
+	registry.WatchConfigurationContext
+}
 
 type doguEntry struct {
 	Name        string
@@ -18,25 +20,12 @@ type doguEntry struct {
 	Tags        []string
 }
 
-type WatchConfigurationContext interface {
-	registry.WatchConfigurationContext
-}
-
 // DoguConverter converts dogus from the configuration to a warp menu category object
 type DoguConverter struct{}
 
-// ReadAndUnmarshalDogu reads the dogu from the configuration. If it has the specific tag (or no tag) it will be
-// converted to entry with a category for the warp menu
-func (dc *DoguConverter) ReadAndUnmarshalDogu(registry WatchConfigurationContext, key string, tag string) (EntryWithCategory, error) {
-	doguBytes, err := readDoguAsBytes(registry, key)
-	if err != nil {
-		return EntryWithCategory{}, err
-	}
-
-	doguEntry, err := unmarshalDogu(doguBytes)
-	if err != nil {
-		return EntryWithCategory{}, err
-	}
+// CreateEntryWithCategoryFromDogu returns a doguEntry with category if the dogu has the tag specified as parameter.
+func (dc *DoguConverter) CreateEntryWithCategoryFromDogu(dogu *core.Dogu, tag string) (EntryWithCategory, error) {
+	doguEntry := doguEntryFromDogu(dogu)
 
 	if tag == "" || containsString(doguEntry.Tags, tag) {
 		return mapDoguEntry(doguEntry)
@@ -45,31 +34,14 @@ func (dc *DoguConverter) ReadAndUnmarshalDogu(registry WatchConfigurationContext
 	return EntryWithCategory{}, nil
 }
 
-func readDoguAsBytes(registry WatchConfigurationContext, key string) ([]byte, error) {
-	version, err := registry.Get(key + "/current")
-	if err != nil {
-		// the dogu seems to be unregistered
-		if isKeyNotFound(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to read key %s/current from etcd: %w", key, err)
+func doguEntryFromDogu(dogu *core.Dogu) doguEntry {
+	return doguEntry{
+		Name:        dogu.Name,
+		DisplayName: dogu.DisplayName,
+		Description: dogu.Description,
+		Category:    dogu.Category,
+		Tags:        dogu.Tags,
 	}
-
-	dogu, err := registry.Get(key + "/" + version)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read %s with version %s: %w", key, version, err)
-	}
-
-	return []byte(dogu), nil
-}
-
-func unmarshalDogu(doguBytes []byte) (doguEntry, error) {
-	doguEntry := doguEntry{}
-	err := json.Unmarshal(doguBytes, &doguEntry)
-	if err != nil {
-		return doguEntry, fmt.Errorf("failed to unmarshall json from etcd: %w", err)
-	}
-	return doguEntry, nil
 }
 
 func mapDoguEntry(entry doguEntry) (EntryWithCategory, error) {
@@ -105,13 +77,6 @@ func containsString(slice []string, item string) bool {
 		if sliceItem == item {
 			return true
 		}
-	}
-	return false
-}
-
-func isKeyNotFound(err error) bool {
-	if cErr, ok := err.(client.Error); ok {
-		return cErr.Code == client.ErrorCodeKeyNotFound
 	}
 	return false
 }

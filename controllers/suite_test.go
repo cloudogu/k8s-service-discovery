@@ -144,11 +144,13 @@ var _ = BeforeSuite(func() {
 	err = os.Unsetenv("STAGE")
 	Expect(err).NotTo(HaveOccurred())
 
-	watchRegistry.On("Watch", mock.Anything, "/dogu", mock.Anything, mock.Anything)
 	watchRegistry.On("Watch", mock.Anything, "/config/nginx/externals", mock.Anything, mock.Anything)
 	watchRegistry.On("Watch", mock.Anything, "/config/_global/disabled_warpmenu_support_entries", mock.Anything, mock.Anything)
+	watchRegistry.On("Get", "/config/_global/block_warpmenu_support_category").Return("false", nil)
+	watchRegistry.On("Get", "/config/_global/disabled_warpmenu_support_entries").Return("", nil)
+	watchRegistry.On("Get", "/config/_global/allowed_warpmenu_support_entries").Return("", nil)
 
-	warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace, eventRecorder)
+	warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), nil, nil, myNamespace, eventRecorder, watchRegistry)
 	err = k8sManager.Add(warpMenuCreator)
 	Expect(err).ToNot(HaveOccurred())
 
