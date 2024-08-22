@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 	"testing"
+	"time"
 )
 
 //go:embed testdata/k8s_config.yaml
@@ -410,6 +411,9 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		}()
 		channel <- repository.GlobalConfigWatchResult{Err: assert.AnError}
 		<-cancelCtx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Millisecond * 500)
+		<-timer.C
 	})
 
 	t.Run("should return error on error executing global config update on watch event", func(t *testing.T) {
@@ -515,6 +519,9 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		}()
 		channel <- dogu.CurrentVersionsWatchResult{Err: assert.AnError}
 		<-cancelCtx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Millisecond * 500)
+		<-timer.C
 	})
 
 	t.Run("should return error on error executing dogu version update on watch event", func(t *testing.T) {
