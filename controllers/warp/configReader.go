@@ -49,19 +49,21 @@ func (reader *ConfigReader) Read(ctx context.Context, configuration *config.Conf
 
 	ctrl.Log.Info("Read SupportEntries")
 
+	readKeyErrorFmt := "Warning, could not read Key: %v. Err: %v"
+
 	isSupportCategoryBlocked, err := reader.readBool(ctx, globalBlockWarpSupportCategoryConfigurationKey)
 	if err != nil {
-		ctrl.Log.Info(fmt.Sprintf("Warning, could not read Key: %v. Err: %v", globalBlockWarpSupportCategoryConfigurationKey, err))
+		ctrl.Log.Info(fmt.Sprintf(readKeyErrorFmt, globalBlockWarpSupportCategoryConfigurationKey, err))
 	}
 
 	disabledSupportEntries, err := reader.readStrings(ctx, globalDisabledWarpSupportEntriesConfigurationKey)
 	if err != nil {
-		ctrl.Log.Info(fmt.Sprintf("Warning, could not read Key: %v. Err: %v", globalDisabledWarpSupportEntriesConfigurationKey, err))
+		ctrl.Log.Info(fmt.Sprintf(readKeyErrorFmt, globalDisabledWarpSupportEntriesConfigurationKey, err))
 	}
 
 	allowedSupportEntries, err := reader.readStrings(ctx, globalAllowedWarpSupportEntriesConfigurationKey)
 	if err != nil {
-		ctrl.Log.Info(fmt.Sprintf("Warning, could not read Key: %v. Err: %v", globalAllowedWarpSupportEntriesConfigurationKey, err))
+		ctrl.Log.Info(fmt.Sprintf(readKeyErrorFmt, globalAllowedWarpSupportEntriesConfigurationKey, err))
 	}
 
 	supportCategory := reader.readSupport(configuration.Support, isSupportCategoryBlocked, disabledSupportEntries, allowedSupportEntries)
