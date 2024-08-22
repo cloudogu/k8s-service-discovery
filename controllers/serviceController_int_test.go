@@ -8,8 +8,8 @@ import (
 	_ "embed"
 	"fmt"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
-	etcdclient "go.etcd.io/etcd/client/v2"
 	"k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -250,7 +250,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			createSelfDeployment(k8sApiClient)
 
 			By("Trigger channel")
-			SSLChannel <- &etcdclient.Response{}
+			SSLChannel <- repository.GlobalConfigWatchResult{}
 
 			By("Expect ssl secret")
 			Eventually(func() bool {
@@ -267,6 +267,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 				return true
 			}, timeoutInterval, pollingInterval).Should(BeTrue())
+			close(SSLChannel)
 		})
 	})
 })
