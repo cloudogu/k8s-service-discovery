@@ -111,6 +111,7 @@ func (w *Watcher) handleGlobalConfigUpdates(ctx context.Context, globalConfigWat
 			}
 			if result.Err != nil {
 				ctrl.LoggerFrom(ctx).Error(result.Err, "global config watch channel error. Stop watch.")
+				continue
 			}
 			// Trigger refresh. Content of the result is not needed
 			err := w.execute(ctx)
@@ -147,6 +148,7 @@ func (w *Watcher) handleDoguVersionUpdates(ctx context.Context, versionChannel <
 			}
 			if result.Err != nil {
 				ctrl.LoggerFrom(ctx).Error(result.Err, "dogu version watch channel error. Stop watch.")
+				continue
 			}
 			// Trigger refresh. Content of the result is not needed
 			err := w.execute(ctx)

@@ -97,6 +97,7 @@ func (scu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, ma
 			}
 			if result.Err != nil {
 				ctrl.LoggerFrom(ctx).Error(result.Err, "maintenance watch channel error. Stop watch.")
+				continue
 			}
 
 			err := scu.handleMaintenanceModeUpdate(ctx)

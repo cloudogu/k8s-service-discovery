@@ -9,6 +9,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Reader is used to fetch warp categories with a configuration
@@ -42,4 +43,12 @@ type LocalDoguRepo interface {
 type GlobalConfigRepository interface {
 	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
 	Get(context.Context) (libconfig.GlobalConfig, error)
+}
+
+// used for mocks
+
+//nolint:unused
+//goland:noinspection GoUnusedType
+type k8sClient interface {
+	client.Client
 }
