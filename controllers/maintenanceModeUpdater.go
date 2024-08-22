@@ -75,7 +75,7 @@ func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context) error {
 
 	maintenanceWatchChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
 	if err != nil {
-		return fmt.Errorf("failed to start maintenance watch")
+		return fmt.Errorf("failed to start maintenance watch: %w", err)
 	}
 
 	go func() {

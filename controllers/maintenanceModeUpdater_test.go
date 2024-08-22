@@ -3,15 +3,21 @@ package controllers
 import (
 	"context"
 	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
+	"time"
 )
 
 var testCtx = context.Background()
@@ -614,3 +620,169 @@ func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
 // 		})
 // 	}
 // }
+
+func Test_maintenanceModeUpdater_Start(t *testing.T) {
+	t.Run("success with inactive maintenance mode", func(t *testing.T) {
+		// given
+		cancelCtx, cancelFunc := context.WithCancel(context.Background())
+		globalConfigMock := NewMockGlobalConfigRepository(t)
+		channel := make(chan repository.GlobalConfigWatchResult)
+		globalConfigMock.EXPECT().Watch(cancelCtx, mock.Anything).Return(channel, nil)
+		globalConfigMock.EXPECT().Get(cancelCtx).Return(config.GlobalConfig{}, nil)
+
+		k8sClientMock := newMockK8sClient(t)
+		k8sClientMock.EXPECT().List(cancelCtx, mock.Anything, mock.Anything).Return(nil).Times(1)
+		k8sClientMock.EXPECT().List(cancelCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			list.(*corev1.PodList).Items = []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "nginx-static", Namespace: testNamespace}}}
+
+			return nil
+		}).Times(1)
+		k8sClientMock.EXPECT().Delete(cancelCtx, mock.Anything).Return(nil).Times(1)
+		k8sClientMock.EXPECT().Get(cancelCtx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mock.Anything).Return(nil)
+
+		eventRecorderMock := newMockEventRecorder(t)
+		eventRecorderMock.EXPECT().Eventf(mock.Anything, corev1.EventTypeNormal, "Maintenance", "Maintenance mode changed to %t.", false).Run(func(object runtime.Object, eventtype string, reason string, messageFmt string, args ...interface{}) {
+			cancelFunc()
+		})
+
+		serviceRewriterMock := newMockServiceRewriter(t)
+		serviceRewriterMock.EXPECT().rewrite(cancelCtx, mock.Anything, mock.Anything).Return(nil)
+
+		sut := maintenanceModeUpdater{
+			namespace:        testNamespace,
+			globalConfigRepo: globalConfigMock,
+			client:           k8sClientMock,
+			eventRecorder:    eventRecorderMock,
+			serviceRewriter:  serviceRewriterMock,
+		}
+
+		// when
+		err := sut.Start(cancelCtx)
+		channel <- repository.GlobalConfigWatchResult{}
+
+		// then
+		require.NoError(t, err)
+		<-cancelCtx.Done()
+	})
+
+	t.Run("should return error on get watch error", func(t *testing.T) {
+		// given
+		globalConfigMock := NewMockGlobalConfigRepository(t)
+		globalConfigMock.EXPECT().Watch(testCtx, mock.Anything).Return(nil, assert.AnError)
+
+		sut := maintenanceModeUpdater{
+			namespace:        testNamespace,
+			globalConfigRepo: globalConfigMock,
+		}
+
+		// when
+		err := sut.Start(testCtx)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to start maintenance watch")
+	})
+}
+
+func Test_maintenanceModeUpdater_startMaintenanceWatch(t *testing.T) {
+	t.Run("should return and log if the channel will be closed", func(t *testing.T) {
+		// given
+		cancelCtx, cancelFunc := context.WithCancel(context.Background())
+
+		mockLogSink := NewMockLogSink(t)
+		oldLogFn := log.FromContext
+		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+			return logr.New(mockLogSink)
+		}
+		defer func() {
+			controllerruntime.LoggerFrom = oldLogFn
+		}()
+		mockLogSink.EXPECT().Init(mock.Anything)
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "maintenance watch channel canceled - stop watch").Run(func(level int, msg string, keysAndValues ...interface{}) {
+			cancelFunc()
+		})
+
+		sut := maintenanceModeUpdater{}
+		channel := make(chan repository.GlobalConfigWatchResult)
+
+		// when
+		go func() {
+			sut.startMaintenanceWatch(cancelCtx, channel)
+		}()
+		close(channel)
+		<-cancelCtx.Done()
+	})
+
+	t.Run("should continue and log error on watch result error", func(t *testing.T) {
+		// given
+		cancelCtx, cancelFunc := context.WithCancel(context.Background())
+
+		mockLogSink := NewMockLogSink(t)
+		oldLogFn := log.FromContext
+		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+			return logr.New(mockLogSink)
+		}
+		defer func() {
+			controllerruntime.LoggerFrom = oldLogFn
+		}()
+		mockLogSink.EXPECT().Init(mock.Anything)
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for maintenance")
+		mockLogSink.EXPECT().Error(assert.AnError, "maintenance watch channel error").Run(func(err error, msg string, keysAndValues ...interface{}) {
+			cancelFunc()
+		})
+
+		sut := maintenanceModeUpdater{}
+		channel := make(chan repository.GlobalConfigWatchResult)
+
+		// when
+		go func() {
+			sut.startMaintenanceWatch(cancelCtx, channel)
+		}()
+		channel <- repository.GlobalConfigWatchResult{Err: assert.AnError}
+		<-cancelCtx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Millisecond * 500)
+		<-timer.C
+	})
+
+	t.Run("should return error on error executing global config update on watch event", func(t *testing.T) {
+		// given
+		cancelCtx, cancelFunc := context.WithCancel(context.Background())
+
+		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
+		globalConfigRepoMock.EXPECT().Get(cancelCtx).Return(config.GlobalConfig{}, assert.AnError)
+
+		mockLogSink := NewMockLogSink(t)
+		oldLogFn := log.FromContext
+		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+			return logr.New(mockLogSink)
+		}
+		defer func() {
+			controllerruntime.LoggerFrom = oldLogFn
+		}()
+		mockLogSink.EXPECT().Init(mock.Anything)
+		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for maintenance")
+		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle maintenance update").Run(func(err error, msg string, keysAndValues ...interface{}) {
+			cancelFunc()
+		})
+
+		sut := maintenanceModeUpdater{
+			namespace:        testNamespace,
+			globalConfigRepo: globalConfigRepoMock,
+		}
+		channel := make(chan repository.GlobalConfigWatchResult)
+
+		// when
+		go func() {
+			sut.startMaintenanceWatch(cancelCtx, channel)
+		}()
+		channel <- repository.GlobalConfigWatchResult{}
+		<-cancelCtx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Millisecond * 500)
+		<-timer.C
+	})
+}

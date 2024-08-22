@@ -204,6 +204,9 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		<-ctx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Second)
+		<-timer.C
 	})
 
 	t.Run("should fail to getting global config", func(t *testing.T) {
