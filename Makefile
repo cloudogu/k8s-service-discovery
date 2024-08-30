@@ -25,8 +25,6 @@ include build/make/clean.mk
 include build/make/digital-signature.mk
 include build/make/mocks.mk
 
-K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
-
 K8S_COMPONENT_SOURCE_VALUES = ${HELM_SOURCE_DIR}/values.yaml
 K8S_COMPONENT_TARGET_VALUES = ${HELM_TARGET_DIR}/values.yaml
 PRE_COMPILE=generate-deepcopy
@@ -70,8 +68,3 @@ template-image-pull-policy: $(BINARY_YQ)
           $(BINARY_YQ) -i e ".manager.imagePullPolicy=\"Always\"" "${K8S_COMPONENT_TARGET_VALUES}" ; \
     fi
 
-## Local Development
-
-.PHONY: setup-etcd-port-forward
-setup-etcd-port-forward:
-	kubectl port-forward etcd-0 4001:2379 &
