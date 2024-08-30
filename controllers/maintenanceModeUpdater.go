@@ -65,27 +65,27 @@ func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdate
 }
 
 // Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
-func (scu *maintenanceModeUpdater) Start(ctx context.Context) error {
+func (mmu *maintenanceModeUpdater) Start(ctx context.Context) error {
 	log.FromContext(ctx).Info("Starting maintenance mode watcher...")
-	return scu.startGlobalConfigWatch(ctx)
+	return mmu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *maintenanceModeUpdater) startGlobalConfigWatch(ctx context.Context) error {
+func (mmu *maintenanceModeUpdater) startGlobalConfigWatch(ctx context.Context) error {
 	log.FromContext(ctx).Info("Start global config watcher on maintenance key")
 
-	maintenanceWatchChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
+	maintenanceWatchChannel, err := mmu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
 	if err != nil {
 		return fmt.Errorf("failed to start maintenance watch: %w", err)
 	}
 
 	go func() {
-		scu.startMaintenanceWatch(ctx, maintenanceWatchChannel)
+		mmu.startMaintenanceWatch(ctx, maintenanceWatchChannel)
 	}()
 
 	return nil
 }
 
-func (scu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, maintenanceWatchChannel <-chan repository.GlobalConfigWatchResult) {
+func (mmu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, maintenanceWatchChannel <-chan repository.GlobalConfigWatchResult) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -101,7 +101,7 @@ func (scu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, ma
 				continue
 			}
 
-			err := scu.handleMaintenanceModeUpdate(ctx)
+			err := mmu.handleMaintenanceModeUpdate(ctx)
 			if err != nil {
 				ctrl.LoggerFrom(ctx).Error(err, "failed to handle maintenance update")
 			}
@@ -109,51 +109,51 @@ func (scu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, ma
 	}
 }
 
-func (scu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
+func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
 	log.FromContext(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := isMaintenanceModeActive(ctx, scu.globalConfigRepo)
+	isActive, err := isMaintenanceModeActive(ctx, mmu.globalConfigRepo)
 	if err != nil {
 		return err
 	}
 
 	if isActive {
-		err := scu.activateMaintenanceMode(ctx)
+		err := mmu.activateMaintenanceMode(ctx)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := scu.deactivateMaintenanceMode(ctx)
+		err := mmu.deactivateMaintenanceMode(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = scu.restartStaticNginxPod(ctx)
+	err = mmu.restartStaticNginxPod(ctx)
 	if err != nil {
 		return err
 	}
 
 	deployment := &appsv1.Deployment{}
-	err = scu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: scu.namespace}, deployment)
+	err = mmu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: mmu.namespace}, deployment)
 	if err != nil {
 		return fmt.Errorf("maintenance mode: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
-	scu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed to %t.", isActive)
+	mmu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed to %t.", isActive)
 
 	return nil
 }
 
-func (scu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) error {
+func (mmu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) error {
 	podList := &v1.PodList{}
 	staticNginxRequirement, _ := labels.NewRequirement(k8sv1.DoguLabelName, selection.Equals, []string{"nginx-static"})
-	err := scu.client.List(ctx, podList, &client.ListOptions{Namespace: scu.namespace, LabelSelector: labels.NewSelector().Add(*staticNginxRequirement)})
+	err := mmu.client.List(ctx, podList, &client.ListOptions{Namespace: mmu.namespace, LabelSelector: labels.NewSelector().Add(*staticNginxRequirement)})
 	if err != nil {
 		return fmt.Errorf("failed to list [%s] pods: %w", "nginx-static", err)
 	}
 
 	for _, pod := range podList.Items {
-		err := scu.client.Delete(ctx, &pod)
+		err := mmu.client.Delete(ctx, &pod)
 		if err != nil {
 			return fmt.Errorf("failed to delete pod [%s]: %w", pod.Name, err)
 		}
@@ -162,11 +162,11 @@ func (scu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) er
 	return nil
 }
 
-func (scu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1ServiceList, error) {
+func (mmu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1ServiceList, error) {
 	serviceList := &v1.ServiceList{}
-	err := scu.client.List(ctx, serviceList, &client.ListOptions{Namespace: scu.namespace})
+	err := mmu.client.List(ctx, serviceList, &client.ListOptions{Namespace: mmu.namespace})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", scu.namespace, err)
+		return nil, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", mmu.namespace, err)
 	}
 
 	var modifiableServiceList v1ServiceList
@@ -178,23 +178,23 @@ func (scu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1Servic
 	return modifiableServiceList, nil
 }
 
-func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context) error {
+func (mmu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context) error {
 	log.FromContext(ctx).Info("Deactivate maintenance mode...")
 
-	serviceList, err := scu.getAllServices(ctx)
+	serviceList, err := mmu.getAllServices(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to deactivate maintenance mode: %w", err)
 	}
 
 	for _, service := range serviceList {
 		log.FromContext(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpsertIngressForService(ctx, service)
+		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = scu.serviceRewriter.rewrite(ctx, serviceList, false)
+	err = mmu.serviceRewriter.rewrite(ctx, serviceList, false)
 	if err != nil {
 		return fmt.Errorf("failed to rewrite services during maintenance mode deactivation: %w", err)
 	}
@@ -202,23 +202,23 @@ func (scu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 	return nil
 }
 
-func (scu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) error {
+func (mmu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) error {
 	log.FromContext(ctx).Info("Activating maintenance mode...")
 
-	serviceList, err := scu.getAllServices(ctx)
+	serviceList, err := mmu.getAllServices(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to activate maintenance mode: %w", err)
 	}
 
 	for _, service := range serviceList {
 		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := scu.ingressUpdater.UpsertIngressForService(ctx, service)
+		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = scu.serviceRewriter.rewrite(ctx, serviceList, true)
+	err = mmu.serviceRewriter.rewrite(ctx, serviceList, true)
 	if err != nil {
 		return fmt.Errorf("failed to rewrite services during maintenance mode activation: %w", err)
 	}
