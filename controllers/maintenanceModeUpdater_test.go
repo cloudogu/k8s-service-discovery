@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -690,7 +691,7 @@ func Test_maintenanceModeUpdater_startMaintenanceWatch(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
+		oldLogFn := ctrl.LoggerFrom
 		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -719,7 +720,7 @@ func Test_maintenanceModeUpdater_startMaintenanceWatch(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
+		oldLogFn := ctrl.LoggerFrom
 		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -764,6 +765,8 @@ func Test_maintenanceModeUpdater_startMaintenanceWatch(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
+		// One update log gets send initially without updating anything
+		mockLogSink.EXPECT().Info(0, "Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for maintenance")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle maintenance update").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()

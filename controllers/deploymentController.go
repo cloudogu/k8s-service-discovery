@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 )
 
 const legacyDoguLabel = "dogu"
@@ -36,7 +34,7 @@ func NewDeploymentReconciler(client client.Client, updater IngressUpdater) *depl
 // The deploymentReconciler is responsible to regenerate ingress objects for respective dogus containing the ces service
 // discovery annotation when their state switches between ready <-> not ready.
 func (r *deploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := ctrl.LoggerFrom(ctx)
 
 	deployment, err := r.getDeployment(ctx, req)
 	if err != nil {

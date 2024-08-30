@@ -14,9 +14,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	controllerruntime "sigs.k8s.io/controller-runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
 	"time"
 )
@@ -67,12 +66,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -102,12 +101,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -163,12 +162,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -213,12 +212,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -256,12 +255,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)

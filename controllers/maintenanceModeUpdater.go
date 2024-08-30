@@ -7,6 +7,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"strings"
 
+	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/hashicorp/go-multierror"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -15,9 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 )
 
 const (
@@ -66,12 +64,12 @@ func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdate
 
 // Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
 func (mmu *maintenanceModeUpdater) Start(ctx context.Context) error {
-	log.FromContext(ctx).Info("Starting maintenance mode watcher...")
+	ctrl.LoggerFrom(ctx).Info("Starting maintenance mode watcher...")
 	return mmu.startGlobalConfigWatch(ctx)
 }
 
 func (mmu *maintenanceModeUpdater) startGlobalConfigWatch(ctx context.Context) error {
-	log.FromContext(ctx).Info("Start global config watcher on maintenance key")
+	ctrl.LoggerFrom(ctx).Info("Start global config watcher on maintenance key")
 
 	maintenanceWatchChannel, err := mmu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
 	if err != nil {
@@ -110,7 +108,7 @@ func (mmu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, ma
 }
 
 func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
-	log.FromContext(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
+	ctrl.LoggerFrom(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
 	isActive, err := isMaintenanceModeActive(ctx, mmu.globalConfigRepo)
 	if err != nil {
@@ -179,7 +177,7 @@ func (mmu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1Servic
 }
 
 func (mmu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context) error {
-	log.FromContext(ctx).Info("Deactivate maintenance mode...")
+	ctrl.LoggerFrom(ctx).Info("Deactivate maintenance mode...")
 
 	serviceList, err := mmu.getAllServices(ctx)
 	if err != nil {
@@ -187,7 +185,7 @@ func (mmu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 	}
 
 	for _, service := range serviceList {
-		log.FromContext(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
 		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
 		if err != nil {
 			return err
@@ -203,7 +201,7 @@ func (mmu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 }
 
 func (mmu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) error {
-	log.FromContext(ctx).Info("Activating maintenance mode...")
+	ctrl.LoggerFrom(ctx).Info("Activating maintenance mode...")
 
 	serviceList, err := mmu.getAllServices(ctx)
 	if err != nil {

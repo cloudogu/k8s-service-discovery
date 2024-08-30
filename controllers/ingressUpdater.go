@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
+	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,11 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
-	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
-	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 )
 
 const (
@@ -126,7 +124,7 @@ func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *c
 	}
 
 	if !ok {
-		log.FromContext(ctx).Info(fmt.Sprintf("service [%s] has no ports or ces services -> skipping ingress creation", service.Name))
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("service [%s] has no ports or ces services -> skipping ingress creation", service.Name))
 		return nil
 	}
 
@@ -205,7 +203,7 @@ func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv1.Ingres
 }
 
 func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv1.Dogu) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
@@ -218,7 +216,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 }
 
 func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentDoguIsStartingRewrite}
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
@@ -230,7 +228,7 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 }
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
 	serviceRewrite, err := cesService.generateRewriteConfig()
 	if err != nil {
 		return err
@@ -324,8 +322,8 @@ func isMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigR
 		return false, fmt.Errorf("failed to get global config for maintenance mode: %w", err)
 	}
 
-	get, b := globalConfig.Get(maintenanceModeGlobalKey)
-	if !b || get.String() == "" {
+	get, ok := globalConfig.Get(maintenanceModeGlobalKey)
+	if !ok || get.String() == "" {
 		return false, nil
 	}
 

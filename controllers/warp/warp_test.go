@@ -14,10 +14,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	types2 "k8s.io/apimachinery/pkg/types"
 	"os"
-	controllerruntime "sigs.k8s.io/controller-runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 	"testing"
 	"time"
@@ -141,12 +140,12 @@ func TestWatcher_Run(t *testing.T) {
 		k8sClientMock.EXPECT().Get(testCtx, types2.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mock.Anything).Return(assert.AnError)
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Error(mock.Anything, "error creating warp-menu")
@@ -301,12 +300,12 @@ func TestWatcher_startGlobalConfigWatch(t *testing.T) {
 	t.Run("should log error and return on get watch error", func(t *testing.T) {
 		// given
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -329,12 +328,12 @@ func TestWatcher_startVersionRegistryWatch(t *testing.T) {
 	t.Run("should log error and return on get watch error", func(t *testing.T) {
 		// given
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -359,12 +358,12 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -388,12 +387,12 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -430,12 +429,12 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		eventRecoderMock.EXPECT().Eventf(mock.Anything, corev1.EventTypeWarning, "ErrUpdateWarpMenu", "Updating warp menu failed: %w", assert.AnError)
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -467,12 +466,12 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -496,12 +495,12 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
@@ -538,12 +537,12 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		eventRecoderMock.EXPECT().Eventf(mock.Anything, corev1.EventTypeWarning, "ErrUpdateWarpMenu", "Updating warp menu failed: %w", assert.AnError)
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := log.FromContext
-		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		oldLogFn := ctrl.LoggerFrom
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
-			controllerruntime.LoggerFrom = oldLogFn
+			ctrl.LoggerFrom = oldLogFn
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
