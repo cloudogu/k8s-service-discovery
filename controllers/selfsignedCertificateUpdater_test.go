@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
 	"time"
 )
@@ -66,7 +67,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -101,7 +102,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -162,7 +163,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -212,7 +213,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -255,7 +256,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}

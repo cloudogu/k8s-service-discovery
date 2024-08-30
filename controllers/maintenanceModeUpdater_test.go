@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -614,7 +613,7 @@ func Test_maintenanceModeUpdater_startMaintenanceWatch(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
@@ -643,7 +642,7 @@ func Test_maintenanceModeUpdater_startMaintenanceWatch(t *testing.T) {
 		cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 		mockLogSink := NewMockLogSink(t)
-		oldLogFn := ctrl.LoggerFrom
+		oldLogFn := log.FromContext
 		controllerruntime.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
 			return logr.New(mockLogSink)
 		}
