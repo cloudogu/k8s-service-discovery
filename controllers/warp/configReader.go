@@ -91,7 +91,7 @@ func (reader *ConfigReader) externalsReader(ctx context.Context, source config.S
 	for _, value := range children {
 		external, unmarshalErr := reader.externalConverter.ReadAndUnmarshalExternal(value)
 		if unmarshalErr != nil {
-			ctrl.Log.Error(unmarshalErr, fmt.Sprintf("failed to read and unmarshal external external link key %q", value))
+			ctrl.Log.Error(unmarshalErr, fmt.Sprintf("failed to read and unmarshal external link key %q", value))
 			continue
 		}
 		externals = append(externals, external)

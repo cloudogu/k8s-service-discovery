@@ -501,127 +501,6 @@ func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
 	})
 }
 
-// func Test_maintenanceModeUpdater_Start(t *testing.T) {
-// 	type fields struct {
-// 		client           k8sClient
-// 		namespace        string
-// 		ingressUpdater   IngressUpdater
-// 		eventRecorder    eventRecorder
-// 		serviceRewriter  serviceRewriter
-// 		globalConfigRepo GlobalConfigRepository
-// 	}
-// 	type args struct {
-// 		ctx context.Context
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		fields  fields
-// 		args    args
-// 		wantErr assert.ErrorAssertionFunc
-// 	}{
-// 		{ name: "" },
-// 	}
-// 		for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			scu := &maintenanceModeUpdater{
-// 				client:           tt.fields.client,
-// 				namespace:        tt.fields.namespace,
-// 				ingressUpdater:   tt.fields.ingressUpdater,
-// 				eventRecorder:    tt.fields.eventRecorder,
-// 				serviceRewriter:  tt.fields.serviceRewriter,
-// 				globalConfigRepo: tt.fields.globalConfigRepo,
-// 			}
-// 			tt.wantErr(t, scu.Start(tt.args.ctx), fmt.Sprintf("Start(%v)", tt.args.ctx))
-// 		})
-// 	}
-// }
-
-// func Test_maintenanceModeUpdater_Start(t *testing.T) {
-// 	type fields struct {
-// 		namespace          string
-// 		clientFn           func(t *testing.T) k8sClient
-// 		ingressUpdaterFn   func(t *testing.T) IngressUpdater
-// 		eventRecorderFn    func(t *testing.T) eventRecorder
-// 		serviceRewriterFn  func(t *testing.T) serviceRewriter
-// 		globalConfigRepoFn func(t *testing.T) (GlobalConfigRepository, chan repository.GlobalConfigWatchResult)
-// 	}
-// 	type args struct {
-// 		ctx context.Context
-// 	}
-// 	tests := []struct {
-// 		name        string
-// 		fields      fields
-// 		eventMockFn func(t *testing.T, resultChannel chan repository.GlobalConfigWatchResult)
-// 		args        args
-// 		wantErr     assert.ErrorAssertionFunc
-// 	}{
-// 		{
-// 			name: "should activate maintenance on key change",
-// 			fields: fields{
-// 				namespace: testNamespace,
-// 				globalConfigRepoFn: func(t *testing.T) (GlobalConfigRepository, chan repository.GlobalConfigWatchResult) {
-// 					resultChannel := make(chan repository.GlobalConfigWatchResult)
-// 					globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-// 					globalConfigRepoMock.EXPECT().Watch(testCtx, mock.Anything).Return(resultChannel, nil)
-// 					globalConfig := config.CreateGlobalConfig(config.Entries{
-// 						"maintenance": "{\"title\": \"titel\", \"text\":\"text\"}",
-// 					})
-// 					globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-// 					return globalConfigRepoMock, resultChannel
-// 				},
-// 				clientFn: func(t *testing.T) k8sClient {
-// 					clientMock := newMockK8sClient(t)
-// 					clientMock.EXPECT().List(testCtx, &corev1.ServiceList{}, &client.ListOptions{Namespace: testNamespace}).Return(nil).Times(1)
-// 					clientMock.EXPECT().List(testCtx, &corev1.PodList{}, mock.Anything).Times(1)
-// 					clientMock.EXPECT().Delete(testCtx, "todo pod").Return(nil)
-// 					clientMock.EXPECT().Get(testCtx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, &appsv1.Deployment{}).Return(nil)
-// 					return clientMock
-// 				},
-// 				ingressUpdaterFn: func(t *testing.T) IngressUpdater {
-// 					ingressUpdaterMock := NewMockIngressUpdater(t)
-// 					ingressUpdaterMock.EXPECT().UpsertIngressForService(testCtx, nil).Return(nil)
-//
-// 					return ingressUpdaterMock
-// 				},
-// 				serviceRewriterFn: func(t *testing.T) serviceRewriter {
-// 					serviceRewriterMock := newMockServiceRewriter(t)
-// 					serviceRewriterMock.EXPECT().rewrite(testCtx, mock.Anything, true).Return(nil)
-// 					return serviceRewriterMock
-// 				},
-// 				eventRecorderFn: func(t *testing.T) eventRecorder {
-// 					eventRecorderMock := newMockEventRecorder(t)
-// 					eventRecorderMock.EXPECT().Eventf(mock.Anything, corev1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed to %t.", false)
-// 					return eventRecorderMock
-// 				},
-// 			},
-// 			args: args{ctx: testCtx},
-// 			eventMockFn: func(t *testing.T, resultChannel chan repository.GlobalConfigWatchResult) {
-// 				result := repository.GlobalConfigWatchResult{}
-// 				resultChannel <- result
-// 			},
-// 			wantErr: assert.NoError,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			mockGlobalConfigRepo, resultChannel := tt.fields.globalConfigRepoFn(t)
-// 			scu := &maintenanceModeUpdater{
-// 				client:           tt.fields.clientFn(t),
-// 				namespace:        tt.fields.namespace,
-// 				ingressUpdater:   tt.fields.ingressUpdaterFn(t),
-// 				eventRecorder:    tt.fields.eventRecorderFn(t),
-// 				serviceRewriter:  tt.fields.serviceRewriterFn(t),
-// 				globalConfigRepo: mockGlobalConfigRepo,
-// 			}
-// 			tt.wantErr(t, scu.Start(tt.args.ctx), fmt.Sprintf("Start(%v)", tt.args.ctx))
-//
-// 			if tt.eventMockFn != nil {
-// 				tt.eventMockFn(t, resultChannel)
-// 			}
-// 		})
-// 	}
-// }
-
 func Test_maintenanceModeUpdater_Start(t *testing.T) {
 	t.Run("success with inactive maintenance mode", func(t *testing.T) {
 		// given
@@ -635,7 +514,6 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 		k8sClientMock.EXPECT().List(cancelCtx, mock.Anything, mock.Anything).Return(nil).Times(1)
 		k8sClientMock.EXPECT().List(cancelCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
 			list.(*corev1.PodList).Items = []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "nginx-static", Namespace: testNamespace}}}
-
 			return nil
 		}).Times(1)
 		k8sClientMock.EXPECT().Delete(cancelCtx, mock.Anything).Return(nil).Times(1)
@@ -643,6 +521,51 @@ func Test_maintenanceModeUpdater_Start(t *testing.T) {
 
 		eventRecorderMock := newMockEventRecorder(t)
 		eventRecorderMock.EXPECT().Eventf(mock.Anything, corev1.EventTypeNormal, "Maintenance", "Maintenance mode changed to %t.", false).Run(func(object runtime.Object, eventtype string, reason string, messageFmt string, args ...interface{}) {
+			cancelFunc()
+		})
+
+		serviceRewriterMock := newMockServiceRewriter(t)
+		serviceRewriterMock.EXPECT().rewrite(cancelCtx, mock.Anything, mock.Anything).Return(nil)
+
+		sut := maintenanceModeUpdater{
+			namespace:        testNamespace,
+			globalConfigRepo: globalConfigMock,
+			client:           k8sClientMock,
+			eventRecorder:    eventRecorderMock,
+			serviceRewriter:  serviceRewriterMock,
+		}
+
+		// when
+		err := sut.Start(cancelCtx)
+		channel <- repository.GlobalConfigWatchResult{}
+
+		// then
+		require.NoError(t, err)
+		<-cancelCtx.Done()
+	})
+
+	t.Run("success with active maintenance mode", func(t *testing.T) {
+		// given
+		cancelCtx, cancelFunc := context.WithCancel(context.Background())
+		globalConfigMock := NewMockGlobalConfigRepository(t)
+		channel := make(chan repository.GlobalConfigWatchResult)
+		globalConfigMock.EXPECT().Watch(cancelCtx, mock.Anything).Return(channel, nil)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"maintenance": "{\"title\": \"titel\", \"text\":\"text\"}",
+		})
+		globalConfigMock.EXPECT().Get(cancelCtx).Return(globalConfig, nil)
+
+		k8sClientMock := newMockK8sClient(t)
+		k8sClientMock.EXPECT().List(cancelCtx, mock.Anything, mock.Anything).Return(nil).Times(1)
+		k8sClientMock.EXPECT().List(cancelCtx, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, list client.ObjectList, option ...client.ListOption) error {
+			list.(*corev1.PodList).Items = []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "nginx-static", Namespace: testNamespace}}}
+			return nil
+		}).Times(1)
+		k8sClientMock.EXPECT().Delete(cancelCtx, mock.Anything).Return(nil).Times(1)
+		k8sClientMock.EXPECT().Get(cancelCtx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mock.Anything).Return(nil)
+
+		eventRecorderMock := newMockEventRecorder(t)
+		eventRecorderMock.EXPECT().Eventf(mock.Anything, corev1.EventTypeNormal, "Maintenance", "Maintenance mode changed to %t.", true).Run(func(object runtime.Object, eventtype string, reason string, messageFmt string, args ...interface{}) {
 			cancelFunc()
 		})
 

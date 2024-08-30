@@ -463,7 +463,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		assert.ErrorContains(t, err, "\"certificate/server.crt\" is empty or doesn't exists")
 	})
 
-	t.Run("successfully regenrate the certificate", func(t *testing.T) {
+	t.Run("successfully regenerate the certificate", func(t *testing.T) {
 		// given
 		k8sClientMock := newMockK8sClient(t)
 		k8sClientMock.EXPECT().Get(mocks.Anything,
