@@ -62,7 +62,7 @@ func NewWatcher(ctx context.Context, k8sClient client.Client, doguVersionRegistr
 	}, nil
 }
 
-// Run creates the warp menu and update the menu whenever a relevant etcd key was changed
+// Run creates the warp menu and update the menu whenever a relevant configuration key was changed
 func (w *Watcher) Run(ctx context.Context) error {
 	// trigger the warp-menu creation once on startup
 	err := w.execute(ctx)

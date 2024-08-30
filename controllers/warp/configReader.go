@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ConfigReader reads the configuration for the warp menu from etcd
+// ConfigReader reads the configuration for the warp menu from the global configuration
 type ConfigReader struct {
 	configuration       *config.Configuration
 	globalConfigRepo    GlobalConfigRepository
@@ -116,7 +116,7 @@ func (reader *ConfigReader) readGlobalConfigDir(ctx context.Context, key string)
 	return children, nil
 }
 
-// dogusReader reads from etcd and converts the keys and values to a warp menu
+// dogusReader reads from dogu repository and converts the keys and values to a warp menu
 // conform structure
 func (reader *ConfigReader) dogusReader(ctx context.Context, source config.Source) (types.Categories, error) {
 	ctrl.Log.Info(fmt.Sprintf("Read dogus from %s for warp menu", source.Path))

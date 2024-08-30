@@ -48,7 +48,7 @@ sources:
 ```
 
 ##### Hide all entries
-If all support entries of the warp-menu are not to be displayed, this can be configured via the etcd key `/config/_global/block_warpmenu_support_category`.
+If all support entries of the warp-menu are not to be displayed, this can be configured via the global config key `block_warpmenu_support_category`.
 ```shell
 # hide all entries
 kubectl edit configmap global-config --namespace ecosystem

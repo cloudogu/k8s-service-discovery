@@ -67,11 +67,11 @@ func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdate
 // Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
 func (scu *maintenanceModeUpdater) Start(ctx context.Context) error {
 	log.FromContext(ctx).Info("Starting maintenance mode watcher...")
-	return scu.startEtcdWatch(ctx)
+	return scu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *maintenanceModeUpdater) startEtcdWatch(ctx context.Context) error {
-	log.FromContext(ctx).Info("Start etcd watcher on maintenance key")
+func (scu *maintenanceModeUpdater) startGlobalConfigWatch(ctx context.Context) error {
+	log.FromContext(ctx).Info("Start global config watcher on maintenance key")
 
 	maintenanceWatchChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
 	if err != nil {

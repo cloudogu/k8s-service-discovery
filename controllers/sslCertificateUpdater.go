@@ -48,11 +48,11 @@ func NewSslCertificateUpdater(client client.Client, namespace string, globalConf
 func (scu *sslCertificateUpdater) Start(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Starting ssl updater...")
-	return scu.startEtcdWatch(ctx)
+	return scu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on certificate keys")
+func (scu *sslCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
+	ctrl.LoggerFrom(ctx).Info("Start global config watcher on certificate keys")
 
 	sslWatchChannel, err := scu.globalConfigRepo.Watch(ctx, config.DirectoryFilter(globalServerCertificatePath))
 	if err != nil {
@@ -60,9 +60,9 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context) error {
 	}
 
 	go func() {
-		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
+		ctrl.LoggerFrom(ctx).Info("start global config watcher for ssl certificates")
 		scu.startSSLWatch(ctx, sslWatchChannel)
-		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
+		ctrl.LoggerFrom(ctx).Info("stop global config watcher for ssl certificates")
 	}()
 
 	return nil

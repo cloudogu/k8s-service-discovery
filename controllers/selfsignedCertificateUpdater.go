@@ -55,11 +55,11 @@ func NewSelfsignedCertificateUpdater(client client.Client, namespace string, glo
 func (scu *selfsignedCertificateUpdater) Start(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Starting selfsigned certificate updater...")
-	return scu.startEtcdWatch(ctx)
+	return scu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *selfsignedCertificateUpdater) startEtcdWatch(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
+func (scu *selfsignedCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
+	ctrl.LoggerFrom(ctx).Info("start global config watcher for ssl certificates")
 	fqdnChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(globalFqdnPath))
 	if err != nil {
 		return fmt.Errorf("failed to create fqdn watch: %w", err)

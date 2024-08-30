@@ -372,7 +372,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
-		testSources := []config.Source{{Path: "/path/to/etcd/key", Type: "fjkhsdfjh", Tag: "tag"}}
+		testSources := []config.Source{{Path: "/path/to/config/key", Type: "fjkhsdfjh", Tag: "tag"}}
 		reader := &ConfigReader{
 			configuration:    &config.Configuration{Support: []config.SupportSource{}},
 			globalConfigRepo: mockGlobalConfigRepo,

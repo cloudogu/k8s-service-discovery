@@ -73,7 +73,7 @@ func (sr *serviceRewrite) generateConfig() string {
 type ingressUpdater struct {
 	// client used to communicate with k8s.
 	client client.Client
-	// globalConfig is used to read the global config from the etcd.
+	// globalConfig is used to read the global configuration.
 	globalConfigRepo GlobalConfigRepository
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
