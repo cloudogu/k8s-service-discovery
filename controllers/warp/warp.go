@@ -71,17 +71,19 @@ func (w *Watcher) Run(ctx context.Context) error {
 	for _, source := range w.configuration.Sources {
 		if source.Type == "dogu" {
 			w.startVersionRegistryWatch(ctx)
-		} else {
-			w.startGlobalConfigWatch(ctx, source.Path)
+		} else if source.Type == "externals" {
+			w.startGlobalConfigDirectoryWatch(ctx, source.Path)
 		}
 	}
 
 	return nil
 }
 
-func (w *Watcher) startGlobalConfigWatch(ctx context.Context, sourcePath string) {
+func (w *Watcher) startGlobalConfigDirectoryWatch(ctx context.Context, sourcePath string) {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start global config watcher for source [%s]", sourcePath))
-	filter := libconfig.KeyFilter(libconfig.Key(sourcePath))
+	configKey := libconfig.Key(sourcePath)
+
+	filter := libconfig.DirectoryFilter(configKey)
 	globalConfigWatchChannel, err := w.globalConfigRepo.Watch(ctx, filter)
 	if err != nil {
 		ctrl.LoggerFrom(ctx).Error(err, "failed to create global config watch for path %q", sourcePath)
@@ -118,7 +120,7 @@ func (w *Watcher) handleGlobalConfigUpdates(ctx context.Context, globalConfigWat
 }
 
 func (w *Watcher) startVersionRegistryWatch(ctx context.Context) {
-	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start version registry watcher for source type dogu"))
+	ctrl.LoggerFrom(ctx).Info("start version registry watcher for source type dogu")
 	versionChannel, doguVersionWatchError := w.registryToWatch.WatchAllCurrent(ctx)
 	if doguVersionWatchError != nil {
 		ctrl.LoggerFrom(ctx).Error(doguVersionWatchError, "failed to create dogu version registry watch")

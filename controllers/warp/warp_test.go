@@ -321,7 +321,7 @@ func TestWatcher_startGlobalConfigWatch(t *testing.T) {
 		}
 
 		// when
-		sut.startGlobalConfigWatch(testCtx, "/config/externals")
+		sut.startGlobalConfigDirectoryWatch(testCtx, "/config/externals")
 	})
 }
 
