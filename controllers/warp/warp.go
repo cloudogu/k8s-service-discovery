@@ -6,15 +6,13 @@ import (
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	appsv1 "k8s.io/api/apps/v1"
-	types2 "k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"strings"
-
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	types2 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -71,14 +69,10 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 
 	for _, source := range w.configuration.Sources {
-		if strings.HasPrefix(source.Path, "/dogu") || strings.HasPrefix(source.Path, "dogu") {
-			w.startVersionRegistryWatch(ctx, source.Path)
-			continue
-		}
-
-		if strings.HasPrefix(source.Path, "/config/_global") || strings.HasPrefix(source.Path, "config/_global") {
+		if source.Type == "dogu" {
+			w.startVersionRegistryWatch(ctx)
+		} else {
 			w.startGlobalConfigWatch(ctx, source.Path)
-			continue
 		}
 	}
 
@@ -123,8 +117,8 @@ func (w *Watcher) handleGlobalConfigUpdates(ctx context.Context, globalConfigWat
 	}
 }
 
-func (w *Watcher) startVersionRegistryWatch(ctx context.Context, sourcePath string) {
-	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start version registry watcher for source [%s]", sourcePath))
+func (w *Watcher) startVersionRegistryWatch(ctx context.Context) {
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("start version registry watcher for source type dogu"))
 	versionChannel, doguVersionWatchError := w.registryToWatch.WatchAllCurrent(ctx)
 	if doguVersionWatchError != nil {
 		ctrl.LoggerFrom(ctx).Error(doguVersionWatchError, "failed to create dogu version registry watch")

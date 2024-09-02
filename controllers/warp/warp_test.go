@@ -338,7 +338,7 @@ func TestWatcher_startVersionRegistryWatch(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "start version registry watcher for source [/dogu]")
+		mockLogSink.EXPECT().Info(0, "start version registry watcher for source type dogu")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to create dogu version registry watch")
 
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
@@ -349,7 +349,7 @@ func TestWatcher_startVersionRegistryWatch(t *testing.T) {
 		}
 
 		// when
-		sut.startVersionRegistryWatch(testCtx, "/dogu")
+		sut.startVersionRegistryWatch(testCtx)
 	})
 }
 
