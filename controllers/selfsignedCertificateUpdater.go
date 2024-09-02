@@ -9,6 +9,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -104,7 +105,7 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 	}
 
 	certType, typeExists := globalConfig.Get(serverCertificateTypePath)
-	if !typeExists || certType.String() == "" {
+	if !typeExists || !util.ContainsChars(certType.String()) {
 		return fmt.Errorf("%q is empty or doesn't exists: %w", serverCertificateTypePath, err)
 	}
 
@@ -118,7 +119,7 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		}
 
 		previousCertRaw, certExists := globalConfig.Get(serverCertificateID)
-		if !certExists || previousCertRaw.String() == "" {
+		if !certExists || !util.ContainsChars(previousCertRaw.String()) {
 			return fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
 		}
 

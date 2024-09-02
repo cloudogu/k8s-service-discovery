@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -151,12 +152,12 @@ func (scu *sslCertificateUpdater) readCertificateFromRegistry(ctx context.Contex
 	}
 
 	cert, exists := globalConfig.Get(serverCertificateID)
-	if !exists || cert.String() == "" {
+	if !exists || !util.ContainsChars(cert.String()) {
 		return "", "", fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
 	}
 
 	key, exists := globalConfig.Get(serverCertificateKeyID)
-	if !exists || key.String() == "" {
+	if !exists || !util.ContainsChars(key.String()) {
 		return "", "", fmt.Errorf("%q is empty or doesn't exists", serverCertificateKeyID)
 	}
 

@@ -7,6 +7,7 @@ import (
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -323,7 +324,7 @@ func isMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigR
 	}
 
 	get, ok := globalConfig.Get(maintenanceModeGlobalKey)
-	if !ok || get.String() == "" {
+	if !ok || !util.ContainsChars(get.String()) {
 		return false, nil
 	}
 

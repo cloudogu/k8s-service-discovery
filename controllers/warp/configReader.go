@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	"sort"
 	"strconv"
 	"strings"
@@ -153,7 +154,7 @@ func (reader *ConfigReader) readStrings(ctx context.Context, registryKey string)
 	}
 
 	entry, exists := globalConfig.Get(libconfig.Key(registryKey))
-	if !exists || entry.String() == "" {
+	if !exists || !util.ContainsChars(entry.String()) {
 		return []string{}, nil
 	}
 
@@ -191,7 +192,7 @@ func (reader *ConfigReader) readBool(ctx context.Context, registryKey string) (b
 	}
 
 	entry, exists := globalConfig.Get(libconfig.Key(registryKey))
-	if !exists || entry.String() == "" {
+	if !exists || !util.ContainsChars(entry.String()) {
 		return false, nil
 	}
 

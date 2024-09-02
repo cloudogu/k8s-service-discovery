@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/ssl"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 )
 
 type cesSelfSignedSSLGenerator interface {
@@ -42,12 +43,12 @@ func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays i
 	}
 
 	fqdn, exists := globalConfig.Get("fqdn")
-	if !exists || fqdn.String() == "" {
+	if !exists || !util.ContainsChars(fqdn.String()) {
 		return fmt.Errorf("fqdn is empty or doesn't exists")
 	}
 
 	domain, exists := globalConfig.Get("domain")
-	if !exists || domain.String() == "" {
+	if !exists || !util.ContainsChars(domain.String()) {
 		return fmt.Errorf("domain is empty or doesn't exists: %w", err)
 	}
 
