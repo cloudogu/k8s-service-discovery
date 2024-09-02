@@ -100,9 +100,9 @@ func (reader *ConfigReader) externalsReader(ctx context.Context, source config.S
 }
 
 func (reader *ConfigReader) readGlobalConfigDir(ctx context.Context, key string) (map[string]string, error) {
-	globalConfig, err := reader.globalConfigRepo.Get(ctx)
+	globalConfig, err := reader.getGlobalConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get global config: %w", err)
+		return nil, err
 	}
 
 	entries := globalConfig.GetAll()
@@ -147,9 +147,9 @@ func (reader *ConfigReader) dogusReader(ctx context.Context, source config.Sourc
 }
 
 func (reader *ConfigReader) readStrings(ctx context.Context, registryKey string) ([]string, error) {
-	globalConfig, err := reader.globalConfigRepo.Get(ctx)
+	globalConfig, err := reader.getGlobalConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get global config: %w", err)
+		return nil, err
 	}
 
 	entry, exists := globalConfig.Get(libconfig.Key(registryKey))
@@ -175,10 +175,19 @@ func removeLegacyGlobalConfigPrefix(key string) string {
 	return key
 }
 
-func (reader *ConfigReader) readBool(ctx context.Context, registryKey string) (bool, error) {
+func (reader *ConfigReader) getGlobalConfig(ctx context.Context) (libconfig.GlobalConfig, error) {
 	globalConfig, err := reader.globalConfigRepo.Get(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to get global config: %w", err)
+		return libconfig.GlobalConfig{}, fmt.Errorf("failed to get global config: %w", err)
+	}
+
+	return globalConfig, nil
+}
+
+func (reader *ConfigReader) readBool(ctx context.Context, registryKey string) (bool, error) {
+	globalConfig, err := reader.getGlobalConfig(ctx)
+	if err != nil {
+		return false, err
 	}
 
 	entry, exists := globalConfig.Get(libconfig.Key(registryKey))
