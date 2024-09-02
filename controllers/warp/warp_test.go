@@ -238,7 +238,7 @@ func TestWatcher_Run(t *testing.T) {
 		testConfiguration := &config.Configuration{
 			Sources: []config.Source{
 				{
-					Path: "/config/_global/externals",
+					Path: "externals",
 					Type: "externals",
 				},
 			},

@@ -72,7 +72,7 @@ data:
 ```
 
 ##### Show only individual entries
-If all support entries of the warp-menu are hidden, but individual entries should still be displayed, this can be configured via the global configuration key `/config/_global/allowed_warpmenu_support_entries`.
+If all support entries of the warp-menu are hidden, but individual entries should still be displayed, this can be configured via the global configuration key `allowed_warpmenu_support_entries`.
 A JSON array with the entries to be displayed must be specified there.
 
 ```yaml
@@ -82,7 +82,7 @@ allowed_warpmenu_support_entries: '["platform", "aboutCloudoguToken"]'
 > This configuration is only effective if **all** entries are hidden (see [above](#hide-all-entries)).
 
 ##### Hide individual entries
-If individual entries in the warp-menu are not to be rendered, this can be configured via the global configuration key `/config/_global/disabled_warpmenu_support_entries`.
+If individual entries in the warp-menu are not to be rendered, this can be configured via the global configuration key `disabled_warpmenu_support_entries`.
 A JSON array with the entries to be hidden must be specified there.
 
 ```yaml
@@ -111,14 +111,8 @@ sources:
   - path: /dogu
     type: dogus
     tag: warp
-  - path: /config/nginx/externals
+  - path: externals
     type: externals
-  - path: /config/_global/block_warpmenu_support_category
-    type: support_entry_config
-  - path: /config/_global/allowed_warpmenu_support_entries
-    type: support_entry_config
-  - path: /config/_global/disabled_warpmenu_support_entries
-    type: support_entry_config
 target: /var/www/html/warp/menu.json
 order:
   Development Apps: 100

@@ -38,15 +38,10 @@ cloudogu: |
 ```
 
 #### Konfiguration für Support-Einträge in der globalen Konfiguration
-```yaml
-sources:
-  - path: block_warpmenu_support_category
-    type: support_entry_config
-  - path: allowed_warpmenu_support_entries
-    type: support_entry_config
-  - path: disabled_warpmenu_support_entries
-    type: support_entry_config
-```
+Die Konfiguration der Support-Einträge erfolgt direkt in der globalen Konfiguration mithilfe der folgenden drei Schlüssel:
+  - block_warpmenu_support_category
+  - allowed_warpmenu_support_entries
+  - disabled_warpmenu_support_entries
 
 ##### Alle Einträge ausblenden
 Wenn alle Support-Einträge des warp-menu nicht angezeigt werden sollen, kann dies über die globale Konfiguration `block_warpmenu_support_category` konfiguriert werden.
@@ -111,14 +106,8 @@ sources:
   - path: /dogu
     type: dogus
     tag: warp
-  - path: /config/nginx/externals
+  - path: externals
     type: externals
-  - path: /config/_global/block_warpmenu_support_category
-    type: support_entry_config
-  - path: /config/_global/allowed_warpmenu_support_entries
-    type: support_entry_config
-  - path: /config/_global/disabled_warpmenu_support_entries
-    type: support_entry_config
 target: /var/www/html/warp/menu.json
 order:
   Development Apps: 100
