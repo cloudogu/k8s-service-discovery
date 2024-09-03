@@ -397,10 +397,10 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "context done - stop global config watch for warp generation")
 		mockLogSink.EXPECT().Error(assert.AnError, "global config watch channel error for warp generation").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watch for warp generation")
 
 		sut := Watcher{}
 		channel := make(chan repository.GlobalConfigWatchResult)
@@ -439,10 +439,10 @@ func TestWatcher_handleGlobalConfigUpdates(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "context done - stop global config watch for warp generation")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to update entries from global config in warp menu").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
+		mockLogSink.EXPECT().Info(0, "context done - stop global config watch for warp generation")
 
 		sut := Watcher{
 			namespace:     testNamespace,
@@ -489,6 +489,9 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		}()
 		close(channel)
 		<-cancelCtx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Millisecond * 500)
+		<-timer.C
 	})
 
 	t.Run("should continue and log error on watch result error", func(t *testing.T) {
@@ -505,10 +508,10 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "context done - stop dogu version registry watch for warp generation")
 		mockLogSink.EXPECT().Error(assert.AnError, "dogu version watch channel error").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
+		mockLogSink.EXPECT().Info(0, "context done - stop dogu version registry watch for warp generation")
 
 		sut := Watcher{}
 		channel := make(chan dogu.CurrentVersionsWatchResult)
@@ -547,10 +550,10 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		}()
 		mockLogSink.EXPECT().Init(mock.Anything)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, "context done - stop dogu version registry watch for warp generation")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to update dogus in warp menu").Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
+		mockLogSink.EXPECT().Info(0, "context done - stop dogu version registry watch for warp generation")
 
 		sut := Watcher{
 			namespace:     testNamespace,
@@ -566,5 +569,8 @@ func TestWatcher_handleDoguVersionUpdates(t *testing.T) {
 		}()
 		channel <- dogu.CurrentVersionsWatchResult{}
 		<-cancelCtx.Done()
+		// Wait for last log
+		timer := time.NewTimer(time.Millisecond * 500)
+		<-timer.C
 	})
 }
