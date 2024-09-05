@@ -171,7 +171,7 @@ func TestWatcher_Run(t *testing.T) {
 			Sources: []config.Source{
 				{
 					Path: "/dogu",
-					Type: "dogu",
+					Type: "dogus",
 					Tag:  "warp",
 				},
 			},
