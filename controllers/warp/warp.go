@@ -69,7 +69,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 
 	for _, source := range w.configuration.Sources {
-		if source.Type == "dogu" {
+		if source.Type == "dogus" {
 			w.startVersionRegistryWatch(ctx)
 		} else if source.Type == "externals" {
 			w.startGlobalConfigDirectoryWatch(ctx, source.Path)
@@ -128,9 +128,8 @@ func (w *Watcher) startVersionRegistryWatch(ctx context.Context) {
 	}
 
 	go func() {
-		w.handleDoguVersionUpdates(ctx, versionChannel.ResultChan)
+		w.handleDoguVersionUpdates(ctx, versionChannel)
 	}()
-
 }
 
 func (w *Watcher) handleDoguVersionUpdates(ctx context.Context, versionChannel <-chan dogu.CurrentVersionsWatchResult) {

@@ -209,10 +209,7 @@ func TestWatcher_Run(t *testing.T) {
 		})
 
 		resultChannel := make(chan dogu.CurrentVersionsWatchResult)
-		watchResult := dogu.CurrentVersionsWatch{
-			ResultChan: resultChannel,
-		}
-		versionRegistryMock.EXPECT().WatchAllCurrent(cancelCtx).Return(watchResult, nil)
+		versionRegistryMock.EXPECT().WatchAllCurrent(cancelCtx).Return(resultChannel, nil)
 
 		sut := Watcher{
 			k8sClient:       k8sClientMock,
@@ -342,7 +339,8 @@ func TestWatcher_startVersionRegistryWatch(t *testing.T) {
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to create dogu version registry watch")
 
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
-		versionRegistryMock.EXPECT().WatchAllCurrent(mock.Anything).Return(dogu.CurrentVersionsWatch{}, assert.AnError)
+		resultChannel := make(chan dogu.CurrentVersionsWatchResult)
+		versionRegistryMock.EXPECT().WatchAllCurrent(mock.Anything).Return(resultChannel, assert.AnError)
 
 		sut := Watcher{
 			registryToWatch: versionRegistryMock,

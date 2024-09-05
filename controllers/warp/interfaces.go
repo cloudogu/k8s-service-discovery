@@ -32,7 +32,7 @@ type ExternalConverter interface {
 }
 
 type DoguVersionRegistry interface {
-	WatchAllCurrent(context.Context) (dogu.CurrentVersionsWatch, error)
+	WatchAllCurrent(context.Context) (<-chan dogu.CurrentVersionsWatchResult, error)
 	GetCurrentOfAll(context.Context) ([]dogu.DoguVersion, error)
 }
 
