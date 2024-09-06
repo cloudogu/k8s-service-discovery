@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	v1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
 	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
+	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	etcdclient "go.etcd.io/etcd/client/v2"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,16 +21,24 @@ import (
 	"time"
 )
 
-func getGlobalConfigMockWithMaintenance(t *testing.T, maintenanceMode bool) configurationContext {
-	globalContextMock := newMockConfigurationContext(t)
-	expect := globalContextMock.EXPECT()
+func getGlobalConfigRepoMockWithMaintenance(t *testing.T, maintenanceMode bool) GlobalConfigRepository {
+	var entries registryconfig.Entries
+
 	if maintenanceMode {
-		expect.Get(maintenanceModeGlobalKey).Return("active", nil)
+		entries = registryconfig.Entries{
+			"maintenance": "maintenance",
+		}
 	} else {
-		expect.Get(maintenanceModeGlobalKey).Return("", etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound})
+		entries = registryconfig.Entries{}
 	}
 
-	return globalContextMock
+	globalConfigRepoMock := NewMockGlobalConfigRepository(t)
+	globalConfig := registryconfig.GlobalConfig{
+		Config: registryconfig.CreateConfig(entries),
+	}
+	globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+	return globalConfigRepoMock
 }
 
 func TestNewIngressUpdater(t *testing.T) {
@@ -95,8 +103,9 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		service := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
+
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
+		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigRepoMockWithMaintenance(t, true), myNamespace, myIngressClass, newMockEventRecorder(t))
 		require.NoError(t, creationError)
 
 		// when
@@ -113,8 +122,9 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 				{Name: "testPort", Port: 55},
 			}},
 		}
+
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
+		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigRepoMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
 		require.NoError(t, creationError)
 
 		// when
@@ -137,7 +147,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
+		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigRepoMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
 		require.NoError(t, creationError)
 
 		// when
@@ -173,7 +183,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects().Build()
-		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
+		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigRepoMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
 		require.NoError(t, creationError)
 
 		// when
@@ -210,7 +220,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		}
 		dogu := &v1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: myNamespace}}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
-		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
+		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigRepoMockWithMaintenance(t, false), myNamespace, myIngressClass, newMockEventRecorder(t))
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
@@ -253,7 +263,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(dogu).Build()
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(mock.IsType(&v1.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
-		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigMockWithMaintenance(t, false), myNamespace, myIngressClass, recorderMock)
+		creator, creationError := NewIngressUpdater(clientMock, getGlobalConfigRepoMockWithMaintenance(t, false), myNamespace, myIngressClass, recorderMock)
 		require.NoError(t, creationError)
 
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)

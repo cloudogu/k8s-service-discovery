@@ -2,10 +2,8 @@ sources:
   - pathdsf: /dogu
     type: dogus
     tag: warp
-  - patsdfh: /config/nginx/externals
+  - patsdfh: externals
     type: externals
-  - path: /config/_global/disabled_warpmenu_support_entries
-    typsdfe: disabled_support_entries
 tardddddget: /var/www/html/warp/menu.json
 order:
   Development Apps: 100

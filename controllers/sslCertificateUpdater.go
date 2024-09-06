@@ -3,25 +3,24 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/client-go/util/retry"
-	"strings"
-
-	"github.com/cloudogu/cesapp-lib/registry"
-	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	serverCertificatePath  = "/config/_global/certificate"
-	serverCertificateID    = "certificate/server.crt"
-	serverCertificateKeyID = "certificate/server.key"
-	certificateSecretName  = "ecosystem-certificate"
+	globalServerCertificatePath = "certificate"
+	serverCertificateID         = "certificate/server.crt"
+	serverCertificateKeyID      = "certificate/server.key"
+	certificateSecretName       = "ecosystem-certificate"
 )
 
 const (
@@ -30,27 +29,19 @@ const (
 
 // sslCertificateUpdater is responsible to update the ssl certificate of the ecosystem.
 type sslCertificateUpdater struct {
-	client        client.Client
-	namespace     string
-	registry      cesRegistry
-	eventRecorder eventRecorder
-}
-
-type cesRegistry interface {
-	registry.Registry
-}
-
-type watchConfigurationContext interface {
-	registry.WatchConfigurationContext
+	client           client.Client
+	namespace        string
+	globalConfigRepo GlobalConfigRepository
+	eventRecorder    eventRecorder
 }
 
 // NewSslCertificateUpdater creates a new updater.
-func NewSslCertificateUpdater(client client.Client, namespace string, cesRegistry cesRegistry, recorder eventRecorder) *sslCertificateUpdater {
+func NewSslCertificateUpdater(client client.Client, namespace string, globalConfigRepo GlobalConfigRepository, recorder eventRecorder) *sslCertificateUpdater {
 	return &sslCertificateUpdater{
-		client:        client,
-		namespace:     namespace,
-		registry:      cesRegistry,
-		eventRecorder: recorder,
+		client:           client,
+		namespace:        namespace,
+		globalConfigRepo: globalConfigRepo,
+		eventRecorder:    recorder,
 	}
 }
 
@@ -58,28 +49,45 @@ func NewSslCertificateUpdater(client client.Client, namespace string, cesRegistr
 func (scu *sslCertificateUpdater) Start(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Starting ssl updater...")
-	return scu.startEtcdWatch(ctx, scu.registry.RootConfig())
+	return scu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg watchConfigurationContext) error {
-	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on certificate keys")
+func (scu *sslCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
+	ctrl.LoggerFrom(ctx).Info("Start global config watcher on certificate keys")
 
-	sslChannel := make(chan *etcdclient.Response)
+	sslWatchChannel, err := scu.globalConfigRepo.Watch(ctx, config.DirectoryFilter(globalServerCertificatePath))
+	if err != nil {
+		return fmt.Errorf("failed to create ssl watch: %w", err)
+	}
+
 	go func() {
-		ctrl.LoggerFrom(ctx).Info("start etcd watcher for ssl certificates")
-		reg.Watch(ctx, serverCertificatePath, true, sslChannel)
-		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for ssl certificates")
+		ctrl.LoggerFrom(ctx).Info("start global config watcher for ssl certificates")
+		scu.startSSLWatch(ctx, sslWatchChannel)
+		ctrl.LoggerFrom(ctx).Info("stop global config watcher for ssl certificates")
 	}()
 
+	return nil
+}
+
+func (scu *sslCertificateUpdater) startSSLWatch(ctx context.Context, sslWatchChannel <-chan repository.GlobalConfigWatchResult) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-sslChannel:
-			ctrl.Log.Info(fmt.Sprintf("Context: [%+v]", ctx))
+			ctrl.LoggerFrom(ctx).Info("context done - stop global config watcher for ssl certificate changes")
+			return
+		case result, open := <-sslWatchChannel:
+			if !open {
+				ctrl.LoggerFrom(ctx).Info("ssl watch channel canceled - stop watch")
+				return
+			}
+			if result.Err != nil {
+				ctrl.LoggerFrom(ctx).Error(result.Err, "ssl watch channel error")
+				continue
+			}
+
 			err := scu.handleSslChange(ctx)
 			if err != nil {
-				return err
+				ctrl.LoggerFrom(ctx).Error(err, "failed to handle ssl update")
 			}
 		}
 	}
@@ -88,13 +96,9 @@ func (scu *sslCertificateUpdater) startEtcdWatch(ctx context.Context, reg watchC
 func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("Certificate key changed in registry. Refresh ssl certificate secret...")
 
-	cert, key, err := scu.readCertificateFromRegistry()
-	if err != nil && isEtcdKeyNotFoundError(err) {
-		message := fmt.Sprintf("The etcd keys [%s/server.crt] and [%s/server.key] are required but not set in the etcd.", serverCertificatePath, serverCertificatePath)
-		ctrl.LoggerFrom(ctx).Error(fmt.Errorf("%w", err), fmt.Sprintf("%s %s", message, "Writing an event..."))
-		return nil
-	} else if err != nil {
-		return err
+	cert, key, err := scu.readCertificateFromRegistry(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read certificate: %w", err)
 	}
 
 	deployment := &appsv1.Deployment{}
@@ -141,18 +145,23 @@ func (scu *sslCertificateUpdater) handleSslChange(ctx context.Context) error {
 	return nil
 }
 
-func (scu *sslCertificateUpdater) readCertificateFromRegistry() (string, string, error) {
-	cert, err := scu.registry.GlobalConfig().Get(serverCertificateID)
+func (scu *sslCertificateUpdater) readCertificateFromRegistry(ctx context.Context) (string, string, error) {
+	globalConfig, err := scu.globalConfigRepo.Get(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to read the ssl certificate from the registry: %w", err)
+		return "", "", fmt.Errorf("failed to get global config for ssl read: %w", err)
 	}
 
-	key, err := scu.registry.GlobalConfig().Get(serverCertificateKeyID)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to read the ssl certificate key from the registry: %w", err)
+	cert, exists := globalConfig.Get(serverCertificateID)
+	if !exists || !util.ContainsChars(cert.String()) {
+		return "", "", fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
 	}
 
-	return cert, key, nil
+	key, exists := globalConfig.Get(serverCertificateKeyID)
+	if !exists || !util.ContainsChars(key.String()) {
+		return "", "", fmt.Errorf("%q is empty or doesn't exists", serverCertificateKeyID)
+	}
+
+	return cert.String(), key.String(), nil
 }
 
 func (scu *sslCertificateUpdater) getSslSecret(ctx context.Context) (*v1.Secret, bool, error) {
@@ -192,8 +201,4 @@ func (scu *sslCertificateUpdater) createSslSecret(ctx context.Context, cert stri
 	}
 
 	return nil
-}
-
-func isEtcdKeyNotFoundError(err error) bool {
-	return strings.Contains(err.Error(), "Key not found")
 }

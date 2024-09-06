@@ -29,7 +29,7 @@ type Configuration struct {
 	Support []SupportSource
 }
 
-// Source in etcd
+// Source in global config
 type Source struct {
 	Path string
 	Type string

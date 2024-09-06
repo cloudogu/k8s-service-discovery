@@ -98,6 +98,10 @@ node('docker') {
                         }
             }
 
+            stage('create global configmap') {
+                k3d.kubectl("--namespace default create configmap global-config --from-literal=config.yaml='key: value'")
+            }
+
             stage('Deploy Manager') {
                 k3d.helm("install ${repositoryName} ${helmChartDir}")
             }

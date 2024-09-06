@@ -65,7 +65,7 @@
       }
     },
     {
-      "Name": "etcd_redmine_config",
+      "Name": "redmine_dogu_config",
       "Description": "Applies default configuration to redmine.",
       "Optional": true
     }

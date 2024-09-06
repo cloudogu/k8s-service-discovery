@@ -27,7 +27,6 @@ func readJenkinsDogu(t *testing.T) *core.Dogu {
 
 	return dogu
 }
-
 func parseVersion(t *testing.T, version string) *core.Version {
 	t.Helper()
 	v, err := core.ParseVersion(version)

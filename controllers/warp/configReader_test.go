@@ -1,19 +1,16 @@
 package warp
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
-	"fmt"
 	"github.com/cloudogu/cesapp-lib/core"
+	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
-	"github.com/go-logr/logr/funcr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"testing"
 )
 
@@ -29,7 +26,6 @@ func TestConfigReader_readSupport(t *testing.T) {
 	supportSources := []config.SupportSource{{Identifier: "aboutCloudoguToken", External: false, Href: "/local/href"}, {Identifier: "myCloudogu", External: true, Href: "https://ecosystem.cloudogu.com/"}, {Identifier: "docsCloudoguComUrl", External: true, Href: "https://docs.cloudogu.com/"}}
 	reader := &ConfigReader{
 		configuration: &config.Configuration{Support: []config.SupportSource{}},
-		registry:      nil,
 	}
 
 	t.Run("should successfully read support entries without filters", func(t *testing.T) {
@@ -81,143 +77,174 @@ func TestConfigReader_readSupport(t *testing.T) {
 		assert.Equal(t, expectedCategories, actual)
 	})
 }
-
 func TestConfigReader_readStrings(t *testing.T) {
 	t.Run("should successfully read strings", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"disabled_warpmenu_support_entries": "[\"lorem\",\"ipsum\"]",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		reader := &ConfigReader{
-			registry: mockRegistry,
+			globalConfigRepo: mockGlobalConfigRepo,
 		}
 
-		identifiers, err := reader.readStrings("/config/_global/disabled_warpmenu_support_entries")
+		identifiers, err := reader.readStrings(testCtx, "disabled_warpmenu_support_entries")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"lorem", "ipsum"}, identifiers)
 	})
 
-	t.Run("should fail reading from registry", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("", assert.AnError)
+	t.Run("should fail getting global config", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(registryconfig.GlobalConfig{}, assert.AnError)
 		reader := &ConfigReader{
-			registry: mockRegistry,
+			globalConfigRepo: mockGlobalConfigRepo,
 		}
 
-		identifiers, err := reader.readStrings("/config/_global/disabled_warpmenu_support_entries")
+		_, err := reader.readStrings(testCtx, "disabled_warpmenu_support_entries")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to read configuration entry /config/_global/disabled_warpmenu_support_entries from etcd")
-		assert.Equal(t, []string{}, identifiers)
+		assert.ErrorContains(t, err, "failed to get global config")
 	})
 
 	t.Run("should fail unmarshalling", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("not-a-string-array 123", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 
-		reader := &ConfigReader{
-			registry: mockRegistry,
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"disabled_warpmenu_support_entries": "not a string array]",
+			}),
 		}
 
-		identifiers, err := reader.readStrings("/config/_global/disabled_warpmenu_support_entries")
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		reader := &ConfigReader{
+			globalConfigRepo: mockGlobalConfigRepo,
+		}
+
+		identifiers, err := reader.readStrings(testCtx, "disabled_warpmenu_support_entries")
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to unmarshal etcd key to string slice:")
+		assert.ErrorContains(t, err, "failed to unmarshal global config key to string slice")
 		assert.Equal(t, []string{}, identifiers)
 	})
 }
 
 func TestConfigReader_readBool(t *testing.T) {
 	t.Run("should successfully read true bool", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/myBool").Return("true", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 
-		reader := &ConfigReader{
-			registry: mockRegistry,
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"myBool": "true",
+			}),
 		}
 
-		boolValue, err := reader.readBool("/config/_global/myBool")
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		reader := &ConfigReader{
+			globalConfigRepo: mockGlobalConfigRepo,
+		}
+
+		boolValue, err := reader.readBool(testCtx, "myBool")
 		require.NoError(t, err)
 		assert.True(t, boolValue)
 	})
 
 	t.Run("should successfully read false bool", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/myBool").Return("false", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 
-		reader := &ConfigReader{
-			registry: mockRegistry,
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"myBool": "false",
+			}),
 		}
 
-		boolValue, err := reader.readBool("/config/_global/myBool")
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		reader := &ConfigReader{
+			globalConfigRepo: mockGlobalConfigRepo,
+		}
+
+		boolValue, err := reader.readBool(testCtx, "myBool")
 		require.NoError(t, err)
 		assert.False(t, boolValue)
 	})
 
-	t.Run("should fail reading from registry", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/myBool").Return("", assert.AnError)
+	t.Run("should fail getting global config", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(registryconfig.GlobalConfig{}, assert.AnError)
 
 		reader := &ConfigReader{
-			registry: mockRegistry,
+			globalConfigRepo: mockGlobalConfigRepo,
 		}
 
-		boolValue, err := reader.readBool("/config/_global/myBool")
+		_, err := reader.readBool(testCtx, "myBool")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to read configuration entry /config/_global/myBool from etcd")
-		assert.False(t, boolValue)
+		assert.ErrorContains(t, err, "failed to get global config")
 	})
 
 	t.Run("should fail unmarshalling", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/myBool").Return("not a bool", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 
-		reader := &ConfigReader{
-			registry: mockRegistry,
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"myBool": "not a pool",
+			}),
 		}
 
-		boolValue, err := reader.readBool("/config/_global/myBool")
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		reader := &ConfigReader{
+			globalConfigRepo: mockGlobalConfigRepo,
+		}
+
+		boolValue, err := reader.readBool(testCtx, "myBool")
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to unmarshal etcd key to bool:")
+		assert.ErrorContains(t, err, "failed to unmarshal value \"not a pool\" to bool")
 		assert.False(t, boolValue)
 	})
 }
-
 func TestConfigReader_readFromConfig(t *testing.T) {
 
-	testSources := []config.Source{{Path: "/path/to/etcd/key", Type: "externals", Tag: "tag"}, {Path: "/path", Type: "support_entry_config"}}
-	testSupportSoureces := []config.SupportSource{{Identifier: "supportSrc", External: true, Href: "path/to/external"}}
+	testSources := []config.Source{{Path: "/path/to/external/link", Type: "externals", Tag: "tag"}, {Path: "/path", Type: "support_entry_config"}}
+	testSupportSources := []config.SupportSource{{Identifier: "supportSrc", External: true, Href: "path/to/external"}}
 
 	t.Run("success with one external and support link", func(t *testing.T) {
 		// given
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"/path/to/external/link/Cloudogu":               "[\"lorem\", \"ipsum\"]",
+				globalBlockWarpSupportCategoryConfigurationKey:  "false",
+				globalAllowedWarpSupportEntriesConfigurationKey: "[\"lorem\", \"ipsum\"]",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		mockDoguConverter := NewMockDoguConverter(t)
 
 		cloudoguEntryWithCategory := getEntryWithCategory("Cloudogu", "www.cloudogu.com", "Cloudogu", "External", types.TARGET_EXTERNAL)
 		mockExternalConverter := NewMockExternalConverter(t)
-		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(cloudoguEntryWithCategory, nil)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mock.Anything).Return(cloudoguEntryWithCategory, nil)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
+			globalConfigRepo:  mockGlobalConfigRepo,
 			doguConverter:     mockDoguConverter,
 			externalConverter: mockExternalConverter,
 		}
 
 		// when
-		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSources})
 
 		// then
 		assert.Empty(t, err)
 		assert.NotEmpty(t, actual)
 		assert.Equal(t, 2, len(actual))
-		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
 	t.Run("success with one dogu and support link", func(t *testing.T) {
@@ -231,12 +258,17 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			Type: "dogus",
 			Tag:  "warp",
 		}
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
+
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"disabled_warpmenu_support_entries":             "[\"lorem\", \"ipsum\"]",
+				globalBlockWarpSupportCategoryConfigurationKey:  "false",
+				globalAllowedWarpSupportEntriesConfigurationKey: "[\"lorem\", \"ipsum\"]",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		redmineVersion := parseVersion(t, "5.1.3-1")
 		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
@@ -247,7 +279,7 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 		reader := &ConfigReader{
 			configuration:       &config.Configuration{Support: []config.SupportSource{}},
-			registry:            mockRegistry,
+			globalConfigRepo:    mockGlobalConfigRepo,
 			doguConverter:       mockDoguConverter,
 			externalConverter:   mockExternalConverter,
 			doguVersionRegistry: versionRegistryMock,
@@ -255,141 +287,116 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 		}
 
 		// when
-		actual, err := reader.Read(testCtx, &config.Configuration{Sources: []config.Source{doguSource}, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: []config.Source{doguSource}, Support: testSupportSources})
 
 		// then
 		assert.Empty(t, err)
 		assert.NotEmpty(t, actual)
 		assert.Equal(t, 2, len(actual))
-		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
 	t.Run("error during external Read should not result in an error", func(t *testing.T) {
 		// given
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"/path/to/external/link/Cloudogu":               "[\"lorem\", \"ipsum\"]",
+				"disabled_warpmenu_support_entries":             "[\"lorem\", \"ipsum\"]",
+				globalAllowedWarpSupportEntriesConfigurationKey: "[\"lorem\", \"ipsum\"]",
+				globalBlockWarpSupportCategoryConfigurationKey:  "false",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		mockDoguConverter := NewMockDoguConverter(t)
 
 		mockExternalConverter := NewMockExternalConverter(t)
-		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
+			globalConfigRepo:  mockGlobalConfigRepo,
 			doguConverter:     mockDoguConverter,
 			externalConverter: mockExternalConverter,
 		}
 
 		// when
-		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSources})
 
 		// then
 		assert.Empty(t, err)
 		assert.NotEmpty(t, actual)
 		assert.Equal(t, 1, len(actual))
-		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
-	})
-
-	t.Run("error during support Read should not result in an error", func(t *testing.T) {
-		// given
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", assert.AnError)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
-
-		mockExternalConverter := NewMockExternalConverter(t)
-		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
-		mockDoguConverter := NewMockDoguConverter(t)
-
-		reader := &ConfigReader{
-			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
-			doguConverter:     mockDoguConverter,
-			externalConverter: mockExternalConverter,
-		}
-
-		// when
-		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
-
-		// then
-		assert.Empty(t, err)
-		assert.NotEmpty(t, actual)
-		assert.Equal(t, 1, len(actual))
-		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
 	t.Run("empty support category should not result in an error", func(t *testing.T) {
 		// given
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/path/to/etcd/key").Return([]string{"/path/to/etcd/key"}, nil)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"/path/to/external/link/Cloudogu":               "[\"lorem\", \"ipsum\"]",
+				"disabled_warpmenu_support_entries":             "[]",
+				globalAllowedWarpSupportEntriesConfigurationKey: "[\"lorem\", \"ipsum\"]",
+				globalBlockWarpSupportCategoryConfigurationKey:  "false",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		mockExternalConverter := NewMockExternalConverter(t)
-		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
+		mockExternalConverter.EXPECT().ReadAndUnmarshalExternal(mock.Anything).Return(types.EntryWithCategory{}, assert.AnError)
 		mockDoguConverter := NewMockDoguConverter(t)
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
+			globalConfigRepo:  mockGlobalConfigRepo,
 			doguConverter:     mockDoguConverter,
 			externalConverter: mockExternalConverter,
 		}
 
 		// when
-		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSources})
 
 		// then
 		assert.Empty(t, err)
 		assert.NotEmpty(t, actual)
 		assert.Equal(t, 1, len(actual))
-		mock.AssertExpectationsForObjects(t, mockRegistry, mockDoguConverter, mockExternalConverter)
 	})
 
 	t.Run("skip wrong source type", func(t *testing.T) {
 		// given
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get("/config/_global/disabled_warpmenu_support_entries").Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"/path/to/external/link/Cloudogu":               "[\"lorem\", \"ipsum\"]",
+				globalAllowedWarpSupportEntriesConfigurationKey: "[\"lorem\", \"ipsum\"]",
+				globalBlockWarpSupportCategoryConfigurationKey:  "false",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
-		testSources := []config.Source{{Path: "/path/to/etcd/key", Type: "fjkhsdfjh", Tag: "tag"}}
+		testSources := []config.Source{{Path: "/path/to/config/key", Type: "fjkhsdfjh", Tag: "tag"}}
 		reader := &ConfigReader{
-			configuration: &config.Configuration{Support: []config.SupportSource{}},
-			registry:      mockRegistry,
+			configuration:    &config.Configuration{Support: []config.SupportSource{}},
+			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		// when
-		_, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
+		_, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSources})
 
 		// then
 		require.NoError(t, err)
 	})
 
 	t.Run("should read categories from config", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).
-			Return("false", nil)
-		mockRegistry.EXPECT().Get(disabledWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).
-			Return("[\"lorem\", \"ipsum\"]", nil)
-		mockRegistry.EXPECT().GetChildrenPaths("/config/externals").
-			Return([]string{"/config/externals/ext1"}, nil)
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"externals/ext1": "external",
+				globalAllowedWarpSupportEntriesConfigurationKey:  "[\"lorem\", \"ipsum\"]",
+				globalDisabledWarpSupportEntriesConfigurationKey: "[\"lorem\", \"ipsum\"]",
+			}),
+		}
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		mockConverter := NewMockExternalConverter(t)
-		mockConverter.EXPECT().ReadAndUnmarshalExternal(mockRegistry, "/config/externals/ext1").Return(types.EntryWithCategory{
+		mockConverter.EXPECT().ReadAndUnmarshalExternal("external").Return(types.EntryWithCategory{
 			Entry: types.Entry{
 				DisplayName: "ext1",
 				Href:        "https://my.url/ext1",
@@ -401,11 +408,11 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 		reader := &ConfigReader{
 			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
+			globalConfigRepo:  mockGlobalConfigRepo,
 			externalConverter: mockConverter,
 		}
 
-		testSources := []config.Source{{Path: "/config/externals", Type: "externals", Tag: "tag"}}
+		testSources := []config.Source{{Path: "externals", Type: "externals", Tag: "tag"}}
 		testSupportSoureces := []config.SupportSource{{Identifier: "supportSrc", External: true, Href: "https://support.source"}}
 
 		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSoureces})
@@ -420,46 +427,6 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 			}},
 		}
 		assert.Equal(t, expectedCategories, actual)
-	})
-
-	t.Run("should read categories from config", func(t *testing.T) {
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().Get(blockWarpSupportCategoryConfigurationKey).Return("", assert.AnError)
-		mockRegistry.EXPECT().Get(disabledWarpSupportEntriesConfigurationKey).Return("", assert.AnError)
-		mockRegistry.EXPECT().Get(allowedWarpSupportEntriesConfigurationKey).Return("", assert.AnError)
-		mockRegistry.EXPECT().GetChildrenPaths("/config/externals").Return(nil, assert.AnError)
-
-		mockConverter := NewMockExternalConverter(t)
-
-		reader := &ConfigReader{
-			configuration:     &config.Configuration{Support: []config.SupportSource{}},
-			registry:          mockRegistry,
-			externalConverter: mockConverter,
-		}
-
-		testSources := []config.Source{{Path: "/config/externals", Type: "externals", Tag: "tag"}}
-		testSupportSources := []config.SupportSource{}
-
-		// capture log
-		var buf bytes.Buffer
-		existingLog := ctrl.Log
-		ctrl.Log = funcr.New(func(prefix, args string) {
-			buf.WriteString(fmt.Sprintf("[%s] %s\n", prefix, args))
-		}, funcr.Options{})
-		defer func() {
-			ctrl.Log = existingLog
-		}()
-
-		actual, err := reader.Read(testCtx, &config.Configuration{Sources: testSources, Support: testSupportSources})
-		require.NoError(t, err)
-
-		assert.Nil(t, actual)
-
-		// assert log
-		assert.Contains(t, buf.String(), "Error during Read: failed to Read root entry /config/externals from etcd")
-		assert.Contains(t, buf.String(), "Warning, could not read etcd Key: /config/_global/block_warpmenu_support_category.")
-		assert.Contains(t, buf.String(), "Warning, could not read etcd Key: /config/_global/disabled_warpmenu_support_entries.")
-		assert.Contains(t, buf.String(), "Warning, could not read etcd Key: /config/_global/allowed_warpmenu_support_entries.")
 	})
 }
 
@@ -552,7 +519,6 @@ func TestConfigReader_dogusReader(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get all dogu specs with current versions")
 	})
 }
-
 func getEntryWithCategory(displayName string, href string, title string, category string, target types.Target) types.EntryWithCategory {
 	return types.EntryWithCategory{Entry: types.Entry{
 		DisplayName: displayName,
@@ -560,27 +526,4 @@ func getEntryWithCategory(displayName string, href string, title string, categor
 		Title:       title,
 		Target:      target,
 	}, Category: category}
-}
-
-func TestConfigReader_externalsReader(t *testing.T) {
-	t.Run("fail to get children paths", func(t *testing.T) {
-		// given
-		source := config.Source{
-			Path: "/path",
-			Type: "externals",
-		}
-		mockRegistry := newMockWatchConfigurationContext(t)
-		mockRegistry.EXPECT().GetChildrenPaths("/path").Return([]string{}, assert.AnError)
-		reader := &ConfigReader{
-			configuration: &config.Configuration{Support: []config.SupportSource{}},
-			registry:      mockRegistry,
-		}
-
-		// when
-		_, err := reader.externalsReader(source)
-
-		// then
-		require.Error(t, err)
-		mock.AssertExpectationsForObjects(t, mockRegistry)
-	})
 }

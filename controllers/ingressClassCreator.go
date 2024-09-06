@@ -7,10 +7,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/apimachinery/pkg/types"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	networking "k8s.io/api/networking/v1"
@@ -48,7 +48,7 @@ func NewIngressClassCreator(client client.Client, className string, namespace st
 
 // CreateIngressClass check whether the ingress class for the generator exists. If not it will be created.
 func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("checking for existing ingress class [%s]", icc.className))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("checking for existing ingress class [%s]", icc.className))
 	ok, err := icc.isIngressClassAvailable(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to check if ingress class [%s] exists: %w", icc.className, err)
@@ -62,7 +62,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 
 	if ok {
 		icc.eventRecorder.Eventf(deployment, corev1.EventTypeNormal, ingressClassCreationEventReason, "Ingress class [%s] already exists.", icc.className)
-		log.FromContext(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("ingress class [%s] already exists -> skip creation", icc.className))
 		return nil
 	}
 
