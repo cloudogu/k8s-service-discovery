@@ -8,7 +8,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
@@ -41,7 +40,7 @@ type IngressUpdater interface {
 // The serviceReconciler is responsible to generate ingress objects for respective services containing the ces service
 // discovery annotation.
 func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := ctrl.LoggerFrom(ctx)
 
 	service, err := r.getService(ctx, req)
 	if err != nil {

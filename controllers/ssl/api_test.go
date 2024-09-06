@@ -1,6 +1,7 @@
 package ssl
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -9,6 +10,8 @@ import (
 	"net/url"
 	"testing"
 )
+
+var testCtx = context.Background()
 
 func Test_handleSSLRequest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -20,7 +23,7 @@ func Test_handleSSLRequest(t *testing.T) {
 		ginCtx.Request = request
 
 		creatorMock := newMockSelfSignedCertificateCreator(t)
-		creatorMock.EXPECT().CreateAndSafeCertificate(1, "DE", "Lower Saxony", "Brunswick", []string{}).Return(nil)
+		creatorMock.EXPECT().CreateAndSafeCertificate(ginCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{}).Return(nil)
 
 		// when
 		handleSSLRequest(ginCtx, creatorMock)

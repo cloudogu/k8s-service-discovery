@@ -1,11 +1,10 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.15.0
+VERSION=0.15.1
 
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
-GOTAG?=1.21
-MAKEFILES_VERSION=9.0.1
-LINT_VERSION?=v1.52.1
+GOTAG?=1.22
+MAKEFILES_VERSION=9.1.0
 
 ADDITIONAL_CLEAN=dist-clean
 
@@ -26,14 +25,11 @@ include build/make/clean.mk
 include build/make/digital-signature.mk
 include build/make/mocks.mk
 
-K8S_RUN_PRE_TARGETS=setup-etcd-port-forward
-
 K8S_COMPONENT_SOURCE_VALUES = ${HELM_SOURCE_DIR}/values.yaml
 K8S_COMPONENT_TARGET_VALUES = ${HELM_TARGET_DIR}/values.yaml
 PRE_COMPILE=generate-deepcopy
-HELM_PRE_APPLY_TARGETS=template-stage template-log-level template-image-pull-policy
 HELM_PRE_GENERATE_TARGETS = helm-values-update-image-version
-HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo
+HELM_POST_GENERATE_TARGETS = helm-values-replace-image-repo template-stage template-log-level template-image-pull-policy
 CHECK_VAR_TARGETS=check-all-vars
 IMAGE_IMPORT_TARGET=image-import
 
@@ -72,8 +68,3 @@ template-image-pull-policy: $(BINARY_YQ)
           $(BINARY_YQ) -i e ".manager.imagePullPolicy=\"Always\"" "${K8S_COMPONENT_TARGET_VALUES}" ; \
     fi
 
-## Local Development
-
-.PHONY: setup-etcd-port-forward
-setup-etcd-port-forward:
-	kubectl port-forward etcd-0 4001:2379 &

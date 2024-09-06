@@ -8,7 +8,7 @@ returned for each access to a Dogus.
 
 # Activate Maintenance Mode
 
-To put the CES into maintenance mode, the following string must be written to `/config/_global/maintenance`:
+To put the CES into maintenance mode, the following string in the global configuration must be written to `maintenance`:
 
 ```json
 {
@@ -17,8 +17,8 @@ To put the CES into maintenance mode, the following string must be written to `/
 }
 ``` 
 
-Each request to the CES is then answered with the HTTP code 503 (Service Unavailable) until the key in the etcd is
-either deleted. Thereby the content of `title` and `text` is displayed on the page.
+Each request to the CES is then answered with the HTTP code 503 (Service Unavailable) until the key is deleted.
+Thereby the content of `title` and `text` is displayed on the page.
 
 **Note:** Enabling and disabling maintenance mode will cause the Nginx static dogus to restart. However, this should
 only take a few seconds.

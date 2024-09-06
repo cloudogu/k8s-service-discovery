@@ -6,10 +6,10 @@ package controllers
 import (
 	"context"
 	"fmt"
-	cesmocks "github.com/cloudogu/cesapp-lib/registry/mocks"
 	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/mock"
-	etcdclient "go.etcd.io/etcd/client/v2"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +46,9 @@ var stage string
 const myNamespace = "my-test-namespace"
 const myIngressClassName = "my-ingress-class-name"
 
-var SSLChannel chan *etcdclient.Response
+var (
+	SSLChannel chan repository.GlobalConfigWatchResult
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -94,15 +96,18 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	myRegistry := &cesmocks.Registry{}
-	globalConfigMock := &cesmocks.ConfigurationContext{}
-	keyNotFoundErr := etcdclient.Error{Code: etcdclient.ErrorCodeKeyNotFound}
-	globalConfigMock.On("Get", "maintenance").Return("", keyNotFoundErr)
-	myRegistry.On("GlobalConfig").Return(globalConfigMock, nil)
-
 	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), globalConfigMock, myNamespace, myIngressClassName, eventRecorder)
+	t := &testing.T{}
+	globalConfig := config.CreateGlobalConfig(config.Entries{
+		"certificate/server.crt": "mycert",
+		"certificate/server.key": "mykey",
+		"certificate/type":       "selfsigned",
+	})
+	globalConfigRepoMock := NewMockGlobalConfigRepository(t)
+	globalConfigRepoMock.EXPECT().Get(mock.Anything).Return(globalConfig, nil)
+
+	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), globalConfigRepoMock, myNamespace, myIngressClassName, eventRecorder)
 	Expect(err).ToNot(HaveOccurred())
 
 	serviceReconciler := &serviceReconciler{
@@ -124,18 +129,9 @@ var _ = BeforeSuite(func() {
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 
-	watchRegistry := &cesmocks.WatchConfigurationContext{}
-	myRegistry.On("RootConfig").Return(watchRegistry)
-
-	globalConfigMock.On("Get", "certificate/server.crt").Return("mycrt", nil)
-	globalConfigMock.On("Get", "certificate/server.key").Return("mykey", nil)
-
-	// create ssl updater class
-	watchRegistry.On("Watch", mock.Anything, "/config/_global/certificate", true, mock.Anything).Run(func(args mock.Arguments) {
-		SSLChannel = args.Get(3).(chan *etcdclient.Response)
-	})
-
-	sslUpdater := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, myRegistry, eventRecorder)
+	SSLChannel = make(chan repository.GlobalConfigWatchResult)
+	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything).Return(SSLChannel, nil)
+	sslUpdater := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, globalConfigRepoMock, eventRecorder)
 	err = k8sManager.Add(sslUpdater)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -143,20 +139,6 @@ var _ = BeforeSuite(func() {
 	stage = os.Getenv("STAGE")
 	err = os.Unsetenv("STAGE")
 	Expect(err).NotTo(HaveOccurred())
-
-	watchRegistry.On("Watch", mock.Anything, "/dogu", mock.Anything, mock.Anything)
-	watchRegistry.On("Watch", mock.Anything, "/config/nginx/externals", mock.Anything, mock.Anything)
-	watchRegistry.On("Watch", mock.Anything, "/config/_global/disabled_warpmenu_support_entries", mock.Anything, mock.Anything)
-
-	warpMenuCreator := NewWarpMenuCreator(k8sManager.GetClient(), myRegistry, myNamespace, eventRecorder)
-	err = k8sManager.Add(warpMenuCreator)
-	Expect(err).ToNot(HaveOccurred())
-
-	// create maintenance updater
-	maintenanceUpdater, err := NewMaintenanceModeUpdater(k8sManager.GetClient(), myNamespace, ingressCreator, eventRecorder)
-	Expect(err).ToNot(HaveOccurred())
-	err = k8sManager.Add(maintenanceUpdater)
-	Expect(err).ToNot(HaveOccurred())
 
 	createInitialTestData(k8sManager.GetClient())
 	go func() {

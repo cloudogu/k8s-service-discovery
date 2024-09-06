@@ -2,10 +2,10 @@
 
 ## Location
 
-The SSL certificate is located in the registry under the following paths:
-- `config/_global/certificate/key`
-- `config/_global/certificate/server.crt`
-- `config/_global/certificate/server.key`
+The SSL certificate is located in the registry under the following paths in the global config:
+- `certificate/key`
+- `certificate/server.crt`
+- `certificate/server.key`
 
 ## Renew an SSL certificate
 

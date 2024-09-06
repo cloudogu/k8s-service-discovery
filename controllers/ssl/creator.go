@@ -1,14 +1,11 @@
 package ssl
 
 import (
+	"context"
 	"fmt"
-	"github.com/cloudogu/cesapp-lib/registry"
 	"github.com/cloudogu/cesapp-lib/ssl"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 )
-
-type globalConfig interface {
-	registry.ConfigurationContext
-}
 
 type cesSelfSignedSSLGenerator interface {
 	// GenerateSelfSignedCert generates a self-signed certificate for the ces and returns the certificate chain and the
@@ -19,44 +16,48 @@ type cesSelfSignedSSLGenerator interface {
 
 type cesSSLWriter interface {
 	// WriteCertificate writes the type, cert and key to the global config
-	WriteCertificate(certType string, cert string, key string) error
+	WriteCertificate(ctx context.Context, certType string, cert string, key string) error
 }
 
 type creator struct {
-	globalConfig globalConfig
-	sslGenerator cesSelfSignedSSLGenerator
-	sslWriter    cesSSLWriter
+	globalConfigRepo GlobalConfigRepository
+	sslGenerator     cesSelfSignedSSLGenerator
+	sslWriter        cesSSLWriter
 }
 
 // NewCreator generates and writes selfsigned certificates to the ces registry.
-func NewCreator(globalConfig globalConfig) *creator {
+func NewCreator(globalConfigRepo GlobalConfigRepository) *creator {
 	return &creator{
-		globalConfig: globalConfig,
-		sslGenerator: ssl.NewSSLGenerator(),
-		sslWriter:    NewSSLWriter(globalConfig),
+		globalConfigRepo: globalConfigRepo,
+		sslGenerator:     ssl.NewSSLGenerator(),
+		sslWriter:        NewSSLWriter(globalConfigRepo),
 	}
 }
 
 // CreateAndSafeCertificate generates and writes the type, cert and key to the global config.
-func (c *creator) CreateAndSafeCertificate(certExpireDays int, country string,
+func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays int, country string,
 	province string, locality string, altDNSNames []string) error {
-
-	fqdn, err := c.globalConfig.Get("fqdn")
+	globalConfig, err := c.globalConfigRepo.Get(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get FQDN from global config: %w", err)
+		return fmt.Errorf("failed to get global config for ssl creation: %w", err)
 	}
 
-	domain, err := c.globalConfig.Get("domain")
-	if err != nil {
-		return fmt.Errorf("failed to get DOMAIN from global config: %w", err)
+	fqdn, exists := globalConfig.Get("fqdn")
+	if !exists || !util.ContainsChars(fqdn.String()) {
+		return fmt.Errorf("fqdn is empty or doesn't exists")
 	}
 
-	cert, key, err := c.sslGenerator.GenerateSelfSignedCert(fqdn, domain, certExpireDays, country, province, locality, altDNSNames)
+	domain, exists := globalConfig.Get("domain")
+	if !exists || !util.ContainsChars(domain.String()) {
+		return fmt.Errorf("domain is empty or doesn't exists: %w", err)
+	}
+
+	cert, key, err := c.sslGenerator.GenerateSelfSignedCert(fqdn.String(), domain.String(), certExpireDays, country, province, locality, altDNSNames)
 	if err != nil {
 		return fmt.Errorf("failed to generate self-signed certificate and key: %w", err)
 	}
 
-	err = c.sslWriter.WriteCertificate("selfsigned", cert, key)
+	err = c.sslWriter.WriteCertificate(ctx, "selfsigned", cert, key)
 	if err != nil {
 		return fmt.Errorf("failed to write certificate to global config: %w", err)
 	}

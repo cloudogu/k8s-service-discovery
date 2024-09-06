@@ -68,27 +68,10 @@ func Test_mapExternalEntry(t *testing.T) {
 	})
 }
 
-func Test_readExternalAsBytes(t *testing.T) {
-	t.Run("fail on registry get", func(t *testing.T) {
-		// given
-		registryMock := NewMockWatchConfigurationContext(t)
-		registryMock.EXPECT().Get("/key").Return("", assert.AnError)
-
-		// when
-		_, err := readExternalAsBytes(registryMock, "/key")
-
-		// then
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read key /key from etcd")
-	})
-}
-
 func Test_readAndUnmarshalExternal(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		entryStr := "{\n  \"DisplayName\": \"display\",\n  \"URL\": \"url\",\n  \"Description\": \"desc\",\n  \"Category\": \"category\"\n}"
-		registryMock := NewMockWatchConfigurationContext(t)
-		registryMock.EXPECT().Get("key").Return(entryStr, nil)
 		expectedEntryWithCategory := EntryWithCategory{
 			Entry: Entry{
 				DisplayName: "display",
@@ -101,25 +84,11 @@ func Test_readAndUnmarshalExternal(t *testing.T) {
 		externalConverter := ExternalConverter{}
 
 		// when
-		result, err := externalConverter.ReadAndUnmarshalExternal(registryMock, "key")
+		result, err := externalConverter.ReadAndUnmarshalExternal(entryStr)
 
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, expectedEntryWithCategory, result)
-	})
-
-	t.Run("return empty category on error", func(t *testing.T) {
-		// given
-		registryMock := NewMockWatchConfigurationContext(t)
-		registryMock.EXPECT().Get("/key").Return("", assert.AnError)
-		converter := ExternalConverter{}
-
-		// when
-		entryWithCategory, err := converter.ReadAndUnmarshalExternal(registryMock, "/key")
-
-		// then
-		require.NoError(t, err)
-		assert.Equal(t, EntryWithCategory{}, entryWithCategory)
 	})
 }
 

@@ -12,7 +12,7 @@ github = new GitHub(this, git)
 changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
-goVersion = "1.21"
+goVersion = "1.22"
 makefile = new Makefile(this)
 
 // Configuration of repository
@@ -96,6 +96,10 @@ node('docker') {
                         .inside("--volume ${WORKSPACE}:/workdir -w /workdir") {
                             sh "STAGE=development IMAGE_DEV=${repository} make helm-values-replace-image-repo"
                         }
+            }
+
+            stage('create global configmap') {
+                k3d.kubectl("--namespace default create configmap global-config --from-literal=config.yaml='key: value'")
             }
 
             stage('Deploy Manager') {

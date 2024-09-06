@@ -6,8 +6,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	sslLib "github.com/cloudogu/cesapp-lib/ssl"
+	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
-	etcdclient "go.etcd.io/etcd/client/v2"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,7 +18,7 @@ import (
 )
 
 const (
-	fqdnPath                  = "/config/_global/fqdn"
+	globalFqdnPath            = "fqdn"
 	serverCertificateTypePath = "certificate/type"
 	selfsignedCertificateType = "selfsigned"
 )
@@ -29,24 +31,24 @@ const (
 type selfsignedCertificateUpdater struct {
 	client             client.Client
 	namespace          string
-	registry           cesRegistry
+	globalConfigRepo   GlobalConfigRepository
 	eventRecorder      eventRecorder
 	certificateCreator selfSignedCertificateCreator
 }
 
 type selfSignedCertificateCreator interface {
-	CreateAndSafeCertificate(certExpireDays int, country string,
+	CreateAndSafeCertificate(ctx context.Context, certExpireDays int, country string,
 		province string, locality string, altDNSNames []string) error
 }
 
 // NewSelfsignedCertificateUpdater creates a new updater.
-func NewSelfsignedCertificateUpdater(client client.Client, namespace string, cesRegistry cesRegistry, recorder eventRecorder) *selfsignedCertificateUpdater {
+func NewSelfsignedCertificateUpdater(client client.Client, namespace string, globalConfigRepo GlobalConfigRepository, recorder eventRecorder) *selfsignedCertificateUpdater {
 	return &selfsignedCertificateUpdater{
 		client:             client,
 		namespace:          namespace,
-		registry:           cesRegistry,
+		globalConfigRepo:   globalConfigRepo,
 		eventRecorder:      recorder,
-		certificateCreator: ssl.NewCreator(cesRegistry.GlobalConfig()),
+		certificateCreator: ssl.NewCreator(globalConfigRepo),
 	}
 }
 
@@ -54,28 +56,42 @@ func NewSelfsignedCertificateUpdater(client client.Client, namespace string, ces
 func (scu *selfsignedCertificateUpdater) Start(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Starting selfsigned certificate updater...")
-	return scu.startEtcdWatch(ctx, scu.registry.RootConfig())
+	return scu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *selfsignedCertificateUpdater) startEtcdWatch(ctx context.Context, reg watchConfigurationContext) error {
-	ctrl.LoggerFrom(ctx).Info("Start etcd watcher on fqdn")
+func (scu *selfsignedCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
+	ctrl.LoggerFrom(ctx).Info("start global config watcher for ssl certificates")
+	fqdnChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(globalFqdnPath))
+	if err != nil {
+		return fmt.Errorf("failed to create fqdn watch: %w", err)
+	}
 
-	fqdnChannel := make(chan *etcdclient.Response)
 	go func() {
-		ctrl.LoggerFrom(ctx).Info("start etcd watcher for fqdn changes")
-		reg.Watch(ctx, fqdnPath, false, fqdnChannel)
-		ctrl.LoggerFrom(ctx).Info("stop etcd watcher for fqdn changes")
+		scu.startFQDNWatch(ctx, fqdnChannel)
 	}()
 
+	return nil
+}
+
+func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqdnWatchChannel <-chan repository.GlobalConfigWatchResult) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-fqdnChannel:
-			ctrl.Log.Info(fmt.Sprintf("Context: [%+v]", ctx))
+			ctrl.LoggerFrom(ctx).Info("context done - stop global config watcher for fqdn changes")
+			return
+		case result, open := <-fqdnWatchChannel:
+			if !open {
+				ctrl.LoggerFrom(ctx).Info("fqdn watch channel was closed - stop watch")
+				return
+			}
+			if result.Err != nil {
+				ctrl.LoggerFrom(ctx).Error(result.Err, "fqdn watch channel error")
+				continue
+			}
+
 			err := scu.handleFqdnChange(ctx)
 			if err != nil {
-				return err
+				ctrl.LoggerFrom(ctx).Error(err, "failed to handle fqdn update")
 			}
 		}
 	}
@@ -83,12 +99,17 @@ func (scu *selfsignedCertificateUpdater) startEtcdWatch(ctx context.Context, reg
 
 func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("FQDN or domain changed in registry. Checking for selfsigned certificate...")
-	certificateType, err := scu.registry.GlobalConfig().Get(serverCertificateTypePath)
+	globalConfig, err := scu.globalConfigRepo.Get(ctx)
 	if err != nil {
-		return fmt.Errorf("could get certificate type from registry: %w", err)
+		return fmt.Errorf("failed to get global config for ssl read: %w", err)
 	}
 
-	if certificateType == selfsignedCertificateType {
+	certType, typeExists := globalConfig.Get(serverCertificateTypePath)
+	if !typeExists || !util.ContainsChars(certType.String()) {
+		return fmt.Errorf("%q is empty or doesn't exists: %w", serverCertificateTypePath, err)
+	}
+
+	if certType == selfsignedCertificateType {
 		ctrl.LoggerFrom(ctx).Info("Certificate is selfsigned. Regenerating certificate...")
 
 		deployment := &appsv1.Deployment{}
@@ -97,9 +118,9 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 			return fmt.Errorf("selfsigned certificate handling: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 		}
 
-		previousCertRaw, err := scu.registry.GlobalConfig().Get(serverCertificateID)
-		if err != nil {
-			return fmt.Errorf("failed to get previous certificate from global config: %w", err)
+		previousCertRaw, certExists := globalConfig.Get(serverCertificateID)
+		if !certExists || !util.ContainsChars(previousCertRaw.String()) {
+			return fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
 		}
 
 		block, _ := pem.Decode([]byte(previousCertRaw))
@@ -118,7 +139,7 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		locality := getFirstOrDefault(previousCert.Subject.Locality, sslLib.Locality)
 		altDnsNames := previousCert.DNSNames
 
-		err = scu.certificateCreator.CreateAndSafeCertificate(int(expireDays), country, province, locality, altDnsNames)
+		err = scu.certificateCreator.CreateAndSafeCertificate(ctx, int(expireDays), country, province, locality, altDnsNames)
 		if err != nil {
 			return fmt.Errorf("failed to regenerate and safe selfsigned certificate: %w", err)
 		}

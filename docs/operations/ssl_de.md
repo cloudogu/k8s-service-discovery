@@ -2,10 +2,10 @@
 
 ## Ablage
 
-Das SSL-Zertifikat befindet sich in der Registry unter den folgenden Pfaden:
-- `config/_global/certificate/key`
-- `config/_global/certificate/server.crt`
-- `config/_global/certificate/server.key`
+Das SSL-Zertifikat befindet sich in der Registry unter den folgenden Pfaden in der globalen Config:
+- `certificate/key`
+- `certificate/server.crt`
+- `certificate/server.key`
 
 ## Ein selbst-signiertes SSL-Zertifikat erneuern
 

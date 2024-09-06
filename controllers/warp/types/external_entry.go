@@ -1,16 +1,16 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 )
 
 type externalEntry struct {
-	DisplayName string
-	URL         string
-	Description string
-	Category    string
+	DisplayName string `yaml:"DisplayName"`
+	URL         string `yaml:"URL"`
+	Description string `yaml:"Description"`
+	Category    string `yaml:"Category"`
 }
 
 // EntryWithCategory is a dto for entries with a Category
@@ -23,27 +23,13 @@ type EntryWithCategory struct {
 type ExternalConverter struct{}
 
 // ReadAndUnmarshalExternal reads a specific external link from the configuration and converts it to an entry with a category.
-func (ec *ExternalConverter) ReadAndUnmarshalExternal(registry WatchConfigurationContext, key string) (EntryWithCategory, error) {
-	externalBytes, err := readExternalAsBytes(registry, key)
-	if err != nil {
-		return EntryWithCategory{}, nil
-	}
-
-	return unmarshalExternal(externalBytes)
-}
-
-func readExternalAsBytes(registry WatchConfigurationContext, key string) ([]byte, error) {
-	resp, err := registry.Get(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read key %s from etcd: %w", key, err)
-	}
-
-	return []byte(resp), nil
+func (ec *ExternalConverter) ReadAndUnmarshalExternal(value string) (EntryWithCategory, error) {
+	return unmarshalExternal([]byte(value))
 }
 
 func unmarshalExternal(externalBytes []byte) (EntryWithCategory, error) {
 	externalEntry := externalEntry{}
-	err := json.Unmarshal(externalBytes, &externalEntry)
+	err := yaml.Unmarshal(externalBytes, &externalEntry)
 	if err != nil {
 		return EntryWithCategory{}, fmt.Errorf("failed to unmarshall external: %w", err)
 	}

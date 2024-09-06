@@ -8,7 +8,7 @@ Zugriff auf Dogus eine Wartungsseite angezeigt.
 
 # Wartungsmodus aktivieren
 
-Um das CES in den Wartungsmodus zu versetzen, muss der folgende String in `/config/_global/maintenance` geschrieben
+Um das CES in den Wartungsmodus zu versetzen, muss in der globalen Konfiguration der folgende String in `maintenance` geschrieben
 werden:
 
 ```json
@@ -18,8 +18,8 @@ werden:
 }
 ``` 
 
-Jede Anfrage an den CES wird dann mit dem HTTP-Code 503 (Service Unavailable) beantwortet, bis der Schlüssel im etcd (
-s.o.) gelöscht wird. Dabei wird auf der Seite der Inhalt von `title` und `text` angezeigt.
+Jede Anfrage an den CES wird dann mit dem HTTP-Code 503 (Service Unavailable) beantwortet, bis der Schlüssel (s.o.) gelöscht wird.
+Dabei wird auf der Seite der Inhalt von `title` und `text` angezeigt.
 
 **Hinweis:** Das Aktivieren und Deaktivieren des Wartungsmodus führt zu einem Neustart des Nginx-Static Dogus. Dies
 sollte jedoch nur wenige Sekunden in Anspruch nehmen.

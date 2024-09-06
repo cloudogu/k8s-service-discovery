@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
+	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
+	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,12 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/cloudogu/cesapp-lib/registry"
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
-	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
-	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 )
 
 const (
@@ -75,8 +72,8 @@ func (sr *serviceRewrite) generateConfig() string {
 type ingressUpdater struct {
 	// client used to communicate with k8s.
 	client client.Client
-	// globalConfig is used to read the global config from the etcd.
-	globalConfig configurationContext
+	// globalConfig is used to read the global configuration.
+	globalConfigRepo GlobalConfigRepository
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
@@ -92,12 +89,8 @@ type DeploymentReadyChecker interface {
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
 }
 
-type configurationContext interface {
-	registry.ConfigurationContext
-}
-
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(client client.Client, globalConfig configurationContext, namespace string, ingressClassName string, recorder eventRecorder) (*ingressUpdater, error) {
+func NewIngressUpdater(client client.Client, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder) (*ingressUpdater, error) {
 	restConfig, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find cluster config: %w", err)
@@ -111,7 +104,7 @@ func NewIngressUpdater(client client.Client, globalConfig configurationContext, 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
 	return &ingressUpdater{
 		client:                 client,
-		globalConfig:           globalConfig,
+		globalConfigRepo:       globalConfigRepo,
 		namespace:              namespace,
 		ingressClassName:       ingressClassName,
 		deploymentReadyChecker: deploymentReadyChecker,
@@ -121,7 +114,7 @@ func NewIngressUpdater(client client.Client, globalConfig configurationContext, 
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := isMaintenanceModeActive(i.globalConfig)
+	isMaintenanceMode, err := isMaintenanceModeActive(ctx, i.globalConfigRepo)
 	if err != nil {
 		return err
 	}
@@ -132,7 +125,7 @@ func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *c
 	}
 
 	if !ok {
-		log.FromContext(ctx).Info(fmt.Sprintf("service [%s] has no ports or ces services -> skipping ingress creation", service.Name))
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("service [%s] has no ports or ces services -> skipping ingress creation", service.Name))
 		return nil
 	}
 
@@ -211,7 +204,7 @@ func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv1.Ingres
 }
 
 func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv1.Dogu) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
@@ -224,7 +217,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 }
 
 func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentDoguIsStartingRewrite}
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
@@ -236,7 +229,7 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 }
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
-	log.FromContext(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
 	serviceRewrite, err := cesService.generateRewriteConfig()
 	if err != nil {
 		return err
@@ -324,12 +317,15 @@ func (i *ingressUpdater) upsertIngressObject(
 	return nil
 }
 
-func isMaintenanceModeActive(g configurationContext) (bool, error) {
-	_, err := g.Get(maintenanceModeGlobalKey)
-	if registry.IsKeyNotFoundError(err) {
+func isMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigRepository) (bool, error) {
+	globalConfig, err := globalConfigRepo.Get(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get global config for maintenance mode: %w", err)
+	}
+
+	get, ok := globalConfig.Get(maintenanceModeGlobalKey)
+	if !ok || !util.ContainsChars(get.String()) {
 		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("failed to read the maintenance mode from the registry: %w", err)
 	}
 
 	return true, nil

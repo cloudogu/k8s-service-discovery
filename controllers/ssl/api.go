@@ -1,6 +1,7 @@
 package ssl
 
 import (
+	"context"
 	"github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -14,7 +15,7 @@ var logger = ctrl.Log.WithName("k8s-service-discovery")
 
 type selfSignedCertificateCreator interface {
 	// CreateAndSafeCertificate generates and writes the type, cert and key to the global config.
-	CreateAndSafeCertificate(certExpireDays int, country string,
+	CreateAndSafeCertificate(ctx context.Context, certExpireDays int, country string,
 		province string, locality string, altDNSNames []string) error
 }
 
@@ -23,11 +24,11 @@ type ginRouter interface {
 }
 
 // SetupAPI setups the REST API for ssl generation
-func SetupAPI(router ginRouter, globalConfig globalConfig) {
+func SetupAPI(router ginRouter, globalConfigRepo GlobalConfigRepository) {
 	logger.Info("Register endpoint [%s][%s]", http.MethodPost, endpointPostGenerateSSL)
 
 	router.POST(endpointPostGenerateSSL, func(ctx *gin.Context) {
-		handleSSLRequest(ctx, NewCreator(globalConfig))
+		handleSSLRequest(ctx, NewCreator(globalConfigRepo))
 	})
 }
 
@@ -39,7 +40,7 @@ func handleSSLRequest(ctx *gin.Context, certificateCreator selfSignedCertificate
 		return
 	}
 
-	err = certificateCreator.CreateAndSafeCertificate(int(i), ssl.Country, ssl.Province, ssl.Locality, []string{})
+	err = certificateCreator.CreateAndSafeCertificate(ctx, int(i), ssl.Country, ssl.Province, ssl.Locality, []string{})
 	if err != nil {
 		handleError(ctx, http.StatusInternalServerError, err, "Failed to create and write certificate to global config")
 		return

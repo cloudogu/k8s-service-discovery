@@ -4,10 +4,8 @@ cesWarpConfig:
       - path: /dogu
         type: dogus
         tag: warp
-      - path: /config/nginx/externals
+      - path: externals
         type: externals
-      - path: /config/_global/disabled_warpmenu_support_entries
-        type: disabled_support_entries
     target: /var/www/html/warp/menu.json
     order:
       Development Apps: 100
@@ -18,9 +16,9 @@ cesWarpConfig:
       - identifier: aboutCloudoguToken
         external: false
         href: /info/about
-      - identifier: myCloudogu
+      - identifier: platform
         external: true
-        href: https://my.cloudogu.com/
+        href: https://platform.cloudogu.com
 kubeRbacProxy:
   image:
     repository: gcr.io/kubebuilder/kube-rbac-proxy
@@ -35,7 +33,7 @@ kubeRbacProxy:
 manager:
   image:
     repository: cloudogu/k8s-service-discovery
-    tag: 0.15.0
+    tag: 0.15.1
   env:
     logLevel: info
     stage: production
