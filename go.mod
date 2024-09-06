@@ -8,7 +8,7 @@ require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
 	github.com/cloudogu/cesapp-lib v0.12.2
 	github.com/cloudogu/k8s-dogu-operator v1.2.0
-	github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240904095659-19d33e7cb7b8
+	github.com/cloudogu/k8s-registry-lib v0.3.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-logr/logr v1.4.2
 	github.com/hashicorp/go-multierror v1.1.1

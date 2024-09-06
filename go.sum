@@ -35,6 +35,10 @@ github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240904095659-19d33e7cb7b8 h1:DXk
 github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240904095659-19d33e7cb7b8/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240904125215-38d25f37caf9 h1:iBnsM5N/4RJwLjIf1nNw/TZLyibavvBaWP7AzIDmnzE=
 github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240904125215-38d25f37caf9/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
+github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240906114853-a5c3c4c9a088 h1:SHL35qUOd7vaE1VbZp0kn6aMbMwp6vRY6NcP/ufk1qM=
+github.com/cloudogu/k8s-registry-lib v0.2.2-0.20240906114853-a5c3c4c9a088/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
+github.com/cloudogu/k8s-registry-lib v0.3.1 h1:ew+/CupcQUv9HlFWme/TL9EjaxiCc/4L0gVSg9A1b1k=
+github.com/cloudogu/k8s-registry-lib v0.3.1/go.mod h1:OHIrWCAOcc4nlmBK8G+vdHHJ8vo5QQvKCKIGTiFwYBo=
 github.com/cloudwego/base64x v0.1.4 h1:jwCgWpFanWmN8xoIUHa2rtzmkd5J2plF/dnLS6Xd/0Y=
 github.com/cloudwego/base64x v0.1.4/go.mod h1:0zlkT4Wn5C6NdauXdJRhSKRlJvmclQ1hhJgA0rcu/8w=
 github.com/cloudwego/iasm v0.2.0 h1:1KNIy1I1H9hNNFEEH3DVnI4UujN+1zjpuk6gwHLTssg=
