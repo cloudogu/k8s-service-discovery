@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.15.2] - 2024-09-19
+### Changed
+- Relicense to AGPL-3.0-only
+
 ## [v0.15.1] - 2024-09-06
 ### Added
 - [#58] Use new config interface (configmaps instead of the etcd is now used) to request global configuration.
