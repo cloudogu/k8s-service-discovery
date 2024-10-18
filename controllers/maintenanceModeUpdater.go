@@ -7,7 +7,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"strings"
 
-	k8sv1 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/hashicorp/go-multierror"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -144,7 +144,7 @@ func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 
 func (mmu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) error {
 	podList := &v1.PodList{}
-	staticNginxRequirement, _ := labels.NewRequirement(k8sv1.DoguLabelName, selection.Equals, []string{"nginx-static"})
+	staticNginxRequirement, _ := labels.NewRequirement(doguv2.DoguLabelName, selection.Equals, []string{"nginx-static"})
 	err := mmu.client.List(ctx, podList, &client.ListOptions{Namespace: mmu.namespace, LabelSelector: labels.NewSelector().Add(*staticNginxRequirement)})
 	if err != nil {
 		return fmt.Errorf("failed to list [%s] pods: %w", "nginx-static", err)
@@ -247,7 +247,7 @@ func rewriteNonSimpleServiceRoute(ctx context.Context, cli k8sClient, recorder e
 		return nil
 	}
 
-	if service.Spec.Selector[k8sv1.DoguLabelName] == "" {
+	if service.Spec.Selector[doguv2.DoguLabelName] == "" {
 		return nil
 	}
 
@@ -260,10 +260,10 @@ func rewriteNonSimpleServiceRoute(ctx context.Context, cli k8sClient, recorder e
 	var serviceEventMsg string
 	if rewriteToMaintenance {
 		serviceEventMsg = "Maintenance mode was activated, rewriting exposed service %s"
-		service.Spec.Selector = map[string]string{k8sv1.DoguLabelName: exposedServiceMaintenanceSelectorKey}
+		service.Spec.Selector = map[string]string{doguv2.DoguLabelName: exposedServiceMaintenanceSelectorKey}
 	} else {
 		serviceEventMsg = "Maintenance mode was deactivated, restoring exposed service %s"
-		service.Spec.Selector = map[string]string{k8sv1.DoguLabelName: service.Labels[k8sv1.DoguLabelName]}
+		service.Spec.Selector = map[string]string{doguv2.DoguLabelName: service.Labels[doguv2.DoguLabelName]}
 	}
 	recorder.Eventf(service, v1.EventTypeNormal, maintenanceChangeEventReason, serviceEventMsg, service.Name)
 
@@ -276,5 +276,5 @@ func rewriteNonSimpleServiceRoute(ctx context.Context, cli k8sClient, recorder e
 }
 
 func isServiceNginxRelated(service *v1.Service) bool {
-	return strings.HasPrefix(service.Spec.Selector[k8sv1.DoguLabelName], "nginx-")
+	return strings.HasPrefix(service.Spec.Selector[doguv2.DoguLabelName], "nginx-")
 }
