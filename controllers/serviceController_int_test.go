@@ -7,7 +7,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	"k8s.io/api/apps/v1"
@@ -96,10 +96,10 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 		It("Should do nothing if service without annotations", func() {
 			By("Create dogu")
-			dogu := &doguv1.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
+			dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "nexus", Namespace: myNamespace}}
 			Expect(k8sApiClient.Create(context.Background(), dogu)).Should(Succeed())
 			Eventually(func() bool {
-				err := k8sApiClient.Get(ctx, types.NamespacedName{Name: "nexus", Namespace: myNamespace}, &doguv1.Dogu{})
+				err := k8sApiClient.Get(ctx, types.NamespacedName{Name: "nexus", Namespace: myNamespace}, &doguv2.Dogu{})
 				return err == nil
 			}, timeoutInterval, pollingInterval).Should(BeTrue())
 

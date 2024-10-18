@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"context"
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ func getScheme() *runtime.Scheme {
 		Group:   "k8s.cloudogu.com",
 		Version: "v1",
 		Kind:    "Dogu",
-	}, &doguv1.Dogu{})
+	}, &doguv2.Dogu{})
 	return scheme
 }
 

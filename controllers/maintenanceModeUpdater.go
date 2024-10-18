@@ -7,7 +7,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"strings"
 
-	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	k8sv1 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/hashicorp/go-multierror"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
