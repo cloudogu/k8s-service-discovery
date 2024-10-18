@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	k8sv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,7 +80,7 @@ func (r *deploymentReconciler) getDeployment(ctx context.Context, req ctrl.Reque
 
 func hasDoguLabel(deployment client.Object) bool {
 	for label := range deployment.GetLabels() {
-		if label == legacyDoguLabel || label == k8sv1.DoguLabelName {
+		if label == legacyDoguLabel || label == doguv2.DoguLabelName {
 			return true
 		}
 	}

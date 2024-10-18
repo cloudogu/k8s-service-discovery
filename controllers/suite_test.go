@@ -6,7 +6,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/stretchr/testify/mock"
@@ -63,12 +63,12 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	testScheme := scheme.Scheme
-	err := doguv1.AddToScheme(testScheme)
+	err := doguv2.AddToScheme(testScheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "vendor", "github.com", "cloudogu", "k8s-dogu-operator", "api", "v1")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "vendor", "github.com", "cloudogu", "k8s-dogu-operator", "v2", "api", "v2")},
 		ErrorIfCRDPathMissing: true,
 		Scheme:                testScheme,
 	}

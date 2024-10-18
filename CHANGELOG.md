@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.0] - 2024-10-18
+### Changed
+- [#63] Use dogu v2 api
+
 ## [v0.15.2] - 2024-09-19
 ### Changed
 - Relicense to AGPL-3.0-only

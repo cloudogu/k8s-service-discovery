@@ -1,10 +1,10 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=0.15.2
+VERSION=1.0.0
 
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
-GOTAG?=1.22
-MAKEFILES_VERSION=9.1.0
+GOTAG?=1.23.2
+MAKEFILES_VERSION=9.3.1
 
 ADDITIONAL_CLEAN=dist-clean
 
