@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	doguv1 "github.com/cloudogu/k8s-dogu-operator/api/v1"
-	"github.com/cloudogu/k8s-dogu-operator/controllers/annotation"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	"github.com/cloudogu/k8s-dogu-operator/v2/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	corev1 "k8s.io/api/core/v1"
@@ -160,7 +160,7 @@ func (i *ingressUpdater) getCesServices(service *corev1.Service) ([]CesService, 
 
 func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
 	namespacedName := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
-	dogu := &doguv1.Dogu{}
+	dogu := &doguv2.Dogu{}
 	err := i.client.Get(ctx, namespacedName, dogu)
 	if err != nil {
 		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
@@ -190,8 +190,8 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 	return err
 }
 
-func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv1.IngressAnnotations, error) {
-	annotations := doguv1.IngressAnnotations(nil)
+func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv2.IngressAnnotations, error) {
+	annotations := doguv2.IngressAnnotations(nil)
 	annotationsJson, exists := doguService.Annotations[annotation.AdditionalIngressAnnotationsAnnotation]
 	if exists {
 		err := json.Unmarshal([]byte(annotationsJson), &annotations)
@@ -203,7 +203,7 @@ func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv1.Ingres
 	return annotations, nil
 }
 
-func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv1.Dogu) error {
+func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv2.Dogu) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
 

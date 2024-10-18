@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 
-	"github.com/cloudogu/k8s-dogu-operator/api/v1"
+	"github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 
 	"github.com/cloudogu/k8s-service-discovery/controllers"
 	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
@@ -56,7 +56,7 @@ type k8sManager interface {
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
+	utilruntime.Must(v2.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	if err := logging.ConfigureLogger(); err != nil {
