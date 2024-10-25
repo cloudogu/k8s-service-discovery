@@ -44,7 +44,8 @@ helm-values-update-image-version: $(BINARY_YQ)
 helm-values-replace-image-repo: $(BINARY_YQ)
 	@if [[ ${STAGE} != "production" ]]; then \
       		echo "Setting dev image repo in target values.yaml!" ;\
-    		$(BINARY_YQ) -i e ".manager.image.repository=\"${IMAGE_DEV}\"" "${K8S_COMPONENT_TARGET_VALUES}" ;\
+    		$(BINARY_YQ) -i e ".manager.image.registry=\"$(shell echo '${IMAGE_DEV}' | sed 's/\([^\/]*\)\/\(.*\)/\1/')\"" ${K8S_COMPONENT_TARGET_VALUES} ;\
+    		$(BINARY_YQ) -i e ".manager.image.repository=\"$(shell echo '${IMAGE_DEV}' | sed 's/\([^\/]*\)\/\(.*\)/\2/')\"" ${K8S_COMPONENT_TARGET_VALUES} ;\
     	fi
 
 .PHONY: template-stage
