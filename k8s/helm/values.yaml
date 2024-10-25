@@ -1,3 +1,6 @@
+global:
+  imagePullSecrets:
+    - name: "ces-container-registries"
 cesWarpConfig:
   warp: |
     sources:
