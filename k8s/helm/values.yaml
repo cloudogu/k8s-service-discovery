@@ -1,3 +1,6 @@
+global:
+  imagePullSecrets:
+    - name: "ces-container-registries"
 cesWarpConfig:
   warp: |
     sources:
@@ -21,7 +24,8 @@ cesWarpConfig:
         href: https://platform.cloudogu.com
 kubeRbacProxy:
   image:
-    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    registry: gcr.io
+    repository: kubebuilder/kube-rbac-proxy
     tag: v0.14.1
   resources:
     limits:
@@ -32,8 +36,9 @@ kubeRbacProxy:
       memory: 64Mi
 manager:
   image:
+    registry: docker.io
     repository: cloudogu/k8s-service-discovery
-    tag: 1.0.0
+    tag: 1.1.0
   env:
     logLevel: info
     stage: production
