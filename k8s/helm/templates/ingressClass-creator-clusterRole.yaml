@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-ingressClass-creator-role
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - ingressclasses
+    resourceNames:
+      - "k8s-ecosystem-ces-service"
+    verbs:
+      - get
+      - create
