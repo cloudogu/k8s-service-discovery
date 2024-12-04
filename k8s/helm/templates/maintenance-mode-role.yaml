@@ -27,18 +27,24 @@ rules:
     resources:
       - dogus
     verbs:
+      - list
       - get
+      - watch
   - apiGroups:
       - apps
     resources:
       - deployments
     verbs:
+      - list
       - get
+      - watch
   - apiGroups:
-      - ""
+      - networking.k8s.io
     resources:
       - ingresses
     verbs:
+      - list
+      - watch
       - create
       - update
   - apiGroups:
@@ -47,4 +53,6 @@ rules:
       - pods
     verbs:
       - list
+      - get
+      - watch
       - delete
