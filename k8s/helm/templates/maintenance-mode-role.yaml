@@ -1,0 +1,61 @@
+# Role Definition: maintenance-mode role is responsible for enabling / disabling the maintenance mode by updating
+# ingresses and services. It needs to restart the nginx-static pod to take the changes effect by deleting the pod.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-maintenance-mode-role
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - "global-config"
+    verbs:
+      - list
+      - get
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - list
+      - update
+  - apiGroups:
+      - k8s.cloudogu.com
+    resources:
+      - dogus
+    verbs:
+      - list
+      - get
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - list
+      - get
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - list
+      - watch
+      - create
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - list
+      - get
+      - watch
+      - delete
