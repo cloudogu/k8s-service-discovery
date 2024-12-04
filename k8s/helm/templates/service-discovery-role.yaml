@@ -10,23 +10,31 @@ rules:
     resources:
       - services
     verbs:
+      - list
       - get
+      - watch
   - apiGroups:
       - k8s.cloudogu.com
     resources:
       - dogus
     verbs:
+      - list
       - get
+      - watch
   - apiGroups:
       - apps
     resources:
       - deployments
     verbs:
+      - list
       - get
+      - watch
   - apiGroups:
-      - ""
+      - networking.k8s.io
     resources:
       - ingresses
     verbs:
+      - list
+      - watch
       - create
       - update
