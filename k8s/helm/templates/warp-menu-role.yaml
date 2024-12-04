@@ -1,3 +1,5 @@
+# Role Definition: warp menu role is responsible for updating the warp menu
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

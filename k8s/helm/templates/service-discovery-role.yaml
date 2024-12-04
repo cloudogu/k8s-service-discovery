@@ -1,3 +1,6 @@
+# Role Definition: service discovery role is responsible for creating / updating ingresses for dogus
+# that can be accessed externally.
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

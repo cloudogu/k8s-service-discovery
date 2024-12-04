@@ -1,3 +1,5 @@
+# Role Definition: ingressClass creator is responsible for creating the ingressClass for the ingress-controller
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
