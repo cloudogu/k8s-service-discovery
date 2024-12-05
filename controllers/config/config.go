@@ -6,16 +6,25 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"os"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
 
 const (
-	warpConfigMap = "k8s-ces-warp-config"
-	MenuConfigMap = "k8s-ces-menu-json"
-	EnvVarStage   = "STAGE"
-	StageLocal    = "local"
-	DevConfigPath = "k8s/dev-resources/k8s-ces-warp-config.yaml"
+	warpConfigMap           = "k8s-ces-warp-config"
+	MenuConfigMap           = "k8s-ces-menu-json"
+	EnvVarStage             = "STAGE"
+	StageLocal              = "local"
+	DevConfigPath           = "k8s/dev-resources/k8s-ces-warp-config.yaml"
+	envVarIngressController = "INGRESS_CONTROLLER"
+	// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
+	// namespace that should be watched by the service discovery.
+	namespaceEnvVar = "WATCH_NAMESPACE"
+)
+
+var (
+	logger = ctrl.Log.WithName("k8s-service-discovery.config")
 )
 
 // Order can be used to modify ordering via configuration
@@ -90,4 +99,19 @@ func readWarpConfigFromCluster(ctx context.Context, client client.Client, namesp
 	}
 
 	return conf, nil
+}
+
+func ReadIngressController() string {
+	envIngressController := os.Getenv(envVarIngressController)
+	return envIngressController
+}
+
+func ReadWatchNamespace() (string, error) {
+	watchNamespace, found := os.LookupEnv(namespaceEnvVar)
+	if !found {
+		return "", fmt.Errorf("failed to read namespace to watch from environment variable [%s], please set the variable and try again", namespaceEnvVar)
+	}
+	logger.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
+
+	return watchNamespace, nil
 }

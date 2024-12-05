@@ -3,8 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/controllers/expose"
+	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -40,15 +44,11 @@ const (
 
 var (
 	scheme               = runtime.NewScheme()
-	logger               = ctrl.Log.WithName("k8s-service-discovery")
+	logger               = ctrl.Log.WithName("k8s-service-discovery.main")
 	metricsAddr          string
 	enableLeaderElection bool
 	probeAddr            string
 )
-
-// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
-// namespace that should be watched by the service discovery.
-const namespaceEnvVar = "WATCH_NAMESPACE"
 
 type k8sManager interface {
 	manager.Manager
@@ -75,28 +75,32 @@ func main() {
 func startManager() error {
 	logger.Info("Starting k8s-service-discovery...")
 
-	watchNamespace, err := readWatchNamespace()
+	watchNamespace, err := config.ReadWatchNamespace()
 
 	options := getK8sManagerOptions(watchNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to get manager options: %w", err)
 	}
 
-	k8sManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	serviceDiscManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
 
-	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
+	eventRecorder := serviceDiscManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	if err = handleIngressClassCreation(k8sManager, watchNamespace, eventRecorder); err != nil {
-		return fmt.Errorf("failed to create ingress class creator: %w", err)
-	}
+	ingressControllerStr := config.ReadIngressController()
+	controller := ingressController.ParseIngressController(ingressControllerStr)
 
-	clientset, err := getK8sClientSet(k8sManager.GetConfig())
+	clientset, err := getK8sClientSet(serviceDiscManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client set: %w", err)
 	}
+
+	if err = handleIngressClassCreation(serviceDiscManager, clientset, watchNamespace, eventRecorder, controller); err != nil {
+		return fmt.Errorf("failed to create ingress class creator: %w", err)
+	}
+
 	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
 	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
 	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
@@ -104,32 +108,34 @@ func startManager() error {
 
 	provideSSLAPI(globalConfigRepo)
 
-	if err = handleWarpMenuCreation(k8sManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, globalConfigRepo); err != nil {
+	if err = handleWarpMenuCreation(serviceDiscManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, globalConfigRepo); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err = handleSslUpdates(k8sManager, watchNamespace, globalConfigRepo, eventRecorder); err != nil {
+	if err = handleSslUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
 	}
 
-	if err = handleSelfsignedCertificateUpdates(k8sManager, watchNamespace, globalConfigRepo, eventRecorder); err != nil {
+	if err = handleSelfsignedCertificateUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, eventRecorder); err != nil {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
-	ingressUpdater, err := controllers.NewIngressUpdater(k8sManager.GetClient(), globalConfigRepo, watchNamespace, IngressClassName, eventRecorder)
+	ecoSystemClientSet, err := ecoSystem.NewForConfig(serviceDiscManager.GetConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create new ingress updater: %w", err)
+		return fmt.Errorf("failed to create ecosystem client set: %w", err)
 	}
 
-	if err = handleMaintenanceMode(k8sManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
+	ingressUpdater := expose.NewIngressUpdater(clientset, ecoSystemClientSet.Dogus(watchNamespace), globalConfigRepo, watchNamespace, IngressClassName, eventRecorder, controller)
+
+	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
 		return err
 	}
 
-	if err = configureManager(k8sManager, ingressUpdater); err != nil {
+	if err = configureManager(serviceDiscManager, ingressUpdater); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
-	if err = startK8sManager(k8sManager); err != nil {
+	if err = startK8sManager(serviceDiscManager); err != nil {
 		return fmt.Errorf("failure at service discovery manager: %w", err)
 	}
 
@@ -143,16 +149,6 @@ func getK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	}
 
 	return k8sClientSet, nil
-}
-
-func readWatchNamespace() (string, error) {
-	watchNamespace, found := os.LookupEnv(namespaceEnvVar)
-	if !found {
-		return "", fmt.Errorf("failed to read namespace to watch from environment variable [%s], please set the variable and try again", namespaceEnvVar)
-	}
-	logger.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
-
-	return watchNamespace, nil
 }
 
 func provideSSLAPI(globalConfigRepo controllers.GlobalConfigRepository) {
@@ -211,8 +207,8 @@ func startK8sManager(k8sManager k8sManager) error {
 	return nil
 }
 
-func handleIngressClassCreation(k8sManager k8sManager, namespace string, recorder record.EventRecorder) error {
-	ingressClassCreator := controllers.NewIngressClassCreator(k8sManager.GetClient(), IngressClassName, namespace, recorder)
+func handleIngressClassCreation(k8sManager k8sManager, clientSet *kubernetes.Clientset, namespace string, recorder record.EventRecorder, controller ingressController.IngressController) error {
+	ingressClassCreator := expose.NewIngressClassCreator(clientSet, IngressClassName, namespace, recorder, controller)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
 		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)

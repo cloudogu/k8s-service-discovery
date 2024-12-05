@@ -53,6 +53,8 @@ spec:
               fieldPath: metadata.namespace
         - name: LOG_LEVEL
           value: {{ .Values.manager.env.logLevel | default "info" }}
+        - name: INGRESS_CONTROLLER
+          value: {{ .Values.ingress.controller | default "nginx-ingress" }}
         - name: STAGE
           value: {{ .Values.manager.env.stage | default "production" }}
         image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"

@@ -3,15 +3,13 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const legacyDoguLabel = "dogu"
 
 // deploymentReconciler watches every Deployment object in the cluster and creates ingress objects when the ready state
 // of a dogu changes between ready <-> not ready.
@@ -42,7 +40,7 @@ func (r *deploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if !hasDoguLabel(deployment) {
+	if !util.HasDoguLabel(deployment) {
 		// ignore non dogu deployments
 		return ctrl.Result{}, nil
 	}
@@ -76,16 +74,6 @@ func (r *deploymentReconciler) getDeployment(ctx context.Context, req ctrl.Reque
 	}
 
 	return deployment, nil
-}
-
-func hasDoguLabel(deployment client.Object) bool {
-	for label := range deployment.GetLabels() {
-		if label == legacyDoguLabel || label == doguv2.DoguLabelName {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (r *deploymentReconciler) getService(ctx context.Context, req ctrl.Request) (*corev1.Service, error) {

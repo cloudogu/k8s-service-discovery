@@ -11,9 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// CesServiceAnnotation can be appended to service with information of ces services.
-const CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
-
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
 	updater IngressUpdater
