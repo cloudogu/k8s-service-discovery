@@ -5,8 +5,10 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -25,12 +27,6 @@ type GlobalConfigRepository interface {
 	Get(context.Context) (libconfig.GlobalConfig, error)
 	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
 	Update(ctx context.Context, globalConfig libconfig.GlobalConfig) (libconfig.GlobalConfig, error)
-}
-
-type ingressController interface {
-	GetControllerSpec() string
-	GetRewriteAnnotationKey() string
-	GetAdditionalConfigurationKey() string
 }
 
 // used for mocks
@@ -73,4 +69,26 @@ type netInterface interface {
 
 type doguInterface interface {
 	ecoSystem.DoguInterface
+}
+
+type serviceInterface interface {
+	corev1.ServiceInterface
+}
+
+type ingressController interface {
+	GetName() string
+	GetControllerSpec() string
+	GetRewriteAnnotationKey() string
+	GetAdditionalConfigurationKey() string
+	tcpUpdServiceExposer
+}
+
+// tcpUpdServiceExposer is used to expose non http services.
+type tcpUpdServiceExposer interface {
+	// ExposeOrUpdateExposedPorts adds or updates the exposing of the exposed ports from the service in the cluster. These are typically
+	// entries in a configmap.
+	ExposeOrUpdateExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error
+	// DeleteExposedPorts removes the exposing of the exposed ports from the service in the cluster. These are typically
+	// entries in a configmap.
+	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error
 }

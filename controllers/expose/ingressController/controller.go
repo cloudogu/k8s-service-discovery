@@ -11,12 +11,12 @@ const (
 	NginxIngressController   = "nginx-ingress"
 )
 
-func ParseIngressController(controller string) IngressController {
+func ParseIngressController(controller string, configMapInterface configMapInterface) IngressController {
 	switch controller {
 	case NginxIngressController:
-		return nginx.NewController()
+		return nginx.NewNginxController(configMapInterface)
 	default:
 		ctrl.Log.WithName("k8s-service-discovery.ParseIngressController").Error(fmt.Errorf("could not parse ingress controller %q. using default: %q", controller, DefaultIngressController), "unknown ingress controller")
-		return nginx.NewController()
+		return nginx.NewNginxController(configMapInterface)
 	}
 }
