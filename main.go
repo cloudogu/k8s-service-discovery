@@ -89,19 +89,18 @@ func startManager() error {
 
 	eventRecorder := serviceDiscManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	ingressControllerStr := config.ReadIngressController()
-	controller := ingressController.ParseIngressController(ingressControllerStr)
-
 	clientset, err := getK8sClientSet(serviceDiscManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client set: %w", err)
 	}
+	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
+	ingressControllerStr := config.ReadIngressController()
+	controller := ingressController.ParseIngressController(ingressControllerStr, configMapInterface)
 
 	if err = handleIngressClassCreation(serviceDiscManager, clientset, watchNamespace, eventRecorder, controller); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
 	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
 	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
 	globalConfigRepo := repository.NewGlobalConfigRepository(configMapInterface)
@@ -131,7 +130,10 @@ func startManager() error {
 		return err
 	}
 
-	if err = configureManager(serviceDiscManager, ingressUpdater); err != nil {
+	serviceInterface := clientset.CoreV1().Services(watchNamespace)
+	exposedPortUpdater := expose.NewExposedPortHandler(serviceInterface, controller, watchNamespace)
+
+	if err = configureManager(serviceDiscManager, ingressUpdater, exposedPortUpdater); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
@@ -161,8 +163,8 @@ func provideSSLAPI(globalConfigRepo controllers.GlobalConfigRepository) {
 	}()
 }
 
-func configureManager(k8sManager k8sManager, updater controllers.IngressUpdater) error {
-	if err := configureReconciler(k8sManager, updater); err != nil {
+func configureManager(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater) error {
+	if err := configureReconciler(k8sManager, ingressUpdater, exposedPortUpdater); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
@@ -260,8 +262,8 @@ func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater cont
 	return nil
 }
 
-func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater) error {
-	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater)
+func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater) error {
+	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, exposedPortUpdater)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
 	}

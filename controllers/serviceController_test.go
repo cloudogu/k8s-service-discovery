@@ -20,6 +20,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		// given
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
 		ingressUpdaterMock := NewMockIngressUpdater(t)
+		exposedPortUpdateMock := NewMockExposedPortUpdater(t)
 
 		// mock logger to catch log messages
 		mockLogSink := NewMockLogSink(t)
@@ -31,7 +32,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		// inject logger into context this way because the context search key is private to the logging framework
 		valuedTestCtx := log.IntoContext(testCtx, logger)
 
-		sut := NewServiceReconciler(clientMock, ingressUpdaterMock)
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock)
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
 		// when
@@ -51,8 +52,9 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()
 		ingressUpdaterMock := NewMockIngressUpdater(t)
 		ingressUpdaterMock.EXPECT().UpsertIngressForService(testCtx, service).Return(assert.AnError)
+		exposedPortUpdateMock := NewMockExposedPortUpdater(t)
 
-		sut := NewServiceReconciler(clientMock, ingressUpdaterMock)
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock)
 
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
@@ -62,5 +64,29 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to create/update ingress object of service [my-service]: assert.AnError general error for testing")
+	})
+
+	t.Run("failed to update exposed ports", func(t *testing.T) {
+		// given
+		service := &corev1.Service{
+			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: testNamespace},
+		}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()
+		ingressUpdaterMock := NewMockIngressUpdater(t)
+		ingressUpdaterMock.EXPECT().UpsertIngressForService(testCtx, service).Return(nil)
+		exposedPortUpdateMock := NewMockExposedPortUpdater(t)
+		exposedPortUpdateMock.EXPECT().UpsertCesLoadbalancerService(testCtx, service).Return(assert.AnError)
+
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock)
+
+		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
+
+		// when
+		_, err := sut.Reconcile(testCtx, request)
+
+		// then
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to create/update exposed ports for service [my-service]: assert.AnError general error for testing")
 	})
 }

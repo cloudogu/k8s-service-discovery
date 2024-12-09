@@ -13,22 +13,18 @@ import (
 
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
-	updater IngressUpdater
-	client  client.Client
+	ingressUpdater     IngressUpdater
+	exposedPortUpdater ExposedPortUpdater
+	client             client.Client
 }
 
 // NewServiceReconciler creates a new service reconciler.
-func NewServiceReconciler(client client.Client, updater IngressUpdater) *serviceReconciler {
+func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, exposedPortUpdater ExposedPortUpdater) *serviceReconciler {
 	return &serviceReconciler{
-		client:  client,
-		updater: updater,
+		client:             client,
+		ingressUpdater:     ingressUpdater,
+		exposedPortUpdater: exposedPortUpdater,
 	}
-}
-
-// IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
-type IngressUpdater interface {
-	// UpsertIngressForService creates or updates the ingress object of the given service.
-	UpsertIngressForService(ctx context.Context, service *corev1.Service) error
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -47,9 +43,14 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logger.Info(fmt.Sprintf("Found service [%s]", service.Name))
 
-	err = r.updater.UpsertIngressForService(ctx, service)
+	err = r.ingressUpdater.UpsertIngressForService(ctx, service)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %s", service.Name, err)
+		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", service.Name, err)
+	}
+
+	err = r.exposedPortUpdater.UpsertCesLoadbalancerService(ctx, service)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create/update exposed ports for service [%s]: %w", service.Name, err)
 	}
 
 	return ctrl.Result{}, nil
