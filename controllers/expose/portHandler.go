@@ -6,6 +6,7 @@ import (
 	"fmt"
 	k8sv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,9 +40,9 @@ func NewExposedPortHandler(serviceInterface serviceInterface, ingressController 
 // If the dogu has no exposed ports, this method returns an empty service object and nil.
 func (deph *exposedPortHandler) UpsertCesLoadbalancerService(ctx context.Context, service *corev1.Service) error {
 	logger := log.FromContext(ctx)
-	cesServiceExposedPorts, err := parseExposedPortsFromService(service)
-	if err != nil {
-		return err
+	cesServiceExposedPorts, parseErr := parseExposedPortsFromService(service)
+	if parseErr != nil {
+		return parseErr
 	}
 	targetServiceName := service.Name
 
@@ -50,14 +51,23 @@ func (deph *exposedPortHandler) UpsertCesLoadbalancerService(ctx context.Context
 		return nil
 	}
 
-	lbService, err := deph.getCesLoadBalancerService(ctx)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get loadbalancer service %s: %w", cesLoadbalancerName, err)
-	} else if err != nil && apierrors.IsNotFound(err) {
-		logger.Info(fmt.Sprintf("Loadbalancer service %s does not exist. Create a new one...", cesLoadbalancerName))
-		_, createErr := deph.createCesLoadbalancerService(ctx, targetServiceName, cesServiceExposedPorts)
-		if createErr != nil {
-			return fmt.Errorf("failed to create %s loadbalancer service: %w", cesLoadbalancerName, createErr)
+	retryErr := retry.OnConflict(func() error {
+		lbService, err := deph.getCesLoadBalancerService(ctx)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return errorGetLoadBalancerService(err)
+		} else if err != nil && apierrors.IsNotFound(err) {
+			logger.Info(fmt.Sprintf("Loadbalancer service %s does not exist. Create a new one...", cesLoadbalancerName))
+			_, createErr := deph.createCesLoadbalancerService(ctx, targetServiceName, cesServiceExposedPorts)
+			if createErr != nil {
+				return fmt.Errorf("failed to create %s loadbalancer service: %w", cesLoadbalancerName, createErr)
+			}
+
+			err = deph.ingressController.ExposeOrUpdateExposedPorts(ctx, deph.namespace, targetServiceName, cesServiceExposedPorts)
+			if err != nil {
+				return fmt.Errorf("failed to expose ces-services %q: %w", cesServiceExposedPorts, err)
+			}
+
+			return nil
 		}
 
 		err = deph.ingressController.ExposeOrUpdateExposedPorts(ctx, deph.namespace, targetServiceName, cesServiceExposedPorts)
@@ -65,24 +75,30 @@ func (deph *exposedPortHandler) UpsertCesLoadbalancerService(ctx context.Context
 			return fmt.Errorf("failed to expose ces-services %q: %w", cesServiceExposedPorts, err)
 		}
 
+		lbService, changed := updateCesLoadbalancerService(targetServiceName, lbService, cesServiceExposedPorts)
+		if !changed {
+			logger.Info(fmt.Sprintf("no loadbalancer service %s update required for service %s...", cesLoadbalancerName, targetServiceName))
+			return nil
+		}
+
+		logger.Info(fmt.Sprintf("Update loadbalancer service %s...", cesLoadbalancerName))
+		err = deph.updateService(ctx, lbService)
+		if err != nil {
+			return fmt.Errorf("failed to update loadbalancer service %s: %w", cesLoadbalancerName, err)
+		}
+
 		return nil
-	}
+	})
 
-	logger.Info(fmt.Sprintf("Update loadbalancer service %s...", cesLoadbalancerName))
-	lbService = updateCesLoadbalancerService(targetServiceName, lbService, cesServiceExposedPorts)
-
-	err = deph.ingressController.ExposeOrUpdateExposedPorts(ctx, deph.namespace, targetServiceName, cesServiceExposedPorts)
-	if err != nil {
-		return fmt.Errorf("failed to expose ces-services %q: %w", cesServiceExposedPorts, err)
-	}
-
-	// TODO retry
-	err = deph.updateService(ctx, lbService)
-	if err != nil {
-		return fmt.Errorf("failed to update loadbalancer service %s: %w", cesLoadbalancerName, err)
+	if retryErr != nil {
+		return fmt.Errorf("failed to upsert loadbalancer service %s: %w", cesLoadbalancerName, retryErr)
 	}
 
 	return nil
+}
+
+func errorGetLoadBalancerService(err error) error {
+	return fmt.Errorf("failed to get loadbalancer service %s: %w", cesLoadbalancerName, err)
 }
 
 func parseExposedPortsFromService(service *corev1.Service) (util.ExposedPorts, error) {
@@ -155,7 +171,7 @@ func getServicePortFromExposedPort(targetServiceName string, exposedPort util.Ex
 		Name:       fmt.Sprintf("%s%d", getTargetServicePortNamePrefix(targetServiceName), exposedPort.Port),
 		Protocol:   exposedPort.Protocol,
 		Port:       int32(exposedPort.Port),
-		TargetPort: intstr.FromInt(exposedPort.TargetPort),
+		TargetPort: intstr.FromInt32(int32(exposedPort.TargetPort)),
 	}
 }
 
@@ -163,19 +179,26 @@ func getTargetServicePortNamePrefix(targetServiceName string) string {
 	return fmt.Sprintf("%s-", targetServiceName)
 }
 
-func updateCesLoadbalancerService(targetServiceName string, lbService *corev1.Service, exposedPorts util.ExposedPorts) *corev1.Service {
-	lbService.Spec.Ports = filterTargetServicePorts(targetServiceName, lbService)
+func updateCesLoadbalancerService(targetServiceName string, lbService *corev1.Service, exposedPorts util.ExposedPorts) (*corev1.Service, bool) {
+	var found bool
+	lbService.Spec.Ports, found = filterTargetServicePorts(targetServiceName, lbService)
+
+	if !found && len(exposedPorts) == 0 {
+		return lbService, false
+	}
 
 	for _, port := range exposedPorts {
 		lbService.Spec.Ports = append(lbService.Spec.Ports, getServicePortFromExposedPort(targetServiceName, port))
 	}
 
-	return lbService
+	return lbService, true
 }
 
-// filterTargetServicePorts returns all ports from the service filtered by the service name prefix
-func filterTargetServicePorts(targetServiceName string, lbService *corev1.Service) []corev1.ServicePort {
+// filterTargetServicePorts returns all ports from the service filtered by the service name prefix.
+// If the service has no ports in the service it additionally returns false. Otherwise, true.
+func filterTargetServicePorts(targetServiceName string, lbService *corev1.Service) ([]corev1.ServicePort, bool) {
 	var servicePorts []corev1.ServicePort
+	found := false
 
 	for _, servicePort := range lbService.Spec.Ports {
 		servicePortName := servicePort.Name
@@ -183,10 +206,12 @@ func filterTargetServicePorts(targetServiceName string, lbService *corev1.Servic
 		f := strings.HasPrefix(servicePortName, servicePrefix)
 		if !f {
 			servicePorts = append(servicePorts, servicePort)
+		} else {
+			found = true
 		}
 	}
 
-	return servicePorts
+	return servicePorts, found
 }
 
 func (deph *exposedPortHandler) updateService(ctx context.Context, exposedService *corev1.Service) error {
@@ -200,47 +225,39 @@ func (deph *exposedPortHandler) updateService(ctx context.Context, exposedServic
 // RemoveExposedPorts removes given dogu exposed ports from the loadbalancer service.
 // If these ports are the only ones, the service will be deleted.
 // If the dogu has no exposed ports, the method returns nil.
-func (deph *exposedPortHandler) RemoveExposedPorts(ctx context.Context, service *corev1.Service) error {
+func (deph *exposedPortHandler) RemoveExposedPorts(ctx context.Context, serviceName string) error {
 	logger := log.FromContext(ctx)
 
-	cesServiceExposedPorts, err := parseExposedPortsFromService(service)
-	if err != nil {
-		return err
-	}
-	targetServiceName := service.Name
-
-	if len(cesServiceExposedPorts) == 0 {
-		logger.Info(fmt.Sprintf("Skipping deletion from loadbalancer service because the target service %s has no exposed ports...", targetServiceName))
-		return nil
-	}
-
 	logger.Info("Delete exposed tcp and upd ports...")
-	err = deph.ingressController.DeleteExposedPorts(ctx, deph.namespace, targetServiceName, cesServiceExposedPorts)
+	err := deph.ingressController.DeleteExposedPorts(ctx, deph.namespace, serviceName)
 	if err != nil {
 		return fmt.Errorf("failed to delete entries from expose configmap: %w", err)
 	}
 
-	exposedService, err := deph.getCesLoadBalancerService(ctx)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get service %s: %w", cesLoadbalancerName, err)
-		} else {
+	retryErr := retry.OnConflict(func() error {
+		exposedService, err := deph.getCesLoadBalancerService(ctx)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to get service %s: %w", cesLoadbalancerName, err)
+			} else {
+				return nil
+			}
+		}
+
+		ports, found := filterTargetServicePorts(serviceName, exposedService)
+		if !found {
+			logger.Info(fmt.Sprintf("found no exposed ports for service %s in loadbalancer service %s", serviceName, cesLoadbalancerName))
 			return nil
 		}
-	}
 
-	ports := filterTargetServicePorts(targetServiceName, exposedService)
-	if len(ports) > 0 {
 		logger.Info("Update loadbalancer service...")
+		// Do not delete the loadbalancer service even it has no ports because this could result in a new ip if it gets recreated.
 		exposedService.Spec.Ports = ports
-		// TODO retry
 		return deph.updateService(ctx, exposedService)
-	}
+	})
 
-	logger.Info("Delete loadbalancer service because no ports are remaining...")
-	err = deph.serviceInterface.Delete(ctx, exposedService.Name, metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to delete service %s: %w", cesLoadbalancerName, err)
+	if retryErr != nil {
+		return fmt.Errorf("failed to remove exposed ports from loadbalancer service %s: %w", cesLoadbalancerName, retryErr)
 	}
 
 	return nil

@@ -22,17 +22,17 @@ func (_m *mockTcpUpdServiceExposer) EXPECT() *mockTcpUpdServiceExposer_Expecter 
 	return &mockTcpUpdServiceExposer_Expecter{mock: &_m.Mock}
 }
 
-// DeleteExposedPorts provides a mock function with given fields: ctx, namespace, targetServiceName, exposedPorts
-func (_m *mockTcpUpdServiceExposer) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error {
-	ret := _m.Called(ctx, namespace, targetServiceName, exposedPorts)
+// DeleteExposedPorts provides a mock function with given fields: ctx, namespace, targetServiceName
+func (_m *mockTcpUpdServiceExposer) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error {
+	ret := _m.Called(ctx, namespace, targetServiceName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteExposedPorts")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, util.ExposedPorts) error); ok {
-		r0 = rf(ctx, namespace, targetServiceName, exposedPorts)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, namespace, targetServiceName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -49,14 +49,13 @@ type mockTcpUpdServiceExposer_DeleteExposedPorts_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - targetServiceName string
-//   - exposedPorts util.ExposedPorts
-func (_e *mockTcpUpdServiceExposer_Expecter) DeleteExposedPorts(ctx interface{}, namespace interface{}, targetServiceName interface{}, exposedPorts interface{}) *mockTcpUpdServiceExposer_DeleteExposedPorts_Call {
-	return &mockTcpUpdServiceExposer_DeleteExposedPorts_Call{Call: _e.mock.On("DeleteExposedPorts", ctx, namespace, targetServiceName, exposedPorts)}
+func (_e *mockTcpUpdServiceExposer_Expecter) DeleteExposedPorts(ctx interface{}, namespace interface{}, targetServiceName interface{}) *mockTcpUpdServiceExposer_DeleteExposedPorts_Call {
+	return &mockTcpUpdServiceExposer_DeleteExposedPorts_Call{Call: _e.mock.On("DeleteExposedPorts", ctx, namespace, targetServiceName)}
 }
 
-func (_c *mockTcpUpdServiceExposer_DeleteExposedPorts_Call) Run(run func(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts)) *mockTcpUpdServiceExposer_DeleteExposedPorts_Call {
+func (_c *mockTcpUpdServiceExposer_DeleteExposedPorts_Call) Run(run func(ctx context.Context, namespace string, targetServiceName string)) *mockTcpUpdServiceExposer_DeleteExposedPorts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(util.ExposedPorts))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -66,7 +65,7 @@ func (_c *mockTcpUpdServiceExposer_DeleteExposedPorts_Call) Return(_a0 error) *m
 	return _c
 }
 
-func (_c *mockTcpUpdServiceExposer_DeleteExposedPorts_Call) RunAndReturn(run func(context.Context, string, string, util.ExposedPorts) error) *mockTcpUpdServiceExposer_DeleteExposedPorts_Call {
+func (_c *mockTcpUpdServiceExposer_DeleteExposedPorts_Call) RunAndReturn(run func(context.Context, string, string) error) *mockTcpUpdServiceExposer_DeleteExposedPorts_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -140,6 +140,7 @@ func filterServices(cm *corev1.ConfigMap, namespace string, targetServiceName st
 
 func getExposedPortsByType(exposedPorts util.ExposedPorts, protocol corev1.Protocol) util.ExposedPorts {
 	var result util.ExposedPorts
+	// TODO Test this in cluster. Reinstall nginx-ingress
 	for _, port := range exposedPorts {
 		if port.Port == portHTTP || port.Port == portHTTPS {
 			continue
@@ -156,13 +157,7 @@ func getExposedPortsByType(exposedPorts util.ExposedPorts, protocol corev1.Proto
 // DeleteExposedPorts removes all service related entries in the corresponding tcp/udp configmaps.
 // If the configmap has no entries left this method won't delete the configmap. This would lead to numerous
 // errors in the nginx log.
-func (intue *ingressNginxTcpUpdExposer) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error {
-	logger := log.FromContext(ctx)
-	if len(exposedPorts) < 1 {
-		logger.Info(fmt.Sprintf("Skipping tcp/udp port deletion because the service %q has no exposed ports...", targetServiceName))
-		return nil
-	}
-
+func (intue *ingressNginxTcpUpdExposer) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error {
 	err := intue.deletePortsForProtocol(ctx, namespace, targetServiceName, corev1.ProtocolTCP)
 	if err != nil {
 		return err
@@ -187,10 +182,17 @@ func (intue *ingressNginxTcpUpdExposer) deletePortsForProtocol(ctx context.Conte
 			return nil
 		}
 
+		changed := false
 		for key, value := range cm.Data {
 			if strings.Contains(value, getServiceEntryValuePrefix(namespace, targetServiceName)) {
+				changed = true
 				delete(cm.Data, key)
 			}
+		}
+
+		if !changed {
+			log.FromContext(ctx).Info(fmt.Sprintf("Skipping exposed port deletion because the service %q has no exposed ports for protocol %s...", targetServiceName, protocol))
+			return nil
 		}
 
 		logger := log.FromContext(ctx)

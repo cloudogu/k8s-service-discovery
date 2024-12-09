@@ -22,17 +22,17 @@ func (_m *MockExposedPortUpdater) EXPECT() *MockExposedPortUpdater_Expecter {
 	return &MockExposedPortUpdater_Expecter{mock: &_m.Mock}
 }
 
-// RemoveExposedPorts provides a mock function with given fields: ctx, service
-func (_m *MockExposedPortUpdater) RemoveExposedPorts(ctx context.Context, service *v1.Service) error {
-	ret := _m.Called(ctx, service)
+// RemoveExposedPorts provides a mock function with given fields: ctx, serviceName
+func (_m *MockExposedPortUpdater) RemoveExposedPorts(ctx context.Context, serviceName string) error {
+	ret := _m.Called(ctx, serviceName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RemoveExposedPorts")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v1.Service) error); ok {
-		r0 = rf(ctx, service)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, serviceName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -47,14 +47,14 @@ type MockExposedPortUpdater_RemoveExposedPorts_Call struct {
 
 // RemoveExposedPorts is a helper method to define mock.On call
 //   - ctx context.Context
-//   - service *v1.Service
-func (_e *MockExposedPortUpdater_Expecter) RemoveExposedPorts(ctx interface{}, service interface{}) *MockExposedPortUpdater_RemoveExposedPorts_Call {
-	return &MockExposedPortUpdater_RemoveExposedPorts_Call{Call: _e.mock.On("RemoveExposedPorts", ctx, service)}
+//   - serviceName string
+func (_e *MockExposedPortUpdater_Expecter) RemoveExposedPorts(ctx interface{}, serviceName interface{}) *MockExposedPortUpdater_RemoveExposedPorts_Call {
+	return &MockExposedPortUpdater_RemoveExposedPorts_Call{Call: _e.mock.On("RemoveExposedPorts", ctx, serviceName)}
 }
 
-func (_c *MockExposedPortUpdater_RemoveExposedPorts_Call) Run(run func(ctx context.Context, service *v1.Service)) *MockExposedPortUpdater_RemoveExposedPorts_Call {
+func (_c *MockExposedPortUpdater_RemoveExposedPorts_Call) Run(run func(ctx context.Context, serviceName string)) *MockExposedPortUpdater_RemoveExposedPorts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v1.Service))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -64,7 +64,7 @@ func (_c *MockExposedPortUpdater_RemoveExposedPorts_Call) Return(_a0 error) *Moc
 	return _c
 }
 
-func (_c *MockExposedPortUpdater_RemoveExposedPorts_Call) RunAndReturn(run func(context.Context, *v1.Service) error) *MockExposedPortUpdater_RemoveExposedPorts_Call {
+func (_c *MockExposedPortUpdater_RemoveExposedPorts_Call) RunAndReturn(run func(context.Context, string) error) *MockExposedPortUpdater_RemoveExposedPorts_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -311,10 +311,15 @@ func Test_ingressNginxTcpUpdExposer_createNginxExposeConfigMapForProtocol(t *tes
 func Test_ingressNginxTcpUpdExposer_DeleteExposedServices(t *testing.T) {
 	t.Run("should return nil if the service doesnt contain exposed ports", func(t *testing.T) {
 		// given
-		sut := &ingressNginxTcpUpdExposer{}
+		tcpCm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "tcp-services", Namespace: testNamespace}, Data: map[string]string{"1234": "ecosystem/notldap:1234"}}
+		udpCm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "udp-services", Namespace: testNamespace}, Data: map[string]string{"1234": "ecosystem/notldap:1234"}}
+		configMapInterfaceMock := newMockConfigMapInterface(t)
+		configMapInterfaceMock.EXPECT().Get(testCtx, "tcp-services", metav1.GetOptions{}).Return(tcpCm, nil)
+		configMapInterfaceMock.EXPECT().Get(testCtx, "udp-services", metav1.GetOptions{}).Return(udpCm, nil)
+		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 
 		// when
-		err := sut.DeleteExposedPorts(testCtx, testNamespace, testTargetServiceName, util.ExposedPorts{})
+		err := sut.DeleteExposedPorts(testCtx, testNamespace, testTargetServiceName)
 
 		// then
 		require.Nil(t, err)
@@ -327,7 +332,7 @@ func Test_ingressNginxTcpUpdExposer_DeleteExposedServices(t *testing.T) {
 		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 
 		// when
-		err := sut.DeleteExposedPorts(testCtx, testNamespace, testTargetServiceName, testMixedExposedPorts)
+		err := sut.DeleteExposedPorts(testCtx, testNamespace, testTargetServiceName)
 
 		// then
 		require.Error(t, err)
@@ -343,7 +348,7 @@ func Test_ingressNginxTcpUpdExposer_DeleteExposedServices(t *testing.T) {
 		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 
 		// when
-		err := sut.DeleteExposedPorts(testCtx, testNamespace, testTargetServiceName, testUDPExposedPorts)
+		err := sut.DeleteExposedPorts(testCtx, testNamespace, testTargetServiceName)
 
 		// then
 		require.Error(t, err)

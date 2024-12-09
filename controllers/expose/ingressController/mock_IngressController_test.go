@@ -22,17 +22,17 @@ func (_m *MockIngressController) EXPECT() *MockIngressController_Expecter {
 	return &MockIngressController_Expecter{mock: &_m.Mock}
 }
 
-// DeleteExposedPorts provides a mock function with given fields: ctx, namespace, targetServiceName, exposedPorts
-func (_m *MockIngressController) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error {
-	ret := _m.Called(ctx, namespace, targetServiceName, exposedPorts)
+// DeleteExposedPorts provides a mock function with given fields: ctx, namespace, targetServiceName
+func (_m *MockIngressController) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error {
+	ret := _m.Called(ctx, namespace, targetServiceName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteExposedPorts")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, util.ExposedPorts) error); ok {
-		r0 = rf(ctx, namespace, targetServiceName, exposedPorts)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, namespace, targetServiceName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -49,14 +49,13 @@ type MockIngressController_DeleteExposedPorts_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - targetServiceName string
-//   - exposedPorts util.ExposedPorts
-func (_e *MockIngressController_Expecter) DeleteExposedPorts(ctx interface{}, namespace interface{}, targetServiceName interface{}, exposedPorts interface{}) *MockIngressController_DeleteExposedPorts_Call {
-	return &MockIngressController_DeleteExposedPorts_Call{Call: _e.mock.On("DeleteExposedPorts", ctx, namespace, targetServiceName, exposedPorts)}
+func (_e *MockIngressController_Expecter) DeleteExposedPorts(ctx interface{}, namespace interface{}, targetServiceName interface{}) *MockIngressController_DeleteExposedPorts_Call {
+	return &MockIngressController_DeleteExposedPorts_Call{Call: _e.mock.On("DeleteExposedPorts", ctx, namespace, targetServiceName)}
 }
 
-func (_c *MockIngressController_DeleteExposedPorts_Call) Run(run func(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts)) *MockIngressController_DeleteExposedPorts_Call {
+func (_c *MockIngressController_DeleteExposedPorts_Call) Run(run func(ctx context.Context, namespace string, targetServiceName string)) *MockIngressController_DeleteExposedPorts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(util.ExposedPorts))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -66,7 +65,7 @@ func (_c *MockIngressController_DeleteExposedPorts_Call) Return(_a0 error) *Mock
 	return _c
 }
 
-func (_c *MockIngressController_DeleteExposedPorts_Call) RunAndReturn(run func(context.Context, string, string, util.ExposedPorts) error) *MockIngressController_DeleteExposedPorts_Call {
+func (_c *MockIngressController_DeleteExposedPorts_Call) RunAndReturn(run func(context.Context, string, string) error) *MockIngressController_DeleteExposedPorts_Call {
 	_c.Call.Return(run)
 	return _c
 }

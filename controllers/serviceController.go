@@ -3,11 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
@@ -36,9 +35,19 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := ctrl.LoggerFrom(ctx)
 
 	service, err := r.getService(ctx, req)
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		logger.Info(fmt.Sprintf("failed to get service %s: %s", req.NamespacedName, err))
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
+	}
+
+	if errors.IsNotFound(err) {
+		logger.Info(fmt.Sprintf("service %s not found", req.NamespacedName))
+		logger.Info("remove exposed ports")
+		removeErr := r.exposedPortUpdater.RemoveExposedPorts(ctx, req.Name)
+		if removeErr != nil {
+			logger.Error(err, fmt.Sprintf("failed to remove exposed ports for service %s", req.NamespacedName))
+		}
+		return ctrl.Result{}, nil
 	}
 
 	logger.Info(fmt.Sprintf("Found service [%s]", service.Name))
@@ -60,12 +69,8 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *serviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
-		WithEventFilter(predicate.Funcs{
-			DeleteFunc: func(e event.DeleteEvent) bool {
-				// We don't need to listen to delete events
-				return false
-			},
-		}).
+		// Only reconcile if the annotation changes.
+		WithEventFilter(predicate.AnnotationChangedPredicate{}).
 		Complete(r)
 }
 

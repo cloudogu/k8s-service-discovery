@@ -90,5 +90,5 @@ type tcpUpdServiceExposer interface {
 	ExposeOrUpdateExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error
 	// DeleteExposedPorts removes the exposing of the exposed ports from the service in the cluster. These are typically
 	// entries in a configmap.
-	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error
+	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
 }

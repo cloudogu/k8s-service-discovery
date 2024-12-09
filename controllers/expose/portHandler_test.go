@@ -71,7 +71,6 @@ var (
 )
 
 func Test_doguExposedPortHandler_CreateOrUpdateCesLoadbalancerService(t *testing.T) {
-
 	t.Run("should return nil if service has no exposed ports", func(t *testing.T) {
 		// given
 		sut := &exposedPortHandler{}
@@ -136,31 +135,6 @@ func Test_doguExposedPortHandler_CreateOrUpdateCesLoadbalancerService(t *testing
 		assert.ErrorContains(t, err, "failed to expose ces-services [\"{Port: 2222, TargetPort: 2222, Protocol: TCP}\"]")
 		assert.ErrorIs(t, err, assert.AnError)
 	})
-
-	/*t.Run("should create a new loadbalancer service if none is in the cluster", func(t *testing.T) {
-		// given
-		nginxIngressCR := readNginxIngressDoguResource(t)
-		nginxIngressDogu := readNginxIngressDogu(t)
-		expectedLoadBalancer := readNginxIngressOnlyExpectedLoadBalancer(t)
-		serviceExposer := newMockTcpUpdServiceExposer(t)
-		serviceExposer.EXPECT().ExposeOrUpdateDoguServices(context.TODO(), nginxIngressCR.Namespace, nginxIngressDogu).Return(nil)
-		mockClient := fake.NewClientBuilder().Build()
-		sut := &doguExposedPortHandler{client: mockClient, serviceExposer: serviceExposer}
-
-		// when
-		_, err := sut.CreateOrUpdateCesLoadbalancerService(context.TODO(), nginxIngressCR, nginxIngressDogu)
-
-		// then
-		require.NoError(t, err)
-
-		serviceFromCluster := &v1.Service{}
-		err = mockClient.Get(context.TODO(), types.NamespacedName{Name: "ces-loadbalancer", Namespace: "ecosystem"}, serviceFromCluster)
-		require.NoError(t, err)
-
-		assertServicePorts(t, expectedLoadBalancer, serviceFromCluster)
-		assert.Equal(t, v1.ServiceTypeLoadBalancer, serviceFromCluster.Spec.Type)
-		assert.Equal(t, 0, len(serviceFromCluster.ObjectMeta.OwnerReferences))
-	})*/
 
 	t.Run("should return an error on exposing tcp/udp service error if a loadbalancer is available", func(t *testing.T) {
 		// given
@@ -249,29 +223,8 @@ func Test_doguExposedPortHandler_CreateOrUpdateCesLoadbalancerService(t *testing
 	})
 }
 
-func assertServicePorts(t *testing.T, expected *v1.Service, service *v1.Service) {
-	assert.Equal(t, len(expected.Spec.Ports), len(service.Spec.Ports))
-
-	for _, servicePort := range service.Spec.Ports {
-		found := false
-		for _, expectedServicePort := range expected.Spec.Ports {
-			if areServicePortsEqual(expectedServicePort, servicePort) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fail()
-		}
-	}
-}
-
-func areServicePortsEqual(x v1.ServicePort, y v1.ServicePort) bool {
-	return x.Port == y.Port && x.Name == y.Name && x.TargetPort == y.TargetPort && x.Protocol == y.Protocol
-}
-
 func Test_doguExposedPortHandler_RemoveExposedPorts(t *testing.T) {
-	t.Run("should do nothing if the dogu has no exposed ports", func(t *testing.T) {
+	/*t.Run("should do nothing if the dogu has no exposed ports", func(t *testing.T) {
 		// given
 		sut := &exposedPortHandler{}
 
@@ -280,16 +233,16 @@ func Test_doguExposedPortHandler_RemoveExposedPorts(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-	})
+	})*/
 
 	t.Run("should return error on tcp/udp exposure error", func(t *testing.T) {
 		// given
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName, scmExposedPorts).Return(assert.AnError)
+		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName).Return(assert.AnError)
 		sut := &exposedPortHandler{ingressController: ingressControllerMock, namespace: testNamespace}
 
 		// when
-		err := sut.RemoveExposedPorts(testCtx, scmExposedService)
+		err := sut.RemoveExposedPorts(testCtx, scmServiceName)
 
 		// then
 		require.Error(t, err)
@@ -300,13 +253,13 @@ func Test_doguExposedPortHandler_RemoveExposedPorts(t *testing.T) {
 	t.Run("should do nothing if no loadbalancer service exists", func(t *testing.T) {
 		// given
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName, scmExposedPorts).Return(nil)
+		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName).Return(nil)
 		serviceInterfaceMock := newMockServiceInterface(t)
 		serviceInterfaceMock.EXPECT().Get(testCtx, "ces-loadbalancer", metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
 		sut := &exposedPortHandler{ingressController: ingressControllerMock, namespace: testNamespace, serviceInterface: serviceInterfaceMock}
 
 		// when
-		err := sut.RemoveExposedPorts(testCtx, scmExposedService)
+		err := sut.RemoveExposedPorts(testCtx, scmServiceName)
 
 		// then
 		require.NoError(t, err)
@@ -315,13 +268,13 @@ func Test_doguExposedPortHandler_RemoveExposedPorts(t *testing.T) {
 	t.Run("should return an error on service get error", func(t *testing.T) {
 		// given
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName, scmExposedPorts).Return(nil)
+		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName).Return(nil)
 		serviceInterfaceMock := newMockServiceInterface(t)
 		serviceInterfaceMock.EXPECT().Get(testCtx, "ces-loadbalancer", metav1.GetOptions{}).Return(nil, assert.AnError)
 		sut := &exposedPortHandler{ingressController: ingressControllerMock, namespace: testNamespace, serviceInterface: serviceInterfaceMock}
 
 		// when
-		err := sut.RemoveExposedPorts(testCtx, scmExposedService)
+		err := sut.RemoveExposedPorts(testCtx, scmServiceName)
 
 		// then
 		require.Error(t, err)
@@ -351,20 +304,20 @@ func Test_doguExposedPortHandler_RemoveExposedPorts(t *testing.T) {
 			}}
 
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName, scmExposedPorts).Return(nil)
+		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName).Return(nil)
 		serviceInterfaceMock := newMockServiceInterface(t)
 		serviceInterfaceMock.EXPECT().Get(testCtx, "ces-loadbalancer", metav1.GetOptions{}).Return(existingLB, nil)
 		serviceInterfaceMock.EXPECT().Update(testCtx, expectedLB, metav1.UpdateOptions{}).Return(nil, nil)
 		sut := &exposedPortHandler{ingressController: ingressControllerMock, namespace: testNamespace, serviceInterface: serviceInterfaceMock}
 
 		// when
-		err := sut.RemoveExposedPorts(testCtx, scmExposedService)
+		err := sut.RemoveExposedPorts(testCtx, scmServiceName)
 
 		// then
 		require.NoError(t, err)
 	})
 
-	t.Run("should delete the service if the dogu ports are the only ones", func(t *testing.T) {
+	t.Run("should not delete the service if the dogu ports are the only ones (avoid getting new ip)", func(t *testing.T) {
 		// given
 		existingLB := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "ces-loadbalancer", Namespace: "ecosystem"},
@@ -376,45 +329,24 @@ func Test_doguExposedPortHandler_RemoveExposedPorts(t *testing.T) {
 			},
 		}
 
-		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName, scmExposedPorts).Return(nil)
-		serviceInterfaceMock := newMockServiceInterface(t)
-		serviceInterfaceMock.EXPECT().Get(testCtx, "ces-loadbalancer", metav1.GetOptions{}).Return(existingLB, nil)
-		serviceInterfaceMock.EXPECT().Delete(testCtx, "ces-loadbalancer", metav1.DeleteOptions{}).Return(nil)
-		sut := &exposedPortHandler{ingressController: ingressControllerMock, namespace: testNamespace, serviceInterface: serviceInterfaceMock}
-
-		// when
-		err := sut.RemoveExposedPorts(testCtx, scmExposedService)
-
-		// then
-		require.NoError(t, err)
-	})
-
-	t.Run("should return an error on service deletion error", func(t *testing.T) {
-		// given
-		existingLB := &v1.Service{
+		emptyLB := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "ces-loadbalancer", Namespace: "ecosystem"},
 			Spec: v1.ServiceSpec{
 				Type: v1.ServiceTypeLoadBalancer,
-				Ports: []v1.ServicePort{
-					{Name: "scm-2222", Port: 2222, TargetPort: intstr.IntOrString{IntVal: 2222}, Protocol: v1.ProtocolTCP},
-				},
 			},
 		}
 
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName, scmExposedPorts).Return(nil)
+		ingressControllerMock.EXPECT().DeleteExposedPorts(testCtx, testNamespace, scmServiceName).Return(nil)
 		serviceInterfaceMock := newMockServiceInterface(t)
 		serviceInterfaceMock.EXPECT().Get(testCtx, "ces-loadbalancer", metav1.GetOptions{}).Return(existingLB, nil)
-		serviceInterfaceMock.EXPECT().Delete(testCtx, "ces-loadbalancer", metav1.DeleteOptions{}).Return(assert.AnError)
+		serviceInterfaceMock.EXPECT().Update(testCtx, emptyLB, metav1.UpdateOptions{}).Return(nil, nil)
 		sut := &exposedPortHandler{ingressController: ingressControllerMock, namespace: testNamespace, serviceInterface: serviceInterfaceMock}
 
 		// when
-		err := sut.RemoveExposedPorts(testCtx, scmExposedService)
+		err := sut.RemoveExposedPorts(testCtx, scmServiceName)
 
 		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "failed to delete service ces-loadbalancer")
-		assert.ErrorIs(t, err, assert.AnError)
+		require.NoError(t, err)
 	})
 }

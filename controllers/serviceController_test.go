@@ -28,9 +28,11 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		logger = logger.WithSink(mockLogSink) // overwrite original logger with the given LogSink
 		mockLogSink.EXPECT().WithValues().Return(mockLogSink)
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
-		mockLogSink.EXPECT().Info(0, `failed to get service my-namespace/my-service: failed to get service: services "my-service" not found`)
+		mockLogSink.EXPECT().Info(0, `service my-namespace/my-service not found`)
+		mockLogSink.EXPECT().Info(0, `remove exposed ports`)
 		// inject logger into context this way because the context search key is private to the logging framework
 		valuedTestCtx := log.IntoContext(testCtx, logger)
+		exposedPortUpdateMock.EXPECT().RemoveExposedPorts(valuedTestCtx, "my-service").Return(nil)
 
 		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock)
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
