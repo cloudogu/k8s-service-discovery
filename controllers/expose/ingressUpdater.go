@@ -8,8 +8,10 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -294,11 +296,28 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 		},
 	}
 
-	// TODO We do not have to check for conflict errors because the resource has no resource version and will be fully replaced.
-	_, err := i.ingressInterface.Update(ctx, ingress, v1.UpdateOptions{})
+	err := retry.OnConflict(func() error {
+		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
+
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+
+		if errors.IsNotFound(err) {
+			_, createErr := i.ingressInterface.Create(ctx, ingress, v1.CreateOptions{})
+			return createErr
+		}
+
+		_, err = i.ingressInterface.Update(ctx, ingress, v1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 
 	if err != nil {
-		return fmt.Errorf("failed to update ingress object: %w", err)
+		return fmt.Errorf("failed to upsert ingress %s: %w", ingress.Name, err)
 	}
 
 	return nil
