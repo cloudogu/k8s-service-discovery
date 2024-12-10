@@ -169,7 +169,7 @@ func (deph *exposedPortHandler) createCesLoadbalancerService(ctx context.Context
 func getServicePortFromExposedPort(targetServiceName string, exposedPort util.ExposedPort) corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:       fmt.Sprintf("%s%d", getTargetServicePortNamePrefix(targetServiceName), exposedPort.Port),
-		Protocol:   exposedPort.Protocol,
+		Protocol:   corev1.Protocol(strings.ToUpper(string(exposedPort.Protocol))),
 		Port:       int32(exposedPort.Port),
 		TargetPort: intstr.FromInt32(int32(exposedPort.TargetPort)),
 	}
