@@ -140,13 +140,12 @@ func filterServices(cm *corev1.ConfigMap, namespace string, targetServiceName st
 
 func getExposedPortsByType(exposedPorts util.ExposedPorts, protocol corev1.Protocol) util.ExposedPorts {
 	var result util.ExposedPorts
-	// TODO Test this in cluster. Reinstall nginx-ingress
 	for _, port := range exposedPorts {
 		if port.Port == portHTTP || port.Port == portHTTPS {
 			continue
 		}
 
-		if port.Protocol == protocol {
+		if strings.ToUpper(string(port.Protocol)) == strings.ToUpper(string(protocol)) {
 			result = append(result, port)
 		}
 	}
