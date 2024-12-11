@@ -1,6 +1,9 @@
 global:
   imagePullSecrets:
     - name: "ces-container-registries"
+  networkPolicies:
+    enabled: true
+    denyAll: false
 cesWarpConfig:
   warp: |
     sources:
