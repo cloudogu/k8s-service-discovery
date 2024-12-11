@@ -575,6 +575,12 @@ func getTestIngress(service corev1.Service, cesService CesService, targetService
 			Namespace:   testNamespace,
 			Annotations: annotations,
 			Labels:      util.K8sCesServiceDiscoveryLabels,
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: service.APIVersion,
+				Kind:       service.Kind,
+				Name:       service.Name,
+				UID:        service.UID,
+			}},
 		},
 		Spec: v1.IngressSpec{
 			IngressClassName: &ingressClassName,

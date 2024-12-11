@@ -265,8 +265,12 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 			Namespace:   i.namespace,
 			Annotations: annotations,
 			Labels:      util.K8sCesServiceDiscoveryLabels,
-			// TODO
-			// OwnerReferences: []v1.OwnerReference{service},
+			OwnerReferences: []v1.OwnerReference{{
+				APIVersion: service.APIVersion,
+				Kind:       service.Kind,
+				Name:       service.Name,
+				UID:        service.UID,
+			}},
 		},
 		Spec: networking.IngressSpec{
 			IngressClassName: &i.ingressClassName,
