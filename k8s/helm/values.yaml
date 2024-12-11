@@ -25,18 +25,6 @@ cesWarpConfig:
       - identifier: platform
         external: true
         href: https://platform.cloudogu.com
-kubeRbacProxy:
-  image:
-    registry: gcr.io
-    repository: kubebuilder/kube-rbac-proxy
-    tag: v0.14.1
-  resources:
-    limits:
-      cpu: 500m
-      memory: 128Mi
-    requests:
-      cpu: 5m
-      memory: 64Mi
 manager:
   image:
     registry: docker.io
