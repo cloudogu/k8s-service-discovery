@@ -100,9 +100,8 @@ func (nph *networkPolicyHandler) createNetworkPolicy(ctx context.Context, servic
 					From: []v1.NetworkPolicyPeer{
 						{
 							IPBlock: &v1.IPBlock{
-								CIDR: "0.0.0.0/0",
 								// TODO this should be configurable
-								Except: []string{"10.42.0.0/16"},
+								CIDR: "0.0.0.0/0",
 							},
 						},
 					},
