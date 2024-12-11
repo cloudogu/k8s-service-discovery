@@ -21,8 +21,8 @@ type ExposedPorts []ExposedPort
 
 type ExposedPort struct {
 	Protocol   corev1.Protocol `json:"protocol"`
-	Port       int             `json:"port"`
-	TargetPort int             `json:"targetPort"`
+	Port       int32           `json:"port"`
+	TargetPort int32           `json:"targetPort"`
 }
 
 func (ep ExposedPort) String() string {

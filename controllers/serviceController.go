@@ -12,17 +12,19 @@ import (
 
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
-	ingressUpdater     IngressUpdater
-	exposedPortUpdater ExposedPortUpdater
-	client             client.Client
+	ingressUpdater       IngressUpdater
+	exposedPortUpdater   ExposedPortUpdater
+	networkPolicyUpdater NetworkPolicyUpdater
+	client               client.Client
 }
 
 // NewServiceReconciler creates a new service reconciler.
-func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, exposedPortUpdater ExposedPortUpdater) *serviceReconciler {
+func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, exposedPortUpdater ExposedPortUpdater, networkPolicyUpdater NetworkPolicyUpdater) *serviceReconciler {
 	return &serviceReconciler{
-		client:             client,
-		ingressUpdater:     ingressUpdater,
-		exposedPortUpdater: exposedPortUpdater,
+		client:               client,
+		ingressUpdater:       ingressUpdater,
+		exposedPortUpdater:   exposedPortUpdater,
+		networkPolicyUpdater: networkPolicyUpdater,
 	}
 }
 
@@ -47,6 +49,12 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if removeErr != nil {
 			logger.Error(err, fmt.Sprintf("failed to remove exposed ports for service %s", req.NamespacedName))
 		}
+
+		logger.Info("remove network policy ports")
+		removeErr = r.networkPolicyUpdater.RemoveExposedPorts(ctx, req.Name)
+		if removeErr != nil {
+			logger.Error(err, fmt.Sprintf("failed to remove exposed ports in network policy for service %s", req.NamespacedName))
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -60,6 +68,11 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	err = r.exposedPortUpdater.UpsertCesLoadbalancerService(ctx, service)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update exposed ports for service [%s]: %w", service.Name, err)
+	}
+
+	err = r.networkPolicyUpdater.UpsertNetworkPoliciesForService(ctx, service)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create/update network policies for service [%s]: %w", service.Name, err)
 	}
 
 	return ctrl.Result{}, nil

@@ -34,6 +34,11 @@ type ExposedPortUpdater interface {
 	RemoveExposedPorts(ctx context.Context, serviceName string) error
 }
 
+type NetworkPolicyUpdater interface {
+	UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error
+	RemoveExposedPorts(ctx context.Context, serviceName string) error
+}
+
 //nolint:unused
 //goland:noinspection GoUnusedType
 type doguInterace interface {

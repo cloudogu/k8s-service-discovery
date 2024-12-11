@@ -92,3 +92,7 @@ type tcpUpdServiceExposer interface {
 	// entries in a configmap.
 	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
 }
+
+type networkPolicyInterface interface {
+	netv1.NetworkPolicyInterface
+}

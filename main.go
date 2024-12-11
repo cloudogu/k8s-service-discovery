@@ -132,8 +132,10 @@ func startManager() error {
 
 	serviceInterface := clientset.CoreV1().Services(watchNamespace)
 	exposedPortUpdater := expose.NewExposedPortHandler(serviceInterface, controller, watchNamespace)
+	networkPolicyInterface := clientset.NetworkingV1().NetworkPolicies(watchNamespace)
+	networkPolicyUpdate := expose.NewNetworkPolicyHandler(networkPolicyInterface, controller)
 
-	if err = configureManager(serviceDiscManager, ingressUpdater, exposedPortUpdater); err != nil {
+	if err = configureManager(serviceDiscManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdate); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
@@ -163,8 +165,8 @@ func provideSSLAPI(globalConfigRepo controllers.GlobalConfigRepository) {
 	}()
 }
 
-func configureManager(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater) error {
-	if err := configureReconciler(k8sManager, ingressUpdater, exposedPortUpdater); err != nil {
+func configureManager(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater, networkPolicyUpdater controllers.NetworkPolicyUpdater) error {
+	if err := configureReconciler(k8sManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdater); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
@@ -262,8 +264,8 @@ func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater cont
 	return nil
 }
 
-func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater) error {
-	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, exposedPortUpdater)
+func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater, networkPolicyUpdater controllers.NetworkPolicyUpdater) error {
+	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, exposedPortUpdater, networkPolicyUpdater)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
 	}

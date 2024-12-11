@@ -26,8 +26,6 @@ const (
 const (
 	// CesServiceAnnotation can be appended to service with information of ces services.
 	CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
-	// CesExposedPortsAnnotation can be appended to service with information of exposed ports from dogu descriptors.
-	// CesExposedPortsAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports" TODO
 )
 
 const (
@@ -267,6 +265,7 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 			Namespace:   i.namespace,
 			Annotations: annotations,
 			Labels:      util.K8sCesServiceDiscoveryLabels,
+			// TODO
 			// OwnerReferences: []v1.OwnerReference{service},
 		},
 		Spec: networking.IngressSpec{

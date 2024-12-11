@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	cesLoadbalancerName       = "ces-loadbalancer"
+	cesLoadbalancerName = "ces-loadbalancer"
+	// CesExposedPortsAnnotation can be appended to service with information of exposed ports from dogu descriptors.
 	cesExposedPortsAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports"
 )
 
@@ -118,7 +119,7 @@ func parseExposedPortsFromService(service *corev1.Service) (util.ExposedPorts, e
 	for _, port := range *cesExposedPorts {
 		found := false
 		for _, servicePort := range service.Spec.Ports {
-			if servicePort.Port == int32(port.Port) {
+			if servicePort.Port == port.Port {
 				found = true
 			}
 		}
@@ -170,8 +171,8 @@ func getServicePortFromExposedPort(targetServiceName string, exposedPort util.Ex
 	return corev1.ServicePort{
 		Name:       fmt.Sprintf("%s%d", getTargetServicePortNamePrefix(targetServiceName), exposedPort.Port),
 		Protocol:   corev1.Protocol(strings.ToUpper(string(exposedPort.Protocol))),
-		Port:       int32(exposedPort.Port),
-		TargetPort: intstr.FromInt32(int32(exposedPort.TargetPort)),
+		Port:       exposedPort.Port,
+		TargetPort: intstr.FromInt32(exposedPort.TargetPort),
 	}
 }
 
