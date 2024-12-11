@@ -41,6 +41,8 @@ spec:
           value: {{ .Values.ingress.controller | default "nginx-ingress" }}
         - name: STAGE
           value: {{ .Values.manager.env.stage | default "production" }}
+        - name: NETWORK_POLICIES_ENABLED
+          value: {{ .Values.global.networkPolicies.enabled | default "true" }}
         image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
         imagePullPolicy: {{ .Values.manager.imagePullPolicy | default "IfNotPresent" }}
         livenessProbe:
