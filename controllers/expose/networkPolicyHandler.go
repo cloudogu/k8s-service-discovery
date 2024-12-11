@@ -86,11 +86,9 @@ func (nph *networkPolicyHandler) createNetworkPolicy(ctx context.Context, servic
 	policyName := getExposedNetworkPolicyName(ingressControllerName)
 	networkPolicy := &v1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      policyName,
-			Namespace: namespace,
-			Labels:    util.K8sCesServiceDiscoveryLabels,
-			// TODO
-			// OwnerReferences:
+			Name:        policyName,
+			Namespace:   namespace,
+			Labels:      util.K8sCesServiceDiscoveryLabels,
 			Annotations: mappingAnnotations,
 		},
 		Spec: v1.NetworkPolicySpec{
