@@ -133,7 +133,11 @@ func startManager() error {
 	serviceInterface := clientset.CoreV1().Services(watchNamespace)
 	exposedPortUpdater := expose.NewExposedPortHandler(serviceInterface, controller, watchNamespace)
 	networkPolicyInterface := clientset.NetworkingV1().NetworkPolicies(watchNamespace)
-	networkPolicyUpdate := expose.NewNetworkPolicyHandler(networkPolicyInterface, controller)
+	cidr, err := config.ReadNetworkPolicyCIDR()
+	if err != nil {
+		return err
+	}
+	networkPolicyUpdate := expose.NewNetworkPolicyHandler(networkPolicyInterface, controller, cidr)
 
 	if err = configureManager(serviceDiscManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdate); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)

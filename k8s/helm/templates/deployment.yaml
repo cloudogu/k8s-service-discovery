@@ -43,6 +43,8 @@ spec:
           value: {{ .Values.manager.env.stage | default "production" }}
         - name: NETWORK_POLICIES_ENABLED
           value: "{{ .Values.global.networkPolicies.enabled | default "true" }}"
+        - name: NETWORK_POLICIES_CIDR
+          value: {{ .Values.global.networkPolicies.ingressControllerAllowedCIDR | default "0.0.0.0/0" }}
         image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
         imagePullPolicy: {{ .Values.manager.imagePullPolicy | default "IfNotPresent" }}
         livenessProbe:

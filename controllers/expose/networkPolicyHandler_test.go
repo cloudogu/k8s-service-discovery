@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	testCIDR    = "0.0.0.0/0"
 	netPolName  = "nginx-ingress-exposed"
 	intStr80    = intstr.Parse("80")
 	intStr443   = intstr.Parse("443")
@@ -84,6 +85,7 @@ func Test_networkPolicyHandler_updateNetworkPolicy(t *testing.T) {
 	type fields struct {
 		mockNetworkPolicyInterface func() networkPolicyInterface
 		mockIngressController      func() ingressController
+		allowedCIDR                string
 	}
 	type args struct {
 		ctx          context.Context
@@ -111,6 +113,7 @@ func Test_networkPolicyHandler_updateNetworkPolicy(t *testing.T) {
 					ingressControllerMock.EXPECT().GetName().Return("nginx-ingress")
 					return ingressControllerMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:          testCtx,
@@ -132,6 +135,7 @@ func Test_networkPolicyHandler_updateNetworkPolicy(t *testing.T) {
 				mockIngressController: func() ingressController {
 					return getIngressControllerMock(t)
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:          testCtx,
@@ -146,6 +150,7 @@ func Test_networkPolicyHandler_updateNetworkPolicy(t *testing.T) {
 			nph := &networkPolicyHandler{
 				ingressController:      tt.fields.mockIngressController(),
 				networkPolicyInterface: tt.fields.mockNetworkPolicyInterface(),
+				allowedCIDR:            tt.fields.allowedCIDR,
 			}
 			tt.wantErr(t, nph.updateNetworkPolicy(tt.args.ctx, tt.args.serviceName, tt.args.exposedPorts), fmt.Sprintf("updateNetworkPolicy(%v, %v, %v)", tt.args.ctx, tt.args.serviceName, tt.args.exposedPorts))
 		})
@@ -157,6 +162,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 	type fields struct {
 		mockIngressController      func() ingressController
 		mockNetworkPolicyInterface func() networkPolicyInterface
+		allowedCIDR                string
 	}
 	type args struct {
 		ctx         context.Context
@@ -177,10 +183,11 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 				mockNetworkPolicyInterface: func() networkPolicyInterface {
 					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
 					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(jenkinsNetpol, nil)
-					networkPolicyInterfaceMock.EXPECT().Update(testCtx, initialNetpol, metav1.UpdateOptions{}).Return(nil, nil)
+					networkPolicyInterfaceMock.EXPECT().Update(testCtx, getInitialNetpolWithCIDR(testCIDR), metav1.UpdateOptions{}).Return(nil, nil)
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:         testCtx,
@@ -202,6 +209,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:         testCtx,
@@ -223,6 +231,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:         testCtx,
@@ -246,6 +255,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:         testCtx,
@@ -268,6 +278,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:         testCtx,
@@ -283,6 +294,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 			nph := &networkPolicyHandler{
 				ingressController:      tt.fields.mockIngressController(),
 				networkPolicyInterface: tt.fields.mockNetworkPolicyInterface(),
+				allowedCIDR:            tt.fields.allowedCIDR,
 			}
 			tt.wantErr(t, nph.RemoveExposedPorts(tt.args.ctx, tt.args.serviceName), fmt.Sprintf("RemoveExposedPorts(%v, %v)", tt.args.ctx, tt.args.serviceName))
 		})
@@ -294,6 +306,7 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 	type fields struct {
 		mockIngressController      func() ingressController
 		mockNetworkPolicyInterface func() networkPolicyInterface
+		allowedCIDR                string
 	}
 	type args struct {
 		ctx     context.Context
@@ -314,10 +327,11 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 				mockNetworkPolicyInterface: func() networkPolicyInterface {
 					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
 					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-					networkPolicyInterfaceMock.EXPECT().Create(testCtx, initialNetpol, metav1.CreateOptions{}).Return(nil, nil)
+					networkPolicyInterfaceMock.EXPECT().Create(testCtx, getInitialNetpolWithCIDR(testCIDR), metav1.CreateOptions{}).Return(nil, nil)
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:     testCtx,
@@ -336,10 +350,11 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 				mockNetworkPolicyInterface: func() networkPolicyInterface {
 					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
 					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-					networkPolicyInterfaceMock.EXPECT().Create(testCtx, initialNetpol, metav1.CreateOptions{}).Return(nil, assert.AnError)
+					networkPolicyInterfaceMock.EXPECT().Create(testCtx, getInitialNetpolWithCIDR(testCIDR), metav1.CreateOptions{}).Return(nil, assert.AnError)
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:     testCtx,
@@ -363,6 +378,7 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:     testCtx,
@@ -384,6 +400,7 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:     testCtx,
@@ -408,6 +425,7 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 
 					return networkPolicyInterfaceMock
 				},
+				allowedCIDR: testCIDR,
 			},
 			args: args{
 				ctx:     testCtx,
@@ -425,6 +443,7 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 			nph := &networkPolicyHandler{
 				ingressController:      tt.fields.mockIngressController(),
 				networkPolicyInterface: tt.fields.mockNetworkPolicyInterface(),
+				allowedCIDR:            tt.fields.allowedCIDR,
 			}
 			tt.wantErr(t, nph.UpsertNetworkPoliciesForService(tt.args.ctx, tt.args.service), fmt.Sprintf("UpsertNetworkPoliciesForService(%v, %v)", tt.args.ctx, tt.args.service))
 		})
@@ -438,12 +457,13 @@ func TestNewNetworkPolicyHandler(t *testing.T) {
 		ingressControllerMock := newMockIngressController(t)
 
 		// when
-		handler := NewNetworkPolicyHandler(netInterfaceMock, ingressControllerMock)
+		handler := NewNetworkPolicyHandler(netInterfaceMock, ingressControllerMock, "0.0.0.0/0")
 
 		// then
 		require.NotNil(t, handler)
 		assert.Equal(t, netInterfaceMock, handler.networkPolicyInterface)
 		assert.Equal(t, ingressControllerMock, handler.ingressController)
+		assert.Equal(t, "0.0.0.0/0", handler.allowedCIDR)
 	})
 }
 
@@ -455,18 +475,8 @@ func getIngressControllerMock(t *testing.T) ingressController {
 }
 
 func getTestNetworkPolicies() (initialNetpol, invalidAnnotationsNetpol, jenkinsNetpol, updatedJenkinsNetpol *netv1.NetworkPolicy) {
-	initialNetpol = getNetPol(netPolName, map[string]string{"k8s.cloudogu.com/ces-exposed-ports-nginx-ingress": `[{"protocol":"TCP","port":80,"targetPort":80},{"protocol":"TCP","port":443,"targetPort":443}]`},
-		[]netv1.NetworkPolicyPort{
-			{
-				Port:     &intStr80,
-				Protocol: &tcpProtocol,
-			},
-			{
-				Port:     &intStr443,
-				Protocol: &tcpProtocol,
-			},
-		})
-	invalidAnnotationsNetpol = getNetPol(netPolName, map[string]string{"k8s.cloudogu.com/ces-exposed-ports-jenkins": `[{"protocol":80}]`}, []netv1.NetworkPolicyPort{})
+	initialNetpol = getInitialNetpolWithCIDR("10.0.0.0/8")
+	invalidAnnotationsNetpol = getNetPol(netPolName, map[string]string{"k8s.cloudogu.com/ces-exposed-ports-jenkins": `[{"protocol":80}]`}, []netv1.NetworkPolicyPort{}, testCIDR)
 	jenkinsNetpol = getNetPol(netPolName, map[string]string{
 		"k8s.cloudogu.com/ces-exposed-ports-nginx-ingress": `[{"protocol":"TCP","port":80,"targetPort":80},{"protocol":"TCP","port":443,"targetPort":443}]`,
 		"k8s.cloudogu.com/ces-exposed-ports-jenkins":       `[{"protocol":"TCP","port":5000,"targetPort":5000}]`},
@@ -483,7 +493,7 @@ func getTestNetworkPolicies() (initialNetpol, invalidAnnotationsNetpol, jenkinsN
 				Port:     &intStr5000,
 				Protocol: &tcpProtocol,
 			},
-		})
+		}, testCIDR)
 	updatedJenkinsNetpol = getNetPol(netPolName, map[string]string{
 		"k8s.cloudogu.com/ces-exposed-ports-nginx-ingress": `[{"protocol":"TCP","port":80,"targetPort":80},{"protocol":"TCP","port":443,"targetPort":443}]`,
 		"k8s.cloudogu.com/ces-exposed-ports-jenkins":       `[{"protocol":"UDP","port":5001,"targetPort":5001},{"protocol":"UDP","port":5002,"targetPort":5002}]`},
@@ -504,11 +514,11 @@ func getTestNetworkPolicies() (initialNetpol, invalidAnnotationsNetpol, jenkinsN
 				Port:     &intStr5002,
 				Protocol: &udpProtocol,
 			},
-		})
+		}, testCIDR)
 	return
 }
 
-func getNetPol(netpolName string, annotations map[string]string, ports []netv1.NetworkPolicyPort) *netv1.NetworkPolicy {
+func getNetPol(netpolName string, annotations map[string]string, ports []netv1.NetworkPolicyPort, cidr string) *netv1.NetworkPolicy {
 	return &netv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        netpolName,
@@ -525,7 +535,7 @@ func getNetPol(netpolName string, annotations map[string]string, ports []netv1.N
 					From: []netv1.NetworkPolicyPeer{
 						{
 							IPBlock: &netv1.IPBlock{
-								CIDR: "0.0.0.0/0",
+								CIDR: cidr,
 							},
 						},
 					},
@@ -533,4 +543,18 @@ func getNetPol(netpolName string, annotations map[string]string, ports []netv1.N
 			},
 		},
 	}
+}
+
+func getInitialNetpolWithCIDR(cidr string) *netv1.NetworkPolicy {
+	return getNetPol(netPolName, map[string]string{"k8s.cloudogu.com/ces-exposed-ports-nginx-ingress": `[{"protocol":"TCP","port":80,"targetPort":80},{"protocol":"TCP","port":443,"targetPort":443}]`},
+		[]netv1.NetworkPolicyPort{
+			{
+				Port:     &intStr80,
+				Protocol: &tcpProtocol,
+			},
+			{
+				Port:     &intStr443,
+				Protocol: &tcpProtocol,
+			},
+		}, cidr)
 }

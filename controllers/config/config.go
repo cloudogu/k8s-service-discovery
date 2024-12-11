@@ -21,6 +21,9 @@ const (
 	// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
 	// namespace that should be watched by the service discovery.
 	namespaceEnvVar = "WATCH_NAMESPACE"
+
+	// networkPolicyCIDREnvVar define the ip range which is allowed to access the ingress controller if networkpolicies are enabled.
+	networkPolicyCIDREnvVar = "NETWORK_POLICIES_CIDR"
 )
 
 var (
@@ -114,4 +117,14 @@ func ReadWatchNamespace() (string, error) {
 	logger.Info(fmt.Sprintf("found target namespace: [%s]", watchNamespace))
 
 	return watchNamespace, nil
+}
+
+func ReadNetworkPolicyCIDR() (string, error) {
+	cidr, found := os.LookupEnv(networkPolicyCIDREnvVar)
+	if !found {
+		return "", fmt.Errorf("failed to read cidr from environment variable [%s], please set the variable and try again", namespaceEnvVar)
+	}
+	logger.Info(fmt.Sprintf("found ingress controller network policy cidr: [%s]", cidr))
+
+	return cidr, nil
 }

@@ -4,6 +4,7 @@ global:
   networkPolicies:
     enabled: true
     denyAll: false
+    ingressControllerAllowedCIDR: "0.0.0.0/0"
 cesWarpConfig:
   warp: |
     sources:

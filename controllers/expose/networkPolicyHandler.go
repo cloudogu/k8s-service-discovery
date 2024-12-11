@@ -27,12 +27,14 @@ const (
 type networkPolicyHandler struct {
 	ingressController      ingressController
 	networkPolicyInterface networkPolicyInterface
+	allowedCIDR            string
 }
 
-func NewNetworkPolicyHandler(policyInterface networkPolicyInterface, controller ingressController) *networkPolicyHandler {
+func NewNetworkPolicyHandler(policyInterface networkPolicyInterface, controller ingressController, allowedCIDR string) *networkPolicyHandler {
 	return &networkPolicyHandler{
 		networkPolicyInterface: policyInterface,
 		ingressController:      controller,
+		allowedCIDR:            allowedCIDR,
 	}
 }
 
@@ -100,8 +102,7 @@ func (nph *networkPolicyHandler) createNetworkPolicy(ctx context.Context, servic
 					From: []v1.NetworkPolicyPeer{
 						{
 							IPBlock: &v1.IPBlock{
-								// TODO this should be configurable
-								CIDR: "0.0.0.0/0",
+								CIDR: nph.allowedCIDR,
 							},
 						},
 					},
@@ -155,6 +156,7 @@ func (nph *networkPolicyHandler) updateNetworkPolicy(ctx context.Context, servic
 
 			// There should be only one ingress rule
 			get.Spec.Ingress[0].Ports = append(get.Spec.Ingress[0].Ports, getNetworkPolicyPortsFromExposedPorts(exposedPorts)...)
+			nph.updateCIDR(get)
 
 			_, updateErr := nph.networkPolicyInterface.Update(ctx, get, metav1.UpdateOptions{})
 			return updateErr
@@ -168,6 +170,7 @@ func (nph *networkPolicyHandler) updateNetworkPolicy(ctx context.Context, servic
 		deletedPortList := deleteIngressPorts(get.Spec.Ingress[0].Ports, getPortsToDelete(actualPorts, exposedPorts))
 		get.Spec.Ingress[0].Ports = addIngressPorts(deletedPortList, exposedPorts)
 		maps.Copy(get.Annotations, newServicePortMappingAnnotation)
+		nph.updateCIDR(get)
 
 		_, updateErr := nph.networkPolicyInterface.Update(ctx, get, metav1.UpdateOptions{})
 		return updateErr
@@ -178,6 +181,10 @@ func (nph *networkPolicyHandler) updateNetworkPolicy(ctx context.Context, servic
 	}
 
 	return nil
+}
+
+func (nph *networkPolicyHandler) updateCIDR(policy *v1.NetworkPolicy) {
+	policy.Spec.Ingress[0].From[0].IPBlock.CIDR = nph.allowedCIDR
 }
 
 func unmarshalCesExposedPorts(serviceName string, exposedPortStr string) (util.ExposedPorts, error) {
