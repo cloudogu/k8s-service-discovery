@@ -20,8 +20,10 @@ import (
 const (
 	// Name is limited to 63 characters (dns prefix 253).
 	// With this name prefix `service-port-mapping-` the service name length can be max 45.
-	// In those rare case the name will be truncated. TODO truncate to be safe
-	mappingAnnotationServicePortKeyPrefix = "k8s.cloudogu.com/ces-exposed-ports-"
+	// In those rare case the name will be truncated.
+	mappingAnnotationServicePortDNSKeyPrefix  = "k8s.cloudogu.com"
+	mappingAnnotationServicePortNameKeyPrefix = "ces-exposed-ports-"
+	maxLengthAnnotationName                   = 63
 )
 
 type networkPolicyHandler struct {
@@ -283,7 +285,11 @@ func createMappingAnnotation(serviceName string, exposedPorts util.ExposedPorts)
 }
 
 func getServicePortMappingAnnotationKey(serviceName string) string {
-	return fmt.Sprintf("%s%s", mappingAnnotationServicePortKeyPrefix, serviceName)
+	name := fmt.Sprintf("%s%s", mappingAnnotationServicePortNameKeyPrefix, serviceName)
+	if len(name) > maxLengthAnnotationName {
+		name = name[0:maxLengthAnnotationName]
+	}
+	return fmt.Sprintf("%s/%s", mappingAnnotationServicePortDNSKeyPrefix, name)
 }
 
 func getNetworkPolicyPort(exposedPort util.ExposedPort) v1.NetworkPolicyPort {

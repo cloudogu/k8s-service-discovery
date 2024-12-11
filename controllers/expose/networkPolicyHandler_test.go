@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"strings"
 	"testing"
 )
 
@@ -557,4 +558,22 @@ func getInitialNetpolWithCIDR(cidr string) *netv1.NetworkPolicy {
 				Protocol: &tcpProtocol,
 			},
 		}, cidr)
+}
+
+func Test_getServicePortMappingAnnotationKey(t *testing.T) {
+	t.Run("should generate generate name with more than 63 chars including prefix", func(t *testing.T) {
+		// given
+		extraLongServiceName := "testtesttesttesttesttesttesttesttesttesttestttttt"
+		// service name with length > 45 and <= 63 are legit but must be shortened with our prefix.
+		assert.Len(t, extraLongServiceName, 49)
+
+		// when
+		key := getServicePortMappingAnnotationKey(extraLongServiceName)
+
+		// remove dns prefix
+		name := strings.ReplaceAll(key, "k8s.cloudogu.com/", "")
+
+		// then
+		assert.Len(t, name, 63)
+	})
 }
