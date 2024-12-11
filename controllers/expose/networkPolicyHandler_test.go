@@ -525,8 +525,7 @@ func getNetPol(netpolName string, annotations map[string]string, ports []netv1.N
 					From: []netv1.NetworkPolicyPeer{
 						{
 							IPBlock: &netv1.IPBlock{
-								CIDR:   "0.0.0.0/0",
-								Except: []string{"10.42.0.0/16"},
+								CIDR: "0.0.0.0/0",
 							},
 						},
 					},
