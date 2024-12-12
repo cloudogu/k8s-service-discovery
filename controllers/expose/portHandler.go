@@ -53,22 +53,26 @@ func (eph *exposedPortHandler) UpsertCesLoadbalancerService(ctx context.Context,
 	}
 
 	retryErr := retry.OnConflict(func() error {
-		lbService, err := eph.getCesLoadBalancerService(ctx)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return errorGetLoadBalancerService(err)
-		} else if err != nil && apierrors.IsNotFound(err) {
-			logger.Info(fmt.Sprintf("Loadbalancer service %s does not exist. Create a new one...", cesLoadbalancerName))
-			_, createErr := eph.createCesLoadbalancerService(ctx, targetServiceName, cesServiceExposedPorts)
-			if createErr != nil {
-				return fmt.Errorf("failed to create %s loadbalancer service: %w", cesLoadbalancerName, createErr)
-			}
+		return eph.doUpsertCesLoadbalancerService(ctx, targetServiceName, cesServiceExposedPorts)
+	})
 
-			err = eph.ingressController.ExposeOrUpdateExposedPorts(ctx, eph.namespace, targetServiceName, cesServiceExposedPorts)
-			if err != nil {
-				return fmt.Errorf("failed to expose ces-services %q: %w", cesServiceExposedPorts, err)
-			}
+	if retryErr != nil {
+		return fmt.Errorf("failed to upsert loadbalancer service %s: %w", cesLoadbalancerName, retryErr)
+	}
 
-			return nil
+	return nil
+}
+
+func (eph *exposedPortHandler) doUpsertCesLoadbalancerService(ctx context.Context, targetServiceName string, cesServiceExposedPorts util.ExposedPorts) error {
+	logger := log.FromContext(ctx)
+	lbService, err := eph.getCesLoadBalancerService(ctx)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errorGetLoadBalancerService(err)
+	} else if err != nil && apierrors.IsNotFound(err) {
+		logger.Info(fmt.Sprintf("Loadbalancer service %s does not exist. Create a new one...", cesLoadbalancerName))
+		_, createErr := eph.createCesLoadbalancerService(ctx, targetServiceName, cesServiceExposedPorts)
+		if createErr != nil {
+			return fmt.Errorf("failed to create %s loadbalancer service: %w", cesLoadbalancerName, createErr)
 		}
 
 		err = eph.ingressController.ExposeOrUpdateExposedPorts(ctx, eph.namespace, targetServiceName, cesServiceExposedPorts)
@@ -76,23 +80,24 @@ func (eph *exposedPortHandler) UpsertCesLoadbalancerService(ctx context.Context,
 			return fmt.Errorf("failed to expose ces-services %q: %w", cesServiceExposedPorts, err)
 		}
 
-		lbService, changed := updateCesLoadbalancerService(targetServiceName, lbService, cesServiceExposedPorts)
-		if !changed {
-			logger.Info(fmt.Sprintf("no loadbalancer service %s update required for service %s...", cesLoadbalancerName, targetServiceName))
-			return nil
-		}
-
-		logger.Info(fmt.Sprintf("Update loadbalancer service %s...", cesLoadbalancerName))
-		err = eph.updateService(ctx, lbService)
-		if err != nil {
-			return fmt.Errorf("failed to update loadbalancer service %s: %w", cesLoadbalancerName, err)
-		}
-
 		return nil
-	})
+	}
 
-	if retryErr != nil {
-		return fmt.Errorf("failed to upsert loadbalancer service %s: %w", cesLoadbalancerName, retryErr)
+	err = eph.ingressController.ExposeOrUpdateExposedPorts(ctx, eph.namespace, targetServiceName, cesServiceExposedPorts)
+	if err != nil {
+		return fmt.Errorf("failed to expose ces-services %q: %w", cesServiceExposedPorts, err)
+	}
+
+	lbService, changed := updateCesLoadbalancerService(targetServiceName, lbService, cesServiceExposedPorts)
+	if !changed {
+		logger.Info(fmt.Sprintf("no loadbalancer service %s update required for service %s...", cesLoadbalancerName, targetServiceName))
+		return nil
+	}
+
+	logger.Info(fmt.Sprintf("Update loadbalancer service %s...", cesLoadbalancerName))
+	err = eph.updateService(ctx, lbService)
+	if err != nil {
+		return fmt.Errorf("failed to update loadbalancer service %s: %w", cesLoadbalancerName, err)
 	}
 
 	return nil
