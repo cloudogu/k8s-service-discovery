@@ -58,6 +58,7 @@ type ingressController interface {
 
 // tcpUpdServiceExposer is used to expose non http services.
 //
+//nolint:unused
 //goland:noinspection GoUnusedType
 type tcpUpdServiceExposer interface {
 	// ExposeOrUpdateExposedPorts adds or updates the exposing of the exposed ports from the service in the cluster. These are typically
