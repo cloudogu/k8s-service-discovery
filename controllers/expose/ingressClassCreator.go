@@ -14,6 +14,7 @@ import (
 
 const (
 	ingressClassCreationEventReason = "IngressClassCreation"
+	serviceDiscoveryDeployName      = "k8s-service-discovery-controller-manager"
 )
 
 // ingressClassCreator is responsible to create a cluster wide ingress class in the cluster.
@@ -49,9 +50,9 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 		return fmt.Errorf("failed to check if ingress class [%s] exists: %w", icc.className, err)
 	}
 
-	deployment, err := icc.deploymentInterface.Get(ctx, "k8s-service-discovery-controller-manager", metav1.GetOptions{})
+	deployment, err := icc.deploymentInterface.Get(ctx, serviceDiscoveryDeployName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("create ingress class: failed to get deployment [k8s-service-discovery-controller-manager]: %w", err)
+		return fmt.Errorf("create ingress class: failed to get deployment [%s]: %w", serviceDiscoveryDeployName, err)
 	}
 
 	if ok {

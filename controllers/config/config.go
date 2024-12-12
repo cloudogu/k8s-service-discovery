@@ -15,17 +15,17 @@ import (
 const (
 	warpConfigMap           = "k8s-ces-warp-config"
 	MenuConfigMap           = "k8s-ces-menu-json"
-	EnvVarStage             = "STAGE"
 	StageLocal              = "local"
 	DevConfigPath           = "k8s/dev-resources/k8s-ces-warp-config.yaml"
-	envVarIngressController = "INGRESS_CONTROLLER"
+	StageEnvVar             = "STAGE"
+	ingressControllerEnvVar = "INGRESS_CONTROLLER"
 	// namespaceEnvVar defines the name of the environment variables given into the service discovery to define the
 	// namespace that should be watched by the service discovery.
 	namespaceEnvVar = "WATCH_NAMESPACE"
 
 	// networkPolicyCIDREnvVar define the ip range which is allowed to access the ingress controller if networkpolicies are enabled.
-	networkPolicyCIDREnvVar = "NETWORK_POLICIES_CIDR"
-	networkPolicyEnabled    = "NETWORK_POLICIES_ENABLED"
+	networkPolicyCIDREnvVar    = "NETWORK_POLICIES_CIDR"
+	networkPolicyEnabledEnvVar = "NETWORK_POLICIES_ENABLED"
 )
 
 var (
@@ -60,7 +60,7 @@ type SupportSource struct {
 // ReadConfiguration reads the service discovery configuration. Either from file in development mode with environment
 // variable stage=development or from the cluster state
 func ReadConfiguration(ctx context.Context, client client.Client, namespace string) (*Configuration, error) {
-	if os.Getenv(EnvVarStage) == StageLocal {
+	if os.Getenv(StageEnvVar) == StageLocal {
 		return readWarpConfigFromFile(DevConfigPath)
 	}
 	return readWarpConfigFromCluster(ctx, client, namespace)
@@ -107,7 +107,7 @@ func readWarpConfigFromCluster(ctx context.Context, client client.Client, namesp
 }
 
 func ReadIngressController() string {
-	envIngressController := os.Getenv(envVarIngressController)
+	envIngressController := os.Getenv(ingressControllerEnvVar)
 	return envIngressController
 }
 
@@ -132,9 +132,9 @@ func ReadNetworkPolicyCIDR() (string, error) {
 }
 
 func ReadNetworkPolicyEnabled() (bool, error) {
-	enabled, found := os.LookupEnv(networkPolicyEnabled)
+	enabled, found := os.LookupEnv(networkPolicyEnabledEnvVar)
 	if !found {
-		return true, fmt.Errorf("failed to read flag network policy enabled from environment variable [%s], please set the variable and try again", networkPolicyEnabled)
+		return true, fmt.Errorf("failed to read flag network policy enabled from environment variable [%s], please set the variable and try again", networkPolicyEnabledEnvVar)
 	}
 	parseBool, err := strconv.ParseBool(enabled)
 	if err != nil {

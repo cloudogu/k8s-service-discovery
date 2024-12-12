@@ -42,7 +42,7 @@ type NetworkPolicyUpdater interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type doguInterace interface {
+type doguInterface interface {
 	ecoSystem.DoguInterface
 }
 
