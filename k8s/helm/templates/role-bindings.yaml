@@ -1,0 +1,89 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-certificate-role-binding
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-service-discovery.name" . }}-certificate-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-event-recorder-role-binding
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-service-discovery.name" . }}-event-recorder-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-maintenance-mode-role-binding
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-service-discovery.name" . }}-maintenance-mode-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-warp-menu-role-binding
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-service-discovery.name" . }}-warp-menu-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-service-discovery-role-binding
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "k8s-service-discovery.name" . }}-service-discovery-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-ingressClass-creator-role-binding
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "k8s-service-discovery.name" . }}-ingressClass-creator-role'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "k8s-service-discovery.name" . }}-controller-manager'
+    namespace: '{{ .Release.Namespace }}'

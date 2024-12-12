@@ -10,9 +10,6 @@ data:
     health:
       healthProbeBindAddress: ":8081"
     kind: ControllerManagerConfig
-    leaderElection:
-      leaderElect: true
-      resourceName: 92a787f2.cloudogu.com
     metrics:
       bindAddress: 127.0.0.1:8080
     webhook:

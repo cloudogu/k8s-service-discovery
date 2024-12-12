@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Currently, the only supported controller is `nginx-ingress`. This is also the default value.
 - [#69] Added support for networkpolicies. It is enabled by default and will allow connections from all external CIDRs on all exposed ports.
 
+## [v1.2.0] - 2024-12-04
+### Changed
+- [#67] Minimize RBAC permissions for the operator
+  - Separate roles into own files
+  - Restrict permissions for roles as much as possible
+  - Delete leader-election-role
+
 ## [v1.1.0] - 2024-10-28
 ### Changed
 - [#65] Make imagePullSecrets configurable via helm values and use `ces-container-registries` as default.
