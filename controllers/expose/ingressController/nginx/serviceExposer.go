@@ -145,7 +145,7 @@ func getExposedPortsByType(exposedPorts util.ExposedPorts, protocol corev1.Proto
 			continue
 		}
 
-		if strings.ToUpper(string(port.Protocol)) == strings.ToUpper(string(protocol)) {
+		if strings.EqualFold(string(port.Protocol), string(protocol)) {
 			result = append(result, port)
 		}
 	}
@@ -177,7 +177,7 @@ func (intue *ingressNginxTcpUpdExposer) deletePortsForProtocol(ctx context.Conte
 			}
 		}
 
-		if cm.Data == nil || len(cm.Data) == 0 {
+		if len(cm.Data) == 0 {
 			return nil
 		}
 

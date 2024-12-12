@@ -235,7 +235,7 @@ func deleteIngressPorts(ports []v1.NetworkPolicyPort, portsToDelete util.Exposed
 
 // equalsNetpolPortExposedPort returns true if the protocol and the exposed port numbers are equal
 func equalsNetpolPortExposedPort(netpolPort v1.NetworkPolicyPort, exposedPort util.ExposedPort) bool {
-	if strings.ToUpper(string(*netpolPort.Protocol)) != strings.ToUpper(string(exposedPort.Protocol)) {
+	if !strings.EqualFold(string(*netpolPort.Protocol), string(exposedPort.Protocol)) {
 		return false
 	}
 

@@ -266,7 +266,7 @@ func (eph *exposedPortHandler) RemoveExposedPorts(ctx context.Context, serviceNa
 }
 
 func equalsServicePortExposedPort(servicePort corev1.ServicePort, exposedPort util.ExposedPort) bool {
-	if strings.ToUpper(string(servicePort.Protocol)) != strings.ToUpper(string(exposedPort.Protocol)) {
+	if !strings.EqualFold(string(servicePort.Protocol), string(exposedPort.Protocol)) {
 		return false
 	}
 
