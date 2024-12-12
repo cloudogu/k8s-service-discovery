@@ -1,4 +1,4 @@
-{{- if and .Values.global.networkPolicies.enabled .Values.global.networkPolicies.denyAll }}
+{{- if and .Values.networkPolicies.enabled .Values.networkPolicies.denyAll }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

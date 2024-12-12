@@ -1,10 +1,6 @@
 global:
   imagePullSecrets:
     - name: "ces-container-registries"
-  networkPolicies:
-    enabled: true
-    denyAll: false
-    ingressControllerAllowedCIDR: "0.0.0.0/0"
 cesWarpConfig:
   warp: |
     sources:
@@ -45,3 +41,7 @@ manager:
   imagePullPolicy: IfNotPresent
 ingress:
   controller: nginx-ingress # currently only supported ingress controller
+networkPolicies:
+  enabled: true
+  denyAll: false
+  ingressControllerAllowedCIDR: "0.0.0.0/0"
