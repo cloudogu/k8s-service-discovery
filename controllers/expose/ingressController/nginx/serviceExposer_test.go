@@ -365,7 +365,7 @@ func Test_ingressNginxTcpUpdExposer_deletePortsForProtocol(t *testing.T) {
 		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 
 		// when
-		err := sut.deletePortsForProtocol(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
+		err := sut.deletePortsForProtocolWithRetry(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
 
 		// then
 		require.Nil(t, err)
@@ -377,7 +377,7 @@ func Test_ingressNginxTcpUpdExposer_deletePortsForProtocol(t *testing.T) {
 		configMapInterfaceMock.EXPECT().Get(testCtx, "tcp-services", metav1.GetOptions{}).Return(&corev1.ConfigMap{}, nil)
 		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 		// when
-		err := sut.deletePortsForProtocol(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
+		err := sut.deletePortsForProtocolWithRetry(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
 
 		// then
 		require.Nil(t, err)
@@ -389,7 +389,7 @@ func Test_ingressNginxTcpUpdExposer_deletePortsForProtocol(t *testing.T) {
 		configMapInterfaceMock.EXPECT().Get(testCtx, "tcp-services", metav1.GetOptions{}).Return(&corev1.ConfigMap{Data: map[string]string{}}, nil)
 		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 		// when
-		err := sut.deletePortsForProtocol(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
+		err := sut.deletePortsForProtocolWithRetry(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
 
 		// then
 		require.Nil(t, err)
@@ -406,7 +406,7 @@ func Test_ingressNginxTcpUpdExposer_deletePortsForProtocol(t *testing.T) {
 		sut := &ingressNginxTcpUpdExposer{configMapInterface: configMapInterfaceMock}
 
 		// when
-		err := sut.deletePortsForProtocol(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
+		err := sut.deletePortsForProtocolWithRetry(testCtx, testNamespace, testTargetServiceName, corev1.ProtocolTCP)
 
 		// then
 		require.Nil(t, err)

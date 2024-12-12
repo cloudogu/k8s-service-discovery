@@ -157,48 +157,18 @@ func getExposedPortsByType(exposedPorts util.ExposedPorts, protocol corev1.Proto
 // If the configmap has no entries left this method won't delete the configmap. This would lead to numerous
 // errors in the nginx log.
 func (intue *ingressNginxTcpUpdExposer) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error {
-	err := intue.deletePortsForProtocol(ctx, namespace, targetServiceName, corev1.ProtocolTCP)
+	err := intue.deletePortsForProtocolWithRetry(ctx, namespace, targetServiceName, corev1.ProtocolTCP)
 	if err != nil {
 		return err
 	}
 
-	return intue.deletePortsForProtocol(ctx, namespace, targetServiceName, corev1.ProtocolUDP)
+	return intue.deletePortsForProtocolWithRetry(ctx, namespace, targetServiceName, corev1.ProtocolUDP)
 }
 
-func (intue *ingressNginxTcpUpdExposer) deletePortsForProtocol(ctx context.Context, namespace string, targetServiceName string, protocol corev1.Protocol) error {
+func (intue *ingressNginxTcpUpdExposer) deletePortsForProtocolWithRetry(ctx context.Context, namespace string, targetServiceName string, protocol corev1.Protocol) error {
 	configMapName := getConfigMapNameForProtocol(protocol)
 	err := retry.OnConflict(func() error {
-		cm, err := intue.configMapInterface.Get(ctx, configMapName, metav1.GetOptions{})
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return fmt.Errorf("failed to get configmap %s: %w", getConfigMapNameForProtocol(protocol), err)
-			} else {
-				return nil
-			}
-		}
-
-		if len(cm.Data) == 0 {
-			return nil
-		}
-
-		changed := false
-		for key, value := range cm.Data {
-			if strings.Contains(value, getServiceEntryValuePrefix(namespace, targetServiceName)) {
-				changed = true
-				delete(cm.Data, key)
-			}
-		}
-
-		if !changed {
-			log.FromContext(ctx).Info(fmt.Sprintf("Skipping exposed port deletion because the service %q has no exposed ports for protocol %s...", targetServiceName, protocol))
-			return nil
-		}
-
-		logger := log.FromContext(ctx)
-		logger.Info(fmt.Sprintf("Update %s port exposing for service %q...", string(protocol), targetServiceName))
-		// Do not delete the configmap, even it contains no ports. That would throw errors in nginx-ingress log.
-		_, err = intue.configMapInterface.Update(ctx, cm, metav1.UpdateOptions{})
-		return err
+		return intue.deletePortsForProtocol(ctx, namespace, targetServiceName, protocol)
 	})
 
 	if err != nil {
@@ -206,6 +176,41 @@ func (intue *ingressNginxTcpUpdExposer) deletePortsForProtocol(ctx context.Conte
 	}
 
 	return nil
+}
+
+func (intue *ingressNginxTcpUpdExposer) deletePortsForProtocol(ctx context.Context, namespace string, targetServiceName string, protocol corev1.Protocol) error {
+	configMapName := getConfigMapNameForProtocol(protocol)
+	cm, err := intue.configMapInterface.Get(ctx, configMapName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get configmap %s: %w", getConfigMapNameForProtocol(protocol), err)
+		} else {
+			return nil
+		}
+	}
+
+	if len(cm.Data) == 0 {
+		return nil
+	}
+
+	changed := false
+	for key, value := range cm.Data {
+		if strings.Contains(value, getServiceEntryValuePrefix(namespace, targetServiceName)) {
+			changed = true
+			delete(cm.Data, key)
+		}
+	}
+
+	if !changed {
+		log.FromContext(ctx).Info(fmt.Sprintf("Skipping exposed port deletion because the service %q has no exposed ports for protocol %s...", targetServiceName, protocol))
+		return nil
+	}
+
+	logger := log.FromContext(ctx)
+	logger.Info(fmt.Sprintf("Update %s port exposing for service %q...", string(protocol), targetServiceName))
+	// Do not delete the configmap, even it contains no ports. That would throw errors in nginx-ingress log.
+	_, err = intue.configMapInterface.Update(ctx, cm, metav1.UpdateOptions{})
+	return err
 }
 
 func updateCmErr(configMapName string, err error) error {
