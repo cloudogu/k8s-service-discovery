@@ -258,18 +258,48 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 }
 
 func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
+	ingress := i.getIngress(service.Name, service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
+
+	err := retry.OnConflict(func() error {
+		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
+
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+
+		if errors.IsNotFound(err) {
+			_, createErr := i.ingressInterface.Create(ctx, ingress, v1.CreateOptions{})
+			return createErr
+		}
+
+		_, err = i.ingressInterface.Update(ctx, ingress, v1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to upsert ingress %s: %w", ingress.Name, err)
+	}
+
+	return nil
+}
+
+func (i *ingressUpdater) getIngress(name string, ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
 	pathType := networking.PathTypePrefix
-	ingress := &networking.Ingress{
+	return &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        cesService.Name,
+			Name:        name,
 			Namespace:   i.namespace,
 			Annotations: annotations,
 			Labels:      util.K8sCesServiceDiscoveryLabels,
 			OwnerReferences: []v1.OwnerReference{{
-				APIVersion: service.APIVersion,
-				Kind:       service.Kind,
-				Name:       service.Name,
-				UID:        service.UID,
+				APIVersion: ownerType.APIVersion,
+				Kind:       ownerType.Kind,
+				Name:       ownerObject.Name,
+				UID:        ownerObject.UID,
 			}},
 		},
 		Spec: networking.IngressSpec{
@@ -298,30 +328,4 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 			},
 		},
 	}
-
-	err := retry.OnConflict(func() error {
-		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
-
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-
-		if errors.IsNotFound(err) {
-			_, createErr := i.ingressInterface.Create(ctx, ingress, v1.CreateOptions{})
-			return createErr
-		}
-
-		_, err = i.ingressInterface.Update(ctx, ingress, v1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to upsert ingress %s: %w", ingress.Name, err)
-	}
-
-	return nil
 }
