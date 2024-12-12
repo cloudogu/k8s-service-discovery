@@ -345,3 +345,24 @@ func (nph *networkPolicyHandler) RemoveExposedPorts(ctx context.Context, service
 
 	return nil
 }
+
+func (nph *networkPolicyHandler) RemoveNetworkPolicy(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+	policy, err := nph.getNetworkPolicy(ctx)
+	policyName := getExposedNetworkPolicyName(nph.ingressController.GetName())
+	if err != nil && errors.IsNotFound(err) {
+		logger.Info(fmt.Sprintf("do not delete network policy %s because it does not exists", policyName))
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = nph.networkPolicyInterface.Delete(ctx, policy.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete network policy %s: %w", policyName, err)
+	}
+
+	return nil
+}

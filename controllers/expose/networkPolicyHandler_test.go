@@ -20,6 +20,7 @@ import (
 var (
 	testCIDR    = "0.0.0.0/0"
 	netPolName  = "nginx-ingress-exposed"
+	ingressName = "nginx-ingress"
 	intStr80    = intstr.Parse("80")
 	intStr443   = intstr.Parse("443")
 	intStr5000  = intstr.Parse("5000")
@@ -470,7 +471,7 @@ func TestNewNetworkPolicyHandler(t *testing.T) {
 
 func getIngressControllerMock(t *testing.T) ingressController {
 	ingressControllerMock := newMockIngressController(t)
-	ingressControllerMock.EXPECT().GetName().Return("nginx-ingress")
+	ingressControllerMock.EXPECT().GetName().Return(ingressName)
 
 	return ingressControllerMock
 }
@@ -576,4 +577,109 @@ func Test_getServicePortMappingAnnotationKey(t *testing.T) {
 		// then
 		assert.Len(t, name, 63)
 	})
+}
+
+func Test_networkPolicyHandler_RemoveNetworkPolicy(t *testing.T) {
+	netpol, _, _, _ := getTestNetworkPolicies()
+
+	type fields struct {
+		ingressControllerMock      func() ingressController
+		networkPolicyInterfaceMock func() networkPolicyInterface
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr func(t *testing.T, err error, msg string)
+	}{
+		{
+			name: "should delete networkpolicy if existent",
+			fields: fields{
+				ingressControllerMock: func() ingressController {
+					return getIngressControllerMock(t)
+				},
+				networkPolicyInterfaceMock: func() networkPolicyInterface {
+					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
+					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(netpol, nil)
+					networkPolicyInterfaceMock.EXPECT().Delete(testCtx, netPolName, metav1.DeleteOptions{}).Return(nil)
+
+					return networkPolicyInterfaceMock
+				},
+			},
+			args: args{ctx: testCtx},
+			wantErr: func(t *testing.T, err error, msg string) {
+				require.NoError(t, err, msg)
+			},
+		},
+		{
+			name: "should do nothing if networkpolicy is no existent",
+			fields: fields{
+				ingressControllerMock: func() ingressController {
+					return getIngressControllerMock(t)
+				},
+				networkPolicyInterfaceMock: func() networkPolicyInterface {
+					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
+					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
+
+					return networkPolicyInterfaceMock
+				},
+			},
+			args: args{ctx: testCtx},
+			wantErr: func(t *testing.T, err error, msg string) {
+				require.NoError(t, err, msg)
+			},
+		},
+		{
+			name: "should return error on error getting policy",
+			fields: fields{
+				ingressControllerMock: func() ingressController {
+					return getIngressControllerMock(t)
+				},
+				networkPolicyInterfaceMock: func() networkPolicyInterface {
+					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
+					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(nil, assert.AnError)
+
+					return networkPolicyInterfaceMock
+				},
+			},
+			args: args{ctx: testCtx},
+			wantErr: func(t *testing.T, err error, msg string) {
+				require.Error(t, err, msg)
+				assert.ErrorIs(t, err, assert.AnError)
+			},
+		},
+		{
+			name: "should return error on error deleting policy",
+			fields: fields{
+				ingressControllerMock: func() ingressController {
+					return getIngressControllerMock(t)
+				},
+				networkPolicyInterfaceMock: func() networkPolicyInterface {
+					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
+					networkPolicyInterfaceMock.EXPECT().Get(testCtx, netPolName, metav1.GetOptions{}).Return(netpol, nil)
+					networkPolicyInterfaceMock.EXPECT().Delete(testCtx, netPolName, metav1.DeleteOptions{}).Return(assert.AnError)
+
+					return networkPolicyInterfaceMock
+				},
+			},
+			args: args{ctx: testCtx},
+			wantErr: func(t *testing.T, err error, msg string) {
+				require.Error(t, err, msg)
+				assert.ErrorIs(t, err, assert.AnError)
+				assert.ErrorContains(t, err, "failed to delete network policy nginx-ingress-exposed")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nph := &networkPolicyHandler{
+				ingressController:      tt.fields.ingressControllerMock(),
+				networkPolicyInterface: tt.fields.networkPolicyInterfaceMock(),
+			}
+			tt.wantErr(t, nph.RemoveNetworkPolicy(tt.args.ctx), fmt.Sprintf("RemoveNetworkPolicy(%v)", tt.args.ctx))
+		})
+	}
 }

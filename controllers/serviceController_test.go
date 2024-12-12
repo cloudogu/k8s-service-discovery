@@ -37,7 +37,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		exposedPortUpdateMock.EXPECT().RemoveExposedPorts(valuedTestCtx, "my-service").Return(nil)
 		networkPolicyUpdaterMock.EXPECT().RemoveExposedPorts(valuedTestCtx, "my-service").Return(nil)
 
-		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock)
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock, true)
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
 		// when
@@ -60,7 +60,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		exposedPortUpdateMock := NewMockExposedPortUpdater(t)
 		networkPolicyUpdaterMock := NewMockNetworkPolicyUpdater(t)
 
-		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock)
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock, true)
 
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
@@ -85,7 +85,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		exposedPortUpdateMock.EXPECT().UpsertCesLoadbalancerService(testCtx, service).Return(assert.AnError)
 		networkPolicyUpdaterMock := NewMockNetworkPolicyUpdater(t)
 
-		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock)
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock, true)
 
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
@@ -111,7 +111,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		networkPolicyUpdaterMock := NewMockNetworkPolicyUpdater(t)
 		networkPolicyUpdaterMock.EXPECT().UpsertNetworkPoliciesForService(testCtx, service).Return(assert.AnError)
 
-		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock)
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock, true)
 
 		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
 
@@ -121,5 +121,30 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to create/update network policies for service [my-service]: assert.AnError general error for testing")
+	})
+
+	t.Run("should remove networkpolicy if disabled", func(t *testing.T) {
+		// given
+		service := &corev1.Service{
+			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: testNamespace},
+		}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()
+		ingressUpdaterMock := NewMockIngressUpdater(t)
+		ingressUpdaterMock.EXPECT().UpsertIngressForService(testCtx, service).Return(nil)
+		exposedPortUpdateMock := NewMockExposedPortUpdater(t)
+		exposedPortUpdateMock.EXPECT().UpsertCesLoadbalancerService(testCtx, service).Return(nil)
+		networkPolicyUpdaterMock := NewMockNetworkPolicyUpdater(t)
+		networkPolicyUpdaterMock.EXPECT().RemoveNetworkPolicy(testCtx).Return(nil)
+
+		sut := NewServiceReconciler(clientMock, ingressUpdaterMock, exposedPortUpdateMock, networkPolicyUpdaterMock, false)
+
+		request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: "my-service"}}
+
+		// when
+		_, err := sut.Reconcile(testCtx, request)
+
+		// then
+		require.NoError(t, err)
 	})
 }

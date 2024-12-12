@@ -37,6 +37,7 @@ type ExposedPortUpdater interface {
 type NetworkPolicyUpdater interface {
 	UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error
 	RemoveExposedPorts(ctx context.Context, serviceName string) error
+	RemoveNetworkPolicy(ctx context.Context) error
 }
 
 //nolint:unused

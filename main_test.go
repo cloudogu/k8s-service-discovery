@@ -76,6 +76,7 @@ func Test_startManager(t *testing.T) {
 
 	t.Setenv("WATCH_NAMESPACE", "mynamespace")
 	t.Setenv("NETWORK_POLICIES_CIDR", "0.0.0.0/0")
+	t.Setenv("NETWORK_POLICIES_ENABLED", "true")
 
 	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given

@@ -9,6 +9,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
+	"strconv"
 )
 
 const (
@@ -24,6 +25,7 @@ const (
 
 	// networkPolicyCIDREnvVar define the ip range which is allowed to access the ingress controller if networkpolicies are enabled.
 	networkPolicyCIDREnvVar = "NETWORK_POLICIES_CIDR"
+	networkPolicyEnabled    = "NETWORK_POLICIES_ENABLED"
 )
 
 var (
@@ -122,9 +124,24 @@ func ReadWatchNamespace() (string, error) {
 func ReadNetworkPolicyCIDR() (string, error) {
 	cidr, found := os.LookupEnv(networkPolicyCIDREnvVar)
 	if !found {
-		return "", fmt.Errorf("failed to read cidr from environment variable [%s], please set the variable and try again", namespaceEnvVar)
+		return "", fmt.Errorf("failed to read cidr from environment variable [%s], please set the variable and try again", networkPolicyCIDREnvVar)
 	}
 	logger.Info(fmt.Sprintf("found ingress controller network policy cidr: [%s]", cidr))
 
 	return cidr, nil
+}
+
+func ReadNetworkPolicyEnabled() (bool, error) {
+	enabled, found := os.LookupEnv(networkPolicyEnabled)
+	if !found {
+		return true, fmt.Errorf("failed to read flag network policy enabled from environment variable [%s], please set the variable and try again", networkPolicyEnabled)
+	}
+	parseBool, err := strconv.ParseBool(enabled)
+	if err != nil {
+		return true, err
+	}
+
+	logger.Info(fmt.Sprintf("network policies enabled: [%s]", enabled))
+
+	return parseBool, nil
 }

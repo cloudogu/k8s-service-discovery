@@ -69,6 +69,52 @@ func (_c *MockNetworkPolicyUpdater_RemoveExposedPorts_Call) RunAndReturn(run fun
 	return _c
 }
 
+// RemoveNetworkPolicy provides a mock function with given fields: ctx
+func (_m *MockNetworkPolicyUpdater) RemoveNetworkPolicy(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveNetworkPolicy")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveNetworkPolicy'
+type MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call struct {
+	*mock.Call
+}
+
+// RemoveNetworkPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockNetworkPolicyUpdater_Expecter) RemoveNetworkPolicy(ctx interface{}) *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call {
+	return &MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call{Call: _e.mock.On("RemoveNetworkPolicy", ctx)}
+}
+
+func (_c *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call) Run(run func(ctx context.Context)) *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call) Return(_a0 error) *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call) RunAndReturn(run func(context.Context) error) *MockNetworkPolicyUpdater_RemoveNetworkPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpsertNetworkPoliciesForService provides a mock function with given fields: ctx, service
 func (_m *MockNetworkPolicyUpdater) UpsertNetworkPoliciesForService(ctx context.Context, service *v1.Service) error {
 	ret := _m.Called(ctx, service)
