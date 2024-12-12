@@ -129,11 +129,14 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	exposedPortUpdater := expose.NewExposedPortHandler(clientSet.CoreV1().Services(myNamespace), ingressControllerMock, myNamespace)
+	networkPolicyUpdater := expose.NewNetworkPolicyHandler(clientSet.NetworkingV1().NetworkPolicies(myNamespace), ingressControllerMock, "0.0.0.0/0")
 
 	serviceReconciler := &serviceReconciler{
-		client:             k8sManager.GetClient(),
-		ingressUpdater:     ingressCreator,
-		exposedPortUpdater: exposedPortUpdater,
+		client:                 k8sManager.GetClient(),
+		ingressUpdater:         ingressCreator,
+		exposedPortUpdater:     exposedPortUpdater,
+		networkPolicyUpdater:   networkPolicyUpdater,
+		networkPoliciesEnabled: true,
 	}
 	err = serviceReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())

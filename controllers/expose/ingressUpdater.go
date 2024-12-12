@@ -258,7 +258,7 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 }
 
 func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
-	ingress := i.getIngress(service.Name, service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
+	ingress := i.getIngress(service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
 
 	err := retry.OnConflict(func() error {
 		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
@@ -287,11 +287,11 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 	return nil
 }
 
-func (i *ingressUpdater) getIngress(name string, ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
+func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
 	pathType := networking.PathTypePrefix
 	return &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        name,
+			Name:        cesService.Name,
 			Namespace:   i.namespace,
 			Annotations: annotations,
 			Labels:      util.K8sCesServiceDiscoveryLabels,
