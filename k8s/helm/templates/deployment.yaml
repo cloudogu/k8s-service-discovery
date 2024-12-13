@@ -25,22 +25,6 @@ spec:
         {{- end }}
       containers:
       - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8080/
-        - --v=0
-        image: "{{ .Values.kubeRbacProxy.image.registry }}/{{ .Values.kubeRbacProxy.image.repository }}:{{ .Values.kubeRbacProxy.image.tag  }}"
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources: {{- toYaml .Values.kubeRbacProxy.resources | nindent 10 }}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-      - args:
         - --health-probe-bind-address=:8081
         - --metrics-bind-address=127.0.0.1:8080
         command:
@@ -52,8 +36,14 @@ spec:
               fieldPath: metadata.namespace
         - name: LOG_LEVEL
           value: {{ .Values.manager.env.logLevel | default "info" }}
+        - name: INGRESS_CONTROLLER
+          value: {{ .Values.ingress.controller | default "nginx-ingress" }}
         - name: STAGE
           value: {{ .Values.manager.env.stage | default "production" }}
+        - name: NETWORK_POLICIES_ENABLED
+          value: "{{ .Values.networkPolicies.enabled | default "true" }}"
+        - name: NETWORK_POLICIES_CIDR
+          value: {{ .Values.networkPolicies.ingressControllerAllowedCIDR | default "0.0.0.0/0" }}
         image: "{{ .Values.manager.image.registry }}/{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
         imagePullPolicy: {{ .Values.manager.imagePullPolicy | default "IfNotPresent" }}
         livenessProbe:

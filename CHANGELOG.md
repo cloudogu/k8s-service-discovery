@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- [#69] Added helm value `.ingress.controller` to define which ingress controller should be used.
+Currently, the only supported controller is `nginx-ingress`. This is also the default value.
+- [#69] Added support for networkpolicies. It is enabled by default and will allow connections from all external CIDRs on all exposed ports.
 
 ## [v1.2.0] - 2024-12-04
 ### Changed

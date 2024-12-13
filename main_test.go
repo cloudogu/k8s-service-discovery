@@ -74,7 +74,9 @@ func Test_startManager(t *testing.T) {
 		require.Contains(t, err.Error(), "failed to read namespace to watch from environment variable")
 	})
 
-	t.Setenv(namespaceEnvVar, "mynamespace")
+	t.Setenv("WATCH_NAMESPACE", "mynamespace")
+	t.Setenv("NETWORK_POLICIES_CIDR", "0.0.0.0/0")
+	t.Setenv("NETWORK_POLICIES_ENABLED", "true")
 
 	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given
@@ -96,9 +98,9 @@ func Test_startManager(t *testing.T) {
 	t.Run("fail setup when error on Add", func(t *testing.T) {
 		// given
 		k8sManager := NewMockManager(t)
-		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
+		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {

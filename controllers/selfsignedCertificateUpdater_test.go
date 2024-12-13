@@ -199,6 +199,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 
 		// when
 		err := sut.Start(ctx)
+		time.Sleep(time.Second)
 		resultChannel <- repository.GlobalConfigWatchResult{}
 
 		// then
