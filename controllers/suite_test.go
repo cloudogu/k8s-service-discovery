@@ -6,13 +6,16 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/controllers/expose"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"os"
 	"path/filepath"
@@ -43,8 +46,12 @@ var oldGetConfigOrDie func() *rest.Config
 
 var stage string
 
-const myNamespace = "my-test-namespace"
-const myIngressClassName = "my-ingress-class-name"
+const (
+	myNamespace                    = "my-test-namespace"
+	myIngressClassName             = "my-ingress-class-name"
+	mockRewriteAnnotation          = "rewrite"
+	mockAdditionalConfigurationKey = "configuration-snippet"
+)
 
 var (
 	SSLChannel chan repository.GlobalConfigWatchResult
@@ -107,12 +114,29 @@ var _ = BeforeSuite(func() {
 	globalConfigRepoMock := NewMockGlobalConfigRepository(t)
 	globalConfigRepoMock.EXPECT().Get(mock.Anything).Return(globalConfig, nil)
 
-	ingressCreator, err := NewIngressUpdater(k8sManager.GetClient(), globalConfigRepoMock, myNamespace, myIngressClassName, eventRecorder)
+	ecosystemClient, err := ecoSystem.NewForConfig(k8sManager.GetConfig())
+	Expect(err).ToNot(HaveOccurred())
+	doguInterface := ecosystemClient.Dogus(myNamespace)
+
+	ingressControllerMock := newMockIngressController(t)
+	ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return(mockRewriteAnnotation)
+	ingressControllerMock.EXPECT().GetAdditionalConfigurationKey().Return(mockAdditionalConfigurationKey)
+
+	clientSet, err := kubernetes.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
 
+	ingressCreator := expose.NewIngressUpdater(clientSet, doguInterface, globalConfigRepoMock, myNamespace, myIngressClassName, eventRecorder, ingressControllerMock)
+	Expect(err).ToNot(HaveOccurred())
+
+	exposedPortUpdater := expose.NewExposedPortHandler(clientSet.CoreV1().Services(myNamespace), ingressControllerMock, myNamespace)
+	networkPolicyUpdater := expose.NewNetworkPolicyHandler(clientSet.NetworkingV1().NetworkPolicies(myNamespace), ingressControllerMock, "0.0.0.0/0")
+
 	serviceReconciler := &serviceReconciler{
-		client:  k8sManager.GetClient(),
-		updater: ingressCreator,
+		client:                 k8sManager.GetClient(),
+		ingressUpdater:         ingressCreator,
+		exposedPortUpdater:     exposedPortUpdater,
+		networkPolicyUpdater:   networkPolicyUpdater,
+		networkPoliciesEnabled: true,
 	}
 	err = serviceReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -125,7 +149,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	// create initial ingress class
-	ingressClassCreator := NewIngressClassCreator(k8sManager.GetClient(), myIngressClassName, myNamespace, eventRecorder)
+	ingressControllerMock.EXPECT().GetControllerSpec().Return("k8s.io/nginx-ingress")
+	ingressClassCreator := expose.NewIngressClassCreator(clientSet, myIngressClassName, myNamespace, eventRecorder, ingressControllerMock)
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 

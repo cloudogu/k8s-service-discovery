@@ -2,36 +2,34 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// CesServiceAnnotation can be appended to service with information of ces services.
-const CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
-
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
-	updater IngressUpdater
-	client  client.Client
+	ingressUpdater         IngressUpdater
+	exposedPortUpdater     ExposedPortUpdater
+	networkPolicyUpdater   NetworkPolicyUpdater
+	client                 client.Client
+	networkPoliciesEnabled bool
 }
 
 // NewServiceReconciler creates a new service reconciler.
-func NewServiceReconciler(client client.Client, updater IngressUpdater) *serviceReconciler {
+func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, exposedPortUpdater ExposedPortUpdater, networkPolicyUpdater NetworkPolicyUpdater, networkPoliciesEnabled bool) *serviceReconciler {
 	return &serviceReconciler{
-		client:  client,
-		updater: updater,
+		client:                 client,
+		ingressUpdater:         ingressUpdater,
+		exposedPortUpdater:     exposedPortUpdater,
+		networkPolicyUpdater:   networkPolicyUpdater,
+		networkPoliciesEnabled: networkPoliciesEnabled,
 	}
-}
-
-// IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
-type IngressUpdater interface {
-	// UpsertIngressForService creates or updates the ingress object of the given service.
-	UpsertIngressForService(ctx context.Context, service *corev1.Service) error
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -43,31 +41,81 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := ctrl.LoggerFrom(ctx)
 
 	service, err := r.getService(ctx, req)
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logger.Info(fmt.Sprintf("failed to get service %s: %s", req.NamespacedName, err))
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
+	}
+
+	if !r.networkPoliciesEnabled {
+		// Try to delete the networkpolicy
+		logger.Info("networkpolicy support is disabled")
+		err = r.networkPolicyUpdater.RemoveNetworkPolicy(ctx)
+		if err != nil {
+			logger.Error(fmt.Errorf("failed to delete network policy: %w", err), "networkpolicy error")
+		}
+	}
+
+	if apierrors.IsNotFound(err) {
+		logger.Info(fmt.Sprintf("service %s not found", req.NamespacedName))
+		return r.handleDelete(ctx, req)
 	}
 
 	logger.Info(fmt.Sprintf("Found service [%s]", service.Name))
+	return r.handleUpsert(ctx, service)
+}
 
-	err = r.updater.UpsertIngressForService(ctx, service)
+func (r *serviceReconciler) handleUpsert(ctx context.Context, service *corev1.Service) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	err := r.ingressUpdater.UpsertIngressForService(ctx, service)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %s", service.Name, err)
+		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", service.Name, err)
+	}
+
+	err = r.exposedPortUpdater.UpsertCesLoadbalancerService(ctx, service)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create/update exposed ports for service [%s]: %w", service.Name, err)
+	}
+
+	if r.networkPoliciesEnabled {
+		logger.Info("networkpolicy support is enabled")
+		err = r.networkPolicyUpdater.UpsertNetworkPoliciesForService(ctx, service)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to create/update network policies for service [%s]: %w", service.Name, err)
+		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *serviceReconciler) handleDelete(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("remove exposed ports")
+	exposeErr := r.exposedPortUpdater.RemoveExposedPorts(ctx, req.Name)
+	var multiErr []error
+	if exposeErr != nil {
+		multiErr = append(multiErr, exposeErr)
+		logger.Error(exposeErr, fmt.Sprintf("failed to remove exposed ports for service %s", req.NamespacedName))
+	}
+
+	// Do not remove ports if networkpolicies are not enabled because the policy should be deleted anyway.
+	if r.networkPoliciesEnabled {
+		logger.Info("remove network policy ports")
+		netPolErr := r.networkPolicyUpdater.RemoveExposedPorts(ctx, req.Name)
+		if netPolErr != nil {
+			multiErr = append(multiErr, netPolErr)
+			logger.Error(netPolErr, fmt.Sprintf("failed to remove exposed ports in network policy for service %s", req.NamespacedName))
+		}
+	}
+
+	return ctrl.Result{}, errors.Join(multiErr...)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *serviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
-		WithEventFilter(predicate.Funcs{
-			DeleteFunc: func(e event.DeleteEvent) bool {
-				// We don't need to listen to delete events
-				return false
-			},
-		}).
+		// Only reconcile if the annotation changes.
+		WithEventFilter(predicate.AnnotationChangedPredicate{}).
 		Complete(r)
 }
 

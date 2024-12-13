@@ -22,23 +22,11 @@ cesWarpConfig:
       - identifier: platform
         external: true
         href: https://platform.cloudogu.com
-kubeRbacProxy:
-  image:
-    registry: gcr.io
-    repository: kubebuilder/kube-rbac-proxy
-    tag: v0.14.1
-  resources:
-    limits:
-      cpu: 500m
-      memory: 128Mi
-    requests:
-      cpu: 5m
-      memory: 64Mi
 manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-service-discovery
-    tag: 1.2.0
+    tag: 1.3.0
   env:
     logLevel: info
     stage: production
@@ -51,3 +39,9 @@ manager:
       memory: 64Mi
   replicas: 1
   imagePullPolicy: IfNotPresent
+ingress:
+  controller: nginx-ingress # currently only supported ingress controller
+networkPolicies:
+  enabled: true
+  denyAll: false
+  ingressControllerAllowedCIDR: "0.0.0.0/0"

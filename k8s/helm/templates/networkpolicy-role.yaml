@@ -1,0 +1,16 @@
+# Role Definition: networkpolicy-mode role is responsible for create/update the ingressController networkpolicy.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-service-discovery.name" . }}-networkpolicy-role
+  labels:
+  {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - networkpolicies
+    verbs:
+    - get
+    - create
+    - update

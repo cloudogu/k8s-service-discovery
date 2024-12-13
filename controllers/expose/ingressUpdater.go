@@ -1,29 +1,31 @@
-package controllers
+package expose
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
-	"github.com/cloudogu/k8s-dogu-operator/v2/controllers/annotation"
+	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	staticContentBackendName              = "nginx-static"
-	staticContentBackendPort              = 80
-	staticContentBackendRewrite           = "/errors/503.html"
-	staticContentDoguIsStartingRewrite    = "/errors/starting.html"
-	ingressRewriteTargetAnnotation        = "nginx.ingress.kubernetes.io/rewrite-target"
-	ingressConfigurationSnippetAnnotation = "nginx.ingress.kubernetes.io/configuration-snippet"
+	staticContentBackendName           = "nginx-static"
+	staticContentBackendPort           = 80
+	staticContentBackendRewrite        = "/errors/503.html"
+	staticContentDoguIsStartingRewrite = "/errors/starting.html"
+)
+
+const (
+	// CesServiceAnnotation can be appended to service with information of ces services.
+	CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
 )
 
 const (
@@ -70,8 +72,6 @@ func (sr *serviceRewrite) generateConfig() string {
 }
 
 type ingressUpdater struct {
-	// client used to communicate with k8s.
-	client client.Client
 	// globalConfig is used to read the global configuration.
 	globalConfigRepo GlobalConfigRepository
 	// Namespace defines the target namespace for the ingress objects.
@@ -81,40 +81,31 @@ type ingressUpdater struct {
 	// deploymentReadyChecker checks whether dogu are ready (healthy).
 	deploymentReadyChecker DeploymentReadyChecker
 	eventRecorder          eventRecorder
-}
-
-// DeploymentReadyChecker checks the readiness from deployments.
-type DeploymentReadyChecker interface {
-	// IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
-	IsReady(ctx context.Context, deploymentName string) (bool, error)
+	controller             ingressController
+	ingressInterface       ingressInterface
+	doguInterface          doguInterface
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(client client.Client, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder) (*ingressUpdater, error) {
-	restConfig, err := ctrl.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find cluster config: %w", err)
-	}
-
-	clientSet, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client set: %w", err)
-	}
+func NewIngressUpdater(clientSet clientSetInterface, doguInterface doguInterface, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder, controller ingressController) *ingressUpdater {
+	ingressClient := clientSet.NetworkingV1().Ingresses(namespace)
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
 	return &ingressUpdater{
-		client:                 client,
 		globalConfigRepo:       globalConfigRepo,
 		namespace:              namespace,
 		ingressClassName:       ingressClassName,
 		deploymentReadyChecker: deploymentReadyChecker,
 		eventRecorder:          recorder,
-	}, nil
+		controller:             controller,
+		ingressInterface:       ingressClient,
+		doguInterface:          doguInterface,
+	}
 }
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := isMaintenanceModeActive(ctx, i.globalConfigRepo)
+	isMaintenanceMode, err := util.IsMaintenanceModeActive(ctx, i.globalConfigRepo)
 	if err != nil {
 		return err
 	}
@@ -130,9 +121,9 @@ func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *c
 	}
 
 	for _, cesService := range cesServices {
-		err := i.upsertIngressForCesService(ctx, cesService, service, isMaintenanceMode)
-		if err != nil {
-			return fmt.Errorf("failed to create ingress object for ces service [%+v]: %w", cesService, err)
+		upsertErr := i.upsertIngressForCesService(ctx, cesService, service, isMaintenanceMode)
+		if upsertErr != nil {
+			return fmt.Errorf("failed to create ingress object for ces service [%+v]: %w", cesService, upsertErr)
 		}
 	}
 
@@ -159,9 +150,7 @@ func (i *ingressUpdater) getCesServices(service *corev1.Service) ([]CesService, 
 }
 
 func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
-	namespacedName := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
-	dogu := &doguv2.Dogu{}
-	err := i.client.Get(ctx, namespacedName, dogu)
+	dogu, err := i.doguInterface.Get(ctx, service.Name, v1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
 	}
@@ -170,7 +159,7 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service, dogu)
 	}
 
-	if hasDoguLabel(service) {
+	if util.HasDoguLabel(service) {
 		isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
 		if err != nil {
 			return err
@@ -205,7 +194,7 @@ func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv2.Ingres
 
 func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv2.Dogu) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
-	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentBackendRewrite}
+	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): staticContentBackendRewrite}
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
@@ -218,7 +207,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 
 func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
-	annotations := map[string]string{ingressRewriteTargetAnnotation: staticContentDoguIsStartingRewrite}
+	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): staticContentDoguIsStartingRewrite}
 
 	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
@@ -230,7 +219,7 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
-	serviceRewrite, err := cesService.generateRewriteConfig()
+	rewriteStr, err := cesService.generateRewriteConfig()
 	if err != nil {
 		return err
 	}
@@ -240,15 +229,15 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	encodingOverwrite := "proxy_set_header Accept-Encoding \"identity\";"
 
 	configurationSnippet := encodingOverwrite
-	if serviceRewrite != "" {
-		configurationSnippet = fmt.Sprintf("%s\n%s", encodingOverwrite, serviceRewrite)
+	if rewriteStr != "" {
+		configurationSnippet = fmt.Sprintf("%s\n%s", encodingOverwrite, rewriteStr)
 	}
 	annotations := map[string]string{
-		ingressConfigurationSnippetAnnotation: configurationSnippet,
+		i.controller.GetAdditionalConfigurationKey(): configurationSnippet,
 	}
 
 	if cesService.Pass != cesService.Location {
-		annotations[ingressRewriteTargetAnnotation] = cesService.Pass
+		annotations[i.controller.GetRewriteAnnotationKey()] = cesService.Pass
 	}
 
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
@@ -268,65 +257,75 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	return nil
 }
 
-func (i *ingressUpdater) upsertIngressObject(
-	ctx context.Context,
-	service *corev1.Service,
-	cesService CesService,
-	endpointName string,
-	endpointPort int32,
-	annotations map[string]string,
-) error {
-	pathType := networking.PathTypePrefix
-	ingress := &networking.Ingress{
-		ObjectMeta: v1.ObjectMeta{
-			Name:        cesService.Name,
-			Namespace:   i.namespace,
-			Annotations: map[string]string{},
-			Labels:      k8sCesLabels,
-		},
-	}
+func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
+	ingress := i.getIngress(service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
 
-	_, err := ctrl.CreateOrUpdate(ctx, i.client, ingress, func() error {
-		ingress.Annotations = annotations
+	err := retry.OnConflict(func() error {
+		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
 
-		ingress.Spec = networking.IngressSpec{
-			IngressClassName: &i.ingressClassName,
-			Rules: []networking.IngressRule{{
-				IngressRuleValue: networking.IngressRuleValue{
-					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{{Path: cesService.Location,
-							PathType: &pathType,
-							Backend: networking.IngressBackend{
-								Service: &networking.IngressServiceBackend{
-									Name: endpointName,
-									Port: networking.ServiceBackendPort{
-										Number: endpointPort,
-									},
-								}}}}}}}}}
-
-		err := ctrl.SetControllerReference(service, ingress, i.client.Scheme())
-		if err != nil {
-			return fmt.Errorf("failed to set controller reference for ingress: %w", err)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
 		}
+
+		if errors.IsNotFound(err) {
+			_, createErr := i.ingressInterface.Create(ctx, ingress, v1.CreateOptions{})
+			return createErr
+		}
+
+		_, err = i.ingressInterface.Update(ctx, ingress, v1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
+
 	if err != nil {
-		return fmt.Errorf("failed to create or update ingress object: %w", err)
+		return fmt.Errorf("failed to upsert ingress %s: %w", ingress.Name, err)
 	}
 
 	return nil
 }
 
-func isMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigRepository) (bool, error) {
-	globalConfig, err := globalConfigRepo.Get(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get global config for maintenance mode: %w", err)
+func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
+	pathType := networking.PathTypePrefix
+	return &networking.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name:        cesService.Name,
+			Namespace:   i.namespace,
+			Annotations: annotations,
+			Labels:      util.K8sCesServiceDiscoveryLabels,
+			OwnerReferences: []v1.OwnerReference{{
+				APIVersion: ownerType.APIVersion,
+				Kind:       ownerType.Kind,
+				Name:       ownerObject.Name,
+				UID:        ownerObject.UID,
+			}},
+		},
+		Spec: networking.IngressSpec{
+			IngressClassName: &i.ingressClassName,
+			Rules: []networking.IngressRule{
+				{
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{
+								{
+									Path:     cesService.Location,
+									PathType: &pathType,
+									Backend: networking.IngressBackend{
+										Service: &networking.IngressServiceBackend{
+											Name: endpointName,
+											Port: networking.ServiceBackendPort{
+												Number: endpointPort,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
-
-	get, ok := globalConfig.Get(maintenanceModeGlobalKey)
-	if !ok || !util.ContainsChars(get.String()) {
-		return false, nil
-	}
-
-	return true, nil
 }

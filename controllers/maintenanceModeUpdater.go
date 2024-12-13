@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/controllers/util"
 	"strings"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
@@ -110,7 +111,7 @@ func (mmu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, ma
 func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := isMaintenanceModeActive(ctx, mmu.globalConfigRepo)
+	isActive, err := util.IsMaintenanceModeActive(ctx, mmu.globalConfigRepo)
 	if err != nil {
 		return err
 	}
