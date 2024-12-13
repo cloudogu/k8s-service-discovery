@@ -20,7 +20,6 @@ const (
 // ingressClassCreator is responsible to create a cluster wide ingress class in the cluster.
 type ingressClassCreator struct {
 	className             string
-	namespace             string
 	eventRecorder         eventRecorder
 	ingressController     ingressController
 	ingressClassInterface ingressClassInterface
@@ -34,7 +33,6 @@ func NewIngressClassCreator(clientset clientSetInterface, className string, name
 
 	return &ingressClassCreator{
 		className:             className,
-		namespace:             namespace,
 		eventRecorder:         recorder,
 		ingressController:     controller,
 		ingressClassInterface: icInterface,
@@ -42,7 +40,7 @@ func NewIngressClassCreator(clientset clientSetInterface, className string, name
 	}
 }
 
-// CreateIngressClass check whether the ingress class for the generator exists. If not it will be created.
+// CreateIngressClass checks whether the ingress class for the generator exists. If not it will be created.
 func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("checking for existing ingress class [%s]", icc.className))
 	ok, err := icc.isIngressClassAvailable(ctx)
@@ -81,7 +79,7 @@ func (icc ingressClassCreator) CreateIngressClass(ctx context.Context) error {
 	return nil
 }
 
-// isIngressClassAvailable check whether an ingress class with the given name exists in the current namespace.
+// isIngressClassAvailable checks whether an ingress class with the given name exists.
 func (icc ingressClassCreator) isIngressClassAvailable(ctx context.Context) (bool, error) {
 	_, err := icc.ingressClassInterface.Get(ctx, icc.className, metav1.GetOptions{})
 	if err != nil && apierrors.IsNotFound(err) {

@@ -59,7 +59,6 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		sut := ingressClassCreator{
 			className:             className,
-			namespace:             namespace,
 			ingressClassInterface: ingressClassMock,
 			deploymentInterface:   deploymentInterfaceMock,
 			ingressController:     ingressControllerMock,
@@ -89,7 +88,6 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		sut := ingressClassCreator{
 			className:             className,
-			namespace:             namespace,
 			ingressClassInterface: ingressClassMock,
 			deploymentInterface:   deploymentInterfaceMock,
 			eventRecorder:         recorderMock,
@@ -117,7 +115,6 @@ func TestIngressClassCreator_CreateIngressClass(t *testing.T) {
 
 		sut := ingressClassCreator{
 			className:             className,
-			namespace:             namespace,
 			ingressClassInterface: ingressClassMock,
 			deploymentInterface:   deploymentInterfaceMock,
 			eventRecorder:         recorderMock,

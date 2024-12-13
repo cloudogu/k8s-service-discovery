@@ -76,6 +76,9 @@ func startManager() error {
 	logger.Info("Starting k8s-service-discovery...")
 
 	watchNamespace, err := config.ReadWatchNamespace()
+	if err != nil {
+		return fmt.Errorf("failed to read watch namespace: %w", err)
+	}
 
 	options := getK8sManagerOptions(watchNamespace)
 	if err != nil {
