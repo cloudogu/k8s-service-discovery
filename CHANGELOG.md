@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.1] - 2024-12-17
+### Fixed
+- [#72] Missing `get`-permission for ingress objects
+
 ## [v1.3.0] - 2024-12-13
 ### Added
 - [#69] Added helm value `.ingress.controller` to define which ingress controller should be used.
