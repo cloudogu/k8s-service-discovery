@@ -43,5 +43,5 @@ ingress:
   controller: nginx-ingress # currently only supported ingress controller
 networkPolicies:
   enabled: true
-  denyAll: false
+  denyAll: true
   ingressControllerAllowedCIDR: "0.0.0.0/0"
