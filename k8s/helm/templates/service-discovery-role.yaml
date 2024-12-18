@@ -32,6 +32,18 @@ rules:
       - list
       - get
       - watch
+  # update exposed ports in tcp- and udp-services configmaps
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - tcp-services
+      - udp-services
+    verbs:
+      - get
+      - update
+  # create and update ingress objects for dogus
   - apiGroups:
       - networking.k8s.io
     resources:
