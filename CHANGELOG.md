@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.2] - 2024-12-18
+### Changed
+- Activate deny all networkpolicy in helm values.
+
+### Fixed
+- [#74] Missing `get`- and `update`-permissions for `tcp-services` and `udp-services` configmaps
+  - These are necessary to update exposed ports
+
 ## [v1.3.1] - 2024-12-17
 ### Fixed
 - [#72] Missing `get`-permission for ingress objects
