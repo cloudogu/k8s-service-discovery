@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.3] - 2024-12-19
+### Fixed
+- [#101] Fix CVE-2024-45337
+
 ## [v1.3.2] - 2024-12-18
 ### Changed
 - Activate deny all networkpolicy in helm values.
