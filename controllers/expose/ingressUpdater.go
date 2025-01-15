@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strings"
 )
 
 const (
@@ -237,7 +238,9 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	}
 
 	if cesService.Pass != cesService.Location {
-		annotations[i.controller.GetRewriteAnnotationKey()] = cesService.Pass
+		annotations[i.controller.GetRewriteAnnotationKey()] = strings.TrimRight(cesService.Pass, "/") + "/$2"
+		annotations["nginx.ingress.kubernetes.io/use-regex"] = "true"
+		annotations["nginx.ingress.kubernetes.io/proxy-body-size"] = "0"
 	}
 
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
@@ -289,6 +292,11 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 
 func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
 	pathType := networking.PathTypePrefix
+	actualPath := cesService.Location
+	if cesService.Location != cesService.Pass {
+		actualPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(actualPath, "/"))
+	}
+
 	return &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        cesService.Name,
@@ -310,7 +318,7 @@ func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.Type
 						HTTP: &networking.HTTPIngressRuleValue{
 							Paths: []networking.HTTPIngressPath{
 								{
-									Path:     cesService.Location,
+									Path:     actualPath,
 									PathType: &pathType,
 									Backend: networking.IngressBackend{
 										Service: &networking.IngressServiceBackend{
