@@ -122,6 +122,10 @@ func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *c
 	}
 
 	for _, cesService := range cesServices {
+		if !strings.Contains(cesService.Name, service.Name) {
+			// Make sure that additional services contain the name of the original service
+			cesService.Name = fmt.Sprintf("%s-%s", service.Name, cesService.Name)
+		}
 		upsertErr := i.upsertIngressForCesService(ctx, cesService, service, isMaintenanceMode)
 		if upsertErr != nil {
 			return fmt.Errorf("failed to create ingress object for ces service [%+v]: %w", cesService, upsertErr)
@@ -237,12 +241,6 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 		i.controller.GetAdditionalConfigurationKey(): configurationSnippet,
 	}
 
-	if cesService.Pass != cesService.Location {
-		annotations[i.controller.GetRewriteAnnotationKey()] = strings.TrimRight(cesService.Pass, "/") + "/$2"
-		annotations["nginx.ingress.kubernetes.io/use-regex"] = "true"
-		annotations["nginx.ingress.kubernetes.io/proxy-body-size"] = "0"
-	}
-
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
 	if err != nil {
 		return err
@@ -261,6 +259,11 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 }
 
 func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
+	if cesService.Pass != cesService.Location {
+		annotations[i.controller.GetRewriteAnnotationKey()] = strings.TrimRight(cesService.Pass, "/") + "/$2"
+		annotations["nginx.ingress.kubernetes.io/use-regex"] = "true"
+		annotations["nginx.ingress.kubernetes.io/proxy-body-size"] = "0"
+	}
 	ingress := i.getIngress(service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
 
 	err := retry.OnConflict(func() error {
