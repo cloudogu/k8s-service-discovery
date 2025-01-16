@@ -241,6 +241,10 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 		i.controller.GetAdditionalConfigurationKey(): configurationSnippet,
 	}
 
+	if cesService.Pass != cesService.Location {
+		annotations[i.controller.GetRewriteAnnotationKey()] = cesService.Pass
+	}
+
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
 	if err != nil {
 		return err
@@ -260,9 +264,8 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 
 func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
 	if cesService.Pass != cesService.Location {
-		annotations[i.controller.GetRewriteAnnotationKey()] = strings.TrimRight(cesService.Pass, "/") + "/$2"
-		annotations["nginx.ingress.kubernetes.io/use-regex"] = "true"
-		annotations["nginx.ingress.kubernetes.io/proxy-body-size"] = "0"
+		annotations[i.controller.GetUseRegexKey()] = "true"
+		annotations[i.controller.GetProxyBodySizeKey()] = "0"
 	}
 	ingress := i.getIngress(service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
 
