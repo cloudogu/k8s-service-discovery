@@ -122,10 +122,6 @@ func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *c
 	}
 
 	for _, cesService := range cesServices {
-		if !strings.Contains(cesService.Name, service.Name) {
-			// Make sure that additional services contain the name of the original service
-			cesService.Name = fmt.Sprintf("%s-%s", service.Name, cesService.Name)
-		}
 		upsertErr := i.upsertIngressForCesService(ctx, cesService, service, isMaintenanceMode)
 		if upsertErr != nil {
 			return fmt.Errorf("failed to create ingress object for ces service [%+v]: %w", cesService, upsertErr)
