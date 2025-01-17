@@ -254,6 +254,51 @@ func (_c *mockIngressController_GetName_Call) RunAndReturn(run func() string) *m
 	return _c
 }
 
+// GetProxyBodySizeKey provides a mock function with given fields:
+func (_m *mockIngressController) GetProxyBodySizeKey() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetProxyBodySizeKey")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// mockIngressController_GetProxyBodySizeKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetProxyBodySizeKey'
+type mockIngressController_GetProxyBodySizeKey_Call struct {
+	*mock.Call
+}
+
+// GetProxyBodySizeKey is a helper method to define mock.On call
+func (_e *mockIngressController_Expecter) GetProxyBodySizeKey() *mockIngressController_GetProxyBodySizeKey_Call {
+	return &mockIngressController_GetProxyBodySizeKey_Call{Call: _e.mock.On("GetProxyBodySizeKey")}
+}
+
+func (_c *mockIngressController_GetProxyBodySizeKey_Call) Run(run func()) *mockIngressController_GetProxyBodySizeKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockIngressController_GetProxyBodySizeKey_Call) Return(_a0 string) *mockIngressController_GetProxyBodySizeKey_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockIngressController_GetProxyBodySizeKey_Call) RunAndReturn(run func() string) *mockIngressController_GetProxyBodySizeKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRewriteAnnotationKey provides a mock function with given fields:
 func (_m *mockIngressController) GetRewriteAnnotationKey() string {
 	ret := _m.Called()
@@ -295,6 +340,51 @@ func (_c *mockIngressController_GetRewriteAnnotationKey_Call) Return(_a0 string)
 }
 
 func (_c *mockIngressController_GetRewriteAnnotationKey_Call) RunAndReturn(run func() string) *mockIngressController_GetRewriteAnnotationKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUseRegexKey provides a mock function with given fields:
+func (_m *mockIngressController) GetUseRegexKey() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUseRegexKey")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// mockIngressController_GetUseRegexKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUseRegexKey'
+type mockIngressController_GetUseRegexKey_Call struct {
+	*mock.Call
+}
+
+// GetUseRegexKey is a helper method to define mock.On call
+func (_e *mockIngressController_Expecter) GetUseRegexKey() *mockIngressController_GetUseRegexKey_Call {
+	return &mockIngressController_GetUseRegexKey_Call{Call: _e.mock.On("GetUseRegexKey")}
+}
+
+func (_c *mockIngressController_GetUseRegexKey_Call) Run(run func()) *mockIngressController_GetUseRegexKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockIngressController_GetUseRegexKey_Call) Return(_a0 string) *mockIngressController_GetUseRegexKey_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockIngressController_GetUseRegexKey_Call) RunAndReturn(run func() string) *mockIngressController_GetUseRegexKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
