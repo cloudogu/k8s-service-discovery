@@ -119,51 +119,6 @@ func (_c *MockIngressController_ExposeOrUpdateExposedPorts_Call) RunAndReturn(ru
 	return _c
 }
 
-// GetAdditionalConfigurationKey provides a mock function with given fields:
-func (_m *MockIngressController) GetAdditionalConfigurationKey() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAdditionalConfigurationKey")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// MockIngressController_GetAdditionalConfigurationKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdditionalConfigurationKey'
-type MockIngressController_GetAdditionalConfigurationKey_Call struct {
-	*mock.Call
-}
-
-// GetAdditionalConfigurationKey is a helper method to define mock.On call
-func (_e *MockIngressController_Expecter) GetAdditionalConfigurationKey() *MockIngressController_GetAdditionalConfigurationKey_Call {
-	return &MockIngressController_GetAdditionalConfigurationKey_Call{Call: _e.mock.On("GetAdditionalConfigurationKey")}
-}
-
-func (_c *MockIngressController_GetAdditionalConfigurationKey_Call) Run(run func()) *MockIngressController_GetAdditionalConfigurationKey_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockIngressController_GetAdditionalConfigurationKey_Call) Return(_a0 string) *MockIngressController_GetAdditionalConfigurationKey_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockIngressController_GetAdditionalConfigurationKey_Call) RunAndReturn(run func() string) *MockIngressController_GetAdditionalConfigurationKey_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetControllerSpec provides a mock function with given fields:
 func (_m *MockIngressController) GetControllerSpec() string {
 	ret := _m.Called()
@@ -250,51 +205,6 @@ func (_c *MockIngressController_GetName_Call) Return(_a0 string) *MockIngressCon
 }
 
 func (_c *MockIngressController_GetName_Call) RunAndReturn(run func() string) *MockIngressController_GetName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetProxyBodySizeKey provides a mock function with given fields:
-func (_m *MockIngressController) GetProxyBodySizeKey() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetProxyBodySizeKey")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// MockIngressController_GetProxyBodySizeKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetProxyBodySizeKey'
-type MockIngressController_GetProxyBodySizeKey_Call struct {
-	*mock.Call
-}
-
-// GetProxyBodySizeKey is a helper method to define mock.On call
-func (_e *MockIngressController_Expecter) GetProxyBodySizeKey() *MockIngressController_GetProxyBodySizeKey_Call {
-	return &MockIngressController_GetProxyBodySizeKey_Call{Call: _e.mock.On("GetProxyBodySizeKey")}
-}
-
-func (_c *MockIngressController_GetProxyBodySizeKey_Call) Run(run func()) *MockIngressController_GetProxyBodySizeKey_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockIngressController_GetProxyBodySizeKey_Call) Return(_a0 string) *MockIngressController_GetProxyBodySizeKey_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockIngressController_GetProxyBodySizeKey_Call) RunAndReturn(run func() string) *MockIngressController_GetProxyBodySizeKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
