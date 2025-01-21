@@ -47,12 +47,11 @@ var oldGetConfigOrDie func() *rest.Config
 var stage string
 
 const (
-	myNamespace                    = "my-test-namespace"
-	myIngressClassName             = "my-ingress-class-name"
-	mockRewriteAnnotation          = "rewrite"
-	mockRegexAnnotation            = "regex"
-	mockProxyAnnotation            = "proxybodysize"
-	mockAdditionalConfigurationKey = "configuration-snippet"
+	myNamespace           = "my-test-namespace"
+	myIngressClassName    = "my-ingress-class-name"
+	mockRewriteAnnotation = "rewrite"
+	mockRegexAnnotation   = "regex"
+	mockProxyAnnotation   = "proxybodysize"
 )
 
 var (
@@ -124,7 +123,6 @@ var _ = BeforeSuite(func() {
 	ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return(mockRewriteAnnotation)
 	ingressControllerMock.EXPECT().GetProxyBodySizeKey().Return(mockProxyAnnotation)
 	ingressControllerMock.EXPECT().GetUseRegexKey().Return(mockRegexAnnotation)
-	ingressControllerMock.EXPECT().GetAdditionalConfigurationKey().Return(mockAdditionalConfigurationKey)
 
 	clientSet, err := kubernetes.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
