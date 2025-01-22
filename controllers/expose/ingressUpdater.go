@@ -259,7 +259,10 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 }
 
 func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
-	if cesService.Pass != cesService.Location {
+	hasNoExplicitRewrite := annotations[i.controller.GetRewriteAnnotationKey()] == cesService.Pass
+	hasDifferentRewriteLocation := cesService.Pass != cesService.Location
+	if hasDifferentRewriteLocation && hasNoExplicitRewrite {
+		annotations[i.controller.GetRewriteAnnotationKey()] = strings.TrimRight(cesService.Pass, "/") + "/$2"
 		annotations[i.controller.GetUseRegexKey()] = "true"
 		annotations[i.controller.GetProxyBodySizeKey()] = "0"
 	}
