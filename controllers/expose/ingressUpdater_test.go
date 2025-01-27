@@ -1,7 +1,9 @@
 package expose
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
@@ -245,8 +247,10 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		}
 
 		expectedIngress := getTestIngress(service, cesService[0], service.Name, 55, map[string]string{
-			"additional": "proxy_set_header Accept-Encoding \"identity\";\nrewrite ^/myPattern(/|$)(.*) /$2 break;",
-			"rewrite":    "/myPass",
+			"additional":    "proxy_set_header Accept-Encoding \"identity\";\nrewrite ^/myPattern(/|$)(.*) /$2 break;",
+			"rewrite":       "/myPass/$2",
+			"regex":         "true",
+			"proxybodysize": "0",
 		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
@@ -260,9 +264,13 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		ingressControllerMock := newMockIngressController(t)
 		ingressControllerMock.EXPECT().GetAdditionalConfigurationKey().Return("additional")
 		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
+		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
+		ingressControllerMock.EXPECT().GetProxyBodySizeKey().Return("proxybodysize")
 		ingressInterfaceMock := newMockIngressInterface(t)
 		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
+		ingressInterfaceMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, nil).Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.CreateOptions) {
+			assert.Equal(t, ingress, expectedIngress)
+		})
 
 		sut := ingressUpdater{
 			globalConfigRepo:       globalConfigRepoMock,
@@ -312,8 +320,10 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		existingIngress := getTestIngress(service, cesService[0], service.Name, 44, map[string]string{})
 
 		expectedIngress := getTestIngress(service, cesService[0], service.Name, 55, map[string]string{
-			"additional": "proxy_set_header Accept-Encoding \"identity\";\nrewrite ^/myPattern(/|$)(.*) /$2 break;",
-			"rewrite":    "/myPass",
+			"additional":    "proxy_set_header Accept-Encoding \"identity\";\nrewrite ^/myPattern(/|$)(.*) /$2 break;",
+			"rewrite":       "/myPass/$2",
+			"regex":         "true",
+			"proxybodysize": "0",
 		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
@@ -327,9 +337,13 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		ingressControllerMock := newMockIngressController(t)
 		ingressControllerMock.EXPECT().GetAdditionalConfigurationKey().Return("additional")
 		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
+		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
+		ingressControllerMock.EXPECT().GetProxyBodySizeKey().Return("proxybodysize")
 		ingressInterfaceMock := newMockIngressInterface(t)
 		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(existingIngress, nil)
-		ingressInterfaceMock.EXPECT().Update(testCtx, expectedIngress, metav1.UpdateOptions{}).Return(nil, nil)
+		ingressInterfaceMock.EXPECT().Update(testCtx, mock.Anything, metav1.UpdateOptions{}).Return(nil, nil).Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) {
+			assert.Equal(t, ingress, expectedIngress)
+		})
 
 		sut := ingressUpdater{
 			globalConfigRepo:       globalConfigRepoMock,
@@ -411,8 +425,10 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		}
 
 		expectedIngress := getTestIngress(service, cesServiceWithOneWebapp, service.Name, 12345, map[string]string{
-			"additional": "proxy_set_header Accept-Encoding \"identity\";",
-			"rewrite":    "/myPass",
+			"additional":    "proxy_set_header Accept-Encoding \"identity\";",
+			"rewrite":       "/myPass/$2",
+			"regex":         "true",
+			"proxybodysize": "0",
 		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: doguName, Namespace: testNamespace}}
@@ -424,6 +440,8 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		ingressControllerMock := newMockIngressController(t)
 		ingressControllerMock.EXPECT().GetAdditionalConfigurationKey().Return("additional")
 		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
+		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
+		ingressControllerMock.EXPECT().GetProxyBodySizeKey().Return("proxybodysize")
 
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, doguName).Return(true, nil)
@@ -460,7 +478,15 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace},
 		}
 
-		expectedIngress := getTestIngress(service, cesServiceWithOneWebapp, "nginx-static", 80, map[string]string{"rewrite": "/errors/503.html"})
+		expectedIngress := getTestIngress(
+			service,
+			cesServiceWithOneWebapp,
+			"nginx-static",
+			80,
+			map[string]string{
+				"rewrite": "/errors/503.html",
+			},
+		)
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		doguInterfaceMock := newMockDoguInterface(t)
@@ -471,7 +497,9 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Ingress for service [%s] has been updated to maintenance mode.", "test")
 		ingressInterfaceMock := newMockIngressInterface(t)
 		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
+		ingressInterfaceMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, nil).Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.CreateOptions) {
+			assert.Equal(t, ingress, expectedIngress)
+		})
 
 		sut := ingressUpdater{
 			doguInterface:    doguInterfaceMock,
@@ -502,7 +530,9 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 				Labels:    map[string]string{"dogu.name": "test"}},
 		}
 
-		expectedIngress := getTestIngress(service, cesServiceWithOneWebapp, "nginx-static", 80, map[string]string{"rewrite": "/errors/starting.html"})
+		expectedIngress := getTestIngress(service, cesServiceWithOneWebapp, "nginx-static", 80, map[string]string{
+			"rewrite": "/errors/starting.html",
+		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		doguInterfaceMock := newMockDoguInterface(t)
@@ -513,7 +543,9 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(false, nil).Once()
 		ingressInterfaceMock := newMockIngressInterface(t)
 		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
+		ingressInterfaceMock.EXPECT().Create(testCtx, mock.Anything, metav1.CreateOptions{}).Return(nil, nil).Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.CreateOptions) {
+			assert.Equal(t, expectedIngress, ingress)
+		})
 
 		sut := ingressUpdater{
 			deploymentReadyChecker: deploymentReadyChecker,
@@ -569,6 +601,10 @@ func TestCesService_generateRewriteConfig(t *testing.T) {
 func getTestIngress(service corev1.Service, cesService CesService, targetServiceName string, targetPort int32, annotations map[string]string) *v1.Ingress {
 	pathType := v1.PathTypePrefix
 	ingressClassName := testIngressClassName
+	location := cesService.Location
+	if cesService.Location != cesService.Pass {
+		location = fmt.Sprintf("%s(/|$)(.*)", location)
+	}
 	return &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        service.Name,
@@ -590,7 +626,7 @@ func getTestIngress(service corev1.Service, cesService CesService, targetService
 						HTTP: &v1.HTTPIngressRuleValue{
 							Paths: []v1.HTTPIngressPath{
 								{
-									Path:     cesService.Location,
+									Path:     location,
 									PathType: &pathType,
 									Backend: v1.IngressBackend{
 										Service: &v1.IngressServiceBackend{

@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strings"
 )
 
 const (
@@ -258,6 +259,13 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 }
 
 func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
+	hasNoExplicitRewrite := annotations[i.controller.GetRewriteAnnotationKey()] == cesService.Pass
+	hasDifferentRewriteLocation := cesService.Pass != cesService.Location
+	if hasDifferentRewriteLocation && hasNoExplicitRewrite {
+		annotations[i.controller.GetRewriteAnnotationKey()] = strings.TrimRight(cesService.Pass, "/") + "/$2"
+		annotations[i.controller.GetUseRegexKey()] = "true"
+		annotations[i.controller.GetProxyBodySizeKey()] = "0"
+	}
 	ingress := i.getIngress(service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
 
 	err := retry.OnConflict(func() error {
@@ -289,6 +297,11 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 
 func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
 	pathType := networking.PathTypePrefix
+	actualPath := cesService.Location
+	if cesService.Location != cesService.Pass {
+		actualPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(actualPath, "/"))
+	}
+
 	return &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        cesService.Name,
@@ -310,7 +323,7 @@ func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.Type
 						HTTP: &networking.HTTPIngressRuleValue{
 							Paths: []networking.HTTPIngressPath{
 								{
-									Path:     cesService.Location,
+									Path:     actualPath,
 									PathType: &pathType,
 									Backend: networking.IngressBackend{
 										Service: &networking.IngressServiceBackend{
