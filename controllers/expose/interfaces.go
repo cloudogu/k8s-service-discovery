@@ -80,8 +80,6 @@ type ingressController interface {
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
-	GetProxyBodySizeKey() string
-	GetAdditionalConfigurationKey() string
 	tcpUpdServiceExposer
 }
 

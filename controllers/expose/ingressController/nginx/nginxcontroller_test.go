@@ -59,15 +59,15 @@ func Test_controller_GetRewriteAnnotationKey(t *testing.T) {
 	})
 }
 
-func Test_controller_GetAdditionalConfigurationKey(t *testing.T) {
+func Test_controller_GetUseRegexKey(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		sut := &IngressController{}
 
 		// when
-		key := sut.GetAdditionalConfigurationKey()
+		key := sut.GetUseRegexKey()
 
 		// then
-		require.Equal(t, "nginx.ingress.kubernetes.io/configuration-snippet", key)
+		require.Equal(t, "nginx.ingress.kubernetes.io/use-regex", key)
 	})
 }

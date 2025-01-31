@@ -119,51 +119,6 @@ func (_c *mockIngressController_ExposeOrUpdateExposedPorts_Call) RunAndReturn(ru
 	return _c
 }
 
-// GetAdditionalConfigurationKey provides a mock function with given fields:
-func (_m *mockIngressController) GetAdditionalConfigurationKey() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAdditionalConfigurationKey")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// mockIngressController_GetAdditionalConfigurationKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdditionalConfigurationKey'
-type mockIngressController_GetAdditionalConfigurationKey_Call struct {
-	*mock.Call
-}
-
-// GetAdditionalConfigurationKey is a helper method to define mock.On call
-func (_e *mockIngressController_Expecter) GetAdditionalConfigurationKey() *mockIngressController_GetAdditionalConfigurationKey_Call {
-	return &mockIngressController_GetAdditionalConfigurationKey_Call{Call: _e.mock.On("GetAdditionalConfigurationKey")}
-}
-
-func (_c *mockIngressController_GetAdditionalConfigurationKey_Call) Run(run func()) *mockIngressController_GetAdditionalConfigurationKey_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockIngressController_GetAdditionalConfigurationKey_Call) Return(_a0 string) *mockIngressController_GetAdditionalConfigurationKey_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockIngressController_GetAdditionalConfigurationKey_Call) RunAndReturn(run func() string) *mockIngressController_GetAdditionalConfigurationKey_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetControllerSpec provides a mock function with given fields:
 func (_m *mockIngressController) GetControllerSpec() string {
 	ret := _m.Called()
