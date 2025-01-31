@@ -13,7 +13,9 @@ import (
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"path"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strings"
 )
 
 const (
@@ -48,18 +50,22 @@ type CesService struct {
 	Rewrite string `json:"rewrite,omitempty"`
 }
 
-func (cs CesService) generateRewriteConfig() (string, error) {
-	if cs.Rewrite == "" {
-		return "", nil
+func (cs CesService) hasRewriteConfig() bool {
+	return cs.Rewrite != ""
+}
+
+func (cs CesService) getRewriteConfig() (*serviceRewrite, error) {
+	if !cs.hasRewriteConfig() {
+		return nil, fmt.Errorf("cesService has no rewrite config")
 	}
 
 	serviceRewrite := &serviceRewrite{}
 	err := json.Unmarshal([]byte(cs.Rewrite), serviceRewrite)
 	if err != nil {
-		return "", fmt.Errorf("failed to read service rewrite from ces service: %w", err)
+		return nil, fmt.Errorf("failed to read service rewrite from ces service: %w", err)
 	}
 
-	return serviceRewrite.generateConfig(), nil
+	return serviceRewrite, nil
 }
 
 type serviceRewrite struct {
@@ -196,7 +202,7 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): staticContentBackendRewrite}
 
-	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
+	err := i.upsertIngressObject(ctx, cesService.Name, service, cesService.Location, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
 		return fmt.Errorf(failedIngressUpdateErrMsg, err)
 	}
@@ -209,7 +215,7 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
 	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): staticContentDoguIsStartingRewrite}
 
-	err := i.upsertIngressObject(ctx, service, cesService, staticContentBackendName, staticContentBackendPort, annotations)
+	err := i.upsertIngressObject(ctx, cesService.Name, service, cesService.Location, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
 		return fmt.Errorf(failedIngressUpdateErrMsg, err)
 	}
@@ -219,37 +225,37 @@ func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, 
 
 func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
-	rewriteStr, err := cesService.generateRewriteConfig()
-	if err != nil {
-		return err
+
+	ingressPath := cesService.Location
+	annotations := map[string]string{}
+
+	if cesService.hasRewriteConfig() {
+		// the service has rewrite-config, we need to add it
+		rewriteCfg, err := cesService.getRewriteConfig()
+		if err != nil {
+			return fmt.Errorf("error getting rewrite-config from ces-service: %w", err)
+		}
+
+		annotations[i.controller.GetRewriteAnnotationKey()] = rewriteCfg.Rewrite
+		annotations[i.controller.GetUseRegexKey()] = "true"
+		ingressPath = rewriteCfg.Pattern
+	} else if cesService.Pass != cesService.Location {
+		// only add the rewrite-target if there is no explicit rewrite-config and the cesService.Pass is different the location
+		annotations[i.controller.GetRewriteAnnotationKey()] = path.Join(cesService.Pass, "$2")
+		annotations[i.controller.GetUseRegexKey()] = "true"
+		ingressPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(ingressPath, "/"))
 	}
 
-	// This should overwrite the `Accept-Encoding: "gzip"` header that browsers send.
-	// Gzipping by dogus is a problem because it prevents the warp menu from being injected.
-	encodingOverwrite := "proxy_set_header Accept-Encoding \"identity\";"
-
-	configurationSnippet := encodingOverwrite
-	if rewriteStr != "" {
-		configurationSnippet = fmt.Sprintf("%s\n%s", encodingOverwrite, rewriteStr)
-	}
-	annotations := map[string]string{
-		i.controller.GetAdditionalConfigurationKey(): configurationSnippet,
-	}
-
-	if cesService.Pass != cesService.Location {
-		annotations[i.controller.GetRewriteAnnotationKey()] = cesService.Pass
-	}
-
+	// add other additional annotations (can possibly overwrite the rewrite annotations)
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
 	if err != nil {
 		return err
 	}
-
 	for key, value := range additionalAnnotations {
 		annotations[key] = value
 	}
 
-	err = i.upsertIngressObject(ctx, service, cesService, service.GetName(), int32(cesService.Port), annotations)
+	err = i.upsertIngressObject(ctx, cesService.Name, service, ingressPath, service.GetName(), int32(cesService.Port), annotations)
 	if err != nil {
 		return fmt.Errorf(failedIngressUpdateErrMsg, err)
 	}
@@ -257,8 +263,8 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	return nil
 }
 
-func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev1.Service, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) error {
-	ingress := i.getIngress(service.ObjectMeta, service.TypeMeta, cesService, endpointName, endpointPort, annotations)
+func (i *ingressUpdater) upsertIngressObject(ctx context.Context, ingressName string, service *corev1.Service, path string, endpointName string, endpointPort int32, annotations map[string]string) error {
+	ingress := i.getIngress(ingressName, service.ObjectMeta, service.TypeMeta, path, endpointName, endpointPort, annotations)
 
 	err := retry.OnConflict(func() error {
 		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
@@ -287,11 +293,12 @@ func (i *ingressUpdater) upsertIngressObject(ctx context.Context, service *corev
 	return nil
 }
 
-func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, cesService CesService, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
+func (i *ingressUpdater) getIngress(ingressName string, ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, path string, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
 	pathType := networking.PathTypePrefix
+
 	return &networking.Ingress{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        cesService.Name,
+			Name:        ingressName,
 			Namespace:   i.namespace,
 			Annotations: annotations,
 			Labels:      util.K8sCesServiceDiscoveryLabels,
@@ -310,7 +317,7 @@ func (i *ingressUpdater) getIngress(ownerObject v1.ObjectMeta, ownerType v1.Type
 						HTTP: &networking.HTTPIngressRuleValue{
 							Paths: []networking.HTTPIngressPath{
 								{
-									Path:     cesService.Location,
+									Path:     path,
 									PathType: &pathType,
 									Backend: networking.IngressBackend{
 										Service: &networking.IngressServiceBackend{

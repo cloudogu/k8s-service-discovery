@@ -24,6 +24,6 @@ type IngressController interface {
 	GetName() string
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
-	GetAdditionalConfigurationKey() string
+	GetUseRegexKey() string
 	tcpUpdServiceExposer
 }

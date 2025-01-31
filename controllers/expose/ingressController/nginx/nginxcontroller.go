@@ -1,10 +1,10 @@
 package nginx
 
 const (
-	ingressRewriteTargetAnnotation        = "nginx.ingress.kubernetes.io/rewrite-target"
-	ingressConfigurationSnippetAnnotation = "nginx.ingress.kubernetes.io/configuration-snippet"
-	nginxIngressControllerSpec            = "k8s.io/nginx-ingress"
-	nginxIngressControllerName            = "nginx-ingress"
+	ingressRewriteTargetAnnotation = "nginx.ingress.kubernetes.io/rewrite-target"
+	ingressUseRegexAnnotation      = "nginx.ingress.kubernetes.io/use-regex"
+	nginxIngressControllerSpec     = "k8s.io/nginx-ingress"
+	nginxIngressControllerName     = "nginx-ingress"
 )
 
 type IngressController struct {
@@ -29,6 +29,6 @@ func (c *IngressController) GetRewriteAnnotationKey() string {
 	return ingressRewriteTargetAnnotation
 }
 
-func (c *IngressController) GetAdditionalConfigurationKey() string {
-	return ingressConfigurationSnippetAnnotation
+func (c *IngressController) GetUseRegexKey() string {
+	return ingressUseRegexAnnotation
 }

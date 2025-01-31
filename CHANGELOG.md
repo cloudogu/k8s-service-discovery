@@ -6,9 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.4] - 2025-01-31
+### Changed
+- [#80] remove `configuration-snippet`-annotation and use `rewrite-target`-annotation instead 
+
 ## [v1.3.3] - 2024-12-19
 ### Fixed
-- [#101] Fix CVE-2024-45337
+- [#76] Fix CVE-2024-45337
 
 ## [v1.3.2] - 2024-12-18
 ### Changed
