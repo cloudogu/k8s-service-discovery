@@ -32,11 +32,10 @@ manager:
     stage: production
   resources:
     limits:
-      cpu: 500m
-      memory: 128Mi
+      memory: 105M
     requests:
-      cpu: 10m
-      memory: 64Mi
+      cpu: 15m
+      memory: 105M
   replicas: 1
   imagePullPolicy: IfNotPresent
 ingress:
