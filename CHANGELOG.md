@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- [#82] Set sensible resource requests and limits
+
 ## [v1.3.4] - 2025-01-31
 ### Changed
 - [#80] remove `configuration-snippet`-annotation and use `rewrite-target`-annotation instead 
