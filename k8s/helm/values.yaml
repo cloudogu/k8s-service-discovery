@@ -26,17 +26,16 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-service-discovery
-    tag: 1.3.4
+    tag: 1.4.0
   env:
     logLevel: info
     stage: production
   resources:
     limits:
-      cpu: 500m
-      memory: 128Mi
+      memory: 105M
     requests:
-      cpu: 10m
-      memory: 64Mi
+      cpu: 15m
+      memory: 105M
   replicas: 1
   imagePullPolicy: IfNotPresent
 ingress:
