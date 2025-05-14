@@ -1,6 +1,11 @@
 package controllers
 
 import (
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -17,6 +22,17 @@ import (
 )
 
 const testNamespace = "my-namespace"
+
+func getScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group:   "k8s.cloudogu.com",
+		Version: "v1",
+		Kind:    "Dogu",
+	}, &doguv2.Dogu{})
+	return scheme
+}
 
 func TestNewDeploymentReconciler(t *testing.T) {
 	t.Run("successfully create deployment reconciler", func(t *testing.T) {

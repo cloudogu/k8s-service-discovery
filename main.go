@@ -10,10 +10,8 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
-	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
-	ginlogrus "github.com/toorop/gin-logrus"
 	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"os"
 
@@ -34,12 +32,10 @@ import (
 
 	"github.com/cloudogu/k8s-service-discovery/controllers"
 	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
-	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
 )
 
 const (
 	IngressClassName = "k8s-ecosystem-ces-service"
-	apiPort          = 9090
 )
 
 var (
@@ -81,9 +77,6 @@ func startManager() error {
 	}
 
 	options := getK8sManagerOptions(watchNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to get manager options: %w", err)
-	}
 
 	serviceDiscManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
@@ -97,6 +90,7 @@ func startManager() error {
 		return fmt.Errorf("failed to create k8s client set: %w", err)
 	}
 	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
+	secretInterface := clientset.CoreV1().Secrets(watchNamespace)
 	ingressControllerStr := config.ReadIngressController()
 	controller := ingressController.ParseIngressController(ingressControllerStr, configMapInterface)
 
@@ -108,17 +102,11 @@ func startManager() error {
 	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
 	globalConfigRepo := repository.NewGlobalConfigRepository(configMapInterface)
 
-	provideSSLAPI(globalConfigRepo)
-
 	if err = handleWarpMenuCreation(serviceDiscManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, globalConfigRepo); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
-	if err = handleSslUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, eventRecorder); err != nil {
-		return fmt.Errorf("failed to create ssl certificate updater: %w", err)
-	}
-
-	if err = handleSelfsignedCertificateUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, eventRecorder); err != nil {
+	if err = handleSelfsignedCertificateUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, secretInterface); err != nil {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
@@ -148,7 +136,15 @@ func startManager() error {
 
 	networkPolicyUpdater := expose.NewNetworkPolicyHandler(networkPolicyInterface, controller, cidr)
 
-	if err = configureManager(serviceDiscManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkpoliciesEnabled); err != nil {
+	if err = configureManager(
+		serviceDiscManager,
+		ingressUpdater,
+		exposedPortUpdater,
+		networkPolicyUpdater,
+		networkpoliciesEnabled,
+		secretInterface,
+		globalConfigRepo,
+	); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
 
@@ -168,18 +164,16 @@ func getK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	return k8sClientSet, nil
 }
 
-func provideSSLAPI(globalConfigRepo controllers.GlobalConfigRepository) {
-	go func() {
-		router := createSSLAPIRouter(globalConfigRepo)
-		err := router.Run(fmt.Sprintf(":%d", apiPort))
-		if err != nil {
-			logger.Error(fmt.Errorf("failed to start gin router %w", err), "SSL api error")
-		}
-	}()
-}
-
-func configureManager(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater, networkPolicyUpdater controllers.NetworkPolicyUpdater, networkPoliciesEnabled bool) error {
-	if err := configureReconciler(k8sManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkPoliciesEnabled); err != nil {
+func configureManager(
+	k8sManager k8sManager,
+	ingressUpdater controllers.IngressUpdater,
+	exposedPortUpdater controllers.ExposedPortUpdater,
+	networkPolicyUpdater controllers.NetworkPolicyUpdater,
+	networkPoliciesEnabled bool,
+	secretInterface corev1.SecretInterface,
+	globalConfigRepo controllers.GlobalConfigRepository,
+) error {
+	if err := configureReconciler(k8sManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkPoliciesEnabled, secretInterface, globalConfigRepo); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
@@ -244,18 +238,8 @@ func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.Dogu
 	return nil
 }
 
-func handleSslUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, recorder record.EventRecorder) error {
-	sslUpdater := controllers.NewSslCertificateUpdater(k8sManager.GetClient(), namespace, globalConfigRepo, recorder)
-
-	if err := k8sManager.Add(sslUpdater); err != nil {
-		return fmt.Errorf("failed to add ssl certificate updater as runnable to the manager: %w", err)
-	}
-
-	return nil
-}
-
-func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, recorder record.EventRecorder) error {
-	selfsignedCertificateUpdater := controllers.NewSelfsignedCertificateUpdater(k8sManager.GetClient(), namespace, globalConfigRepo, recorder)
+func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, secretClient controllers.SecretClient) error {
+	selfsignedCertificateUpdater := controllers.NewSelfsignedCertificateUpdater(namespace, globalConfigRepo, secretClient)
 
 	if err := k8sManager.Add(selfsignedCertificateUpdater); err != nil {
 		return fmt.Errorf("failed to add selfsigned certificate updater as runnable to the manager: %w", err)
@@ -277,7 +261,7 @@ func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater cont
 	return nil
 }
 
-func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater, networkPolicyUpdater controllers.NetworkPolicyUpdater, networkPoliciesEnabled bool) error {
+func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater, networkPolicyUpdater controllers.NetworkPolicyUpdater, networkPoliciesEnabled bool, secretInterface corev1.SecretInterface, globalConfigRepo controllers.GlobalConfigRepository) error {
 	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkPoliciesEnabled)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
@@ -286,6 +270,11 @@ func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.Ingre
 	deploymentReconciler := controllers.NewDeploymentReconciler(k8sManager.GetClient(), ingressUpdater)
 	if err := deploymentReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup deployment reconciler with the manager: %w", err)
+	}
+
+	ecosystemCertificateReconciler := controllers.NewEcosystemCertificateReconciler(secretInterface, globalConfigRepo)
+	if err := ecosystemCertificateReconciler.SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("failed to setup ecosystem certificate reconciler with the manager: %w", err)
 	}
 
 	return nil
@@ -301,12 +290,4 @@ func addChecks(mgr k8sManager) error {
 	}
 
 	return nil
-}
-
-func createSSLAPIRouter(globalConfigRepo controllers.GlobalConfigRepository) *gin.Engine {
-	router := gin.New()
-	router.Use(ginlogrus.Logger(logrus.StandardLogger()), gin.Recovery())
-	logger.Info("Setup ssl api")
-	ssl.SetupAPI(router, globalConfigRepo)
-	return router
 }

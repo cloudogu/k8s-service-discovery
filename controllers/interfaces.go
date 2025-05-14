@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -105,4 +106,8 @@ type deploymentInterface interface {
 //goland:noinspection GoUnusedType
 type ingressClassInterface interface {
 	netv1.IngressClassInterface
+}
+
+type SecretClient interface {
+	corev1client.SecretInterface
 }

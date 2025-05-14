@@ -1,12 +1,18 @@
 package ssl
 
 import (
-	"context"
-	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
+)
+
+const (
+	cert        = "cert"
+	key         = "key"
+	certEncoded = "Y2VydA=="
+	keyEncoded  = "a2V5"
 )
 
 func Test_sslWriter_WriteCertificate(t *testing.T) {
@@ -14,89 +20,54 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		// given
-		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-		globalConfig := registryconfig.GlobalConfig{
-			Config: registryconfig.CreateConfig(registryconfig.Entries{}),
-		}
 
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-		globalConfigRepoMock.EXPECT().Update(testCtx, mock.Anything).RunAndReturn(func(ctx context.Context, config registryconfig.GlobalConfig) (registryconfig.GlobalConfig, error) {
-			assert.Equal(t, 3, len(config.GetChangeHistory()))
-			certType, _ := config.Get("certificate/type")
-			assert.Equal(t, "self-signed", certType.String())
-			cert, _ := config.Get("certificate/server.crt")
-			assert.Equal(t, "cert", cert.String())
-			key, _ := config.Get("certificate/server.key")
-			assert.Equal(t, "key", key.String())
+		secretClientMock := NewMockSecretClient(t)
+		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
+		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(certEncoded),
+			"tls.key": []byte(keyEncoded),
+		}}, v1.UpdateOptions{}).Return(nil, nil)
 
-			return registryconfig.GlobalConfig{}, nil
-		})
-		writer := NewSSLWriter(globalConfigRepoMock)
+		writer := NewSSLWriter(secretClientMock)
 
 		// when
-		err := writer.WriteCertificate(testCtx, "self-signed", "cert", "key")
+		err := writer.WriteCertificate(testCtx, cert, key)
 
 		// then
 		require.NoError(t, err)
 	})
 
-	t.Run("failed to write type", func(t *testing.T) {
+	t.Run("failed to get ecosystem-certificate secret", func(t *testing.T) {
 		// given
-		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-		globalConfig := registryconfig.GlobalConfig{
-			Config: registryconfig.CreateConfig(registryconfig.Entries{
-				"certificate/type/key": "already a dictionary",
-			}),
-		}
+		secretClientMock := NewMockSecretClient(t)
+		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(nil, assert.AnError)
 
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-		writer := NewSSLWriter(globalConfigRepoMock)
+		writer := NewSSLWriter(secretClientMock)
 
 		// when
-		err := writer.WriteCertificate(testCtx, "self-signed", "cert", "key")
+		err := writer.WriteCertificate(testCtx, cert, key)
 
 		// then
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to set certificate type")
+		assert.Contains(t, err.Error(), "failed to get secret for ssl creation: ")
 	})
 
-	t.Run("failed to write certificate", func(t *testing.T) {
+	t.Run("failed to update certificate secret", func(t *testing.T) {
 		// given
-		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-		globalConfig := registryconfig.GlobalConfig{
-			Config: registryconfig.CreateConfig(registryconfig.Entries{
-				"certificate/server.crt/key": "already a dictionary",
-			}),
-		}
+		secretClientMock := NewMockSecretClient(t)
+		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
+		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(certEncoded),
+			"tls.key": []byte(keyEncoded),
+		}}, v1.UpdateOptions{}).Return(nil, assert.AnError)
 
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-		writer := NewSSLWriter(globalConfigRepoMock)
+		writer := NewSSLWriter(secretClientMock)
 
 		// when
-		err := writer.WriteCertificate(testCtx, "self-signed", "cert", "key")
+		err := writer.WriteCertificate(testCtx, cert, key)
 
 		// then
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to set certificate")
-	})
-
-	t.Run("failed to write certificate key", func(t *testing.T) {
-		// given
-		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-		globalConfig := registryconfig.GlobalConfig{
-			Config: registryconfig.CreateConfig(registryconfig.Entries{
-				"certificate/server.key/key": "already a dictionary",
-			}),
-		}
-
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-		writer := NewSSLWriter(globalConfigRepoMock)
-
-		// when
-		err := writer.WriteCertificate(testCtx, "self-signed", "cert", "key")
-
-		// then
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to set certificate key")
+		assert.Contains(t, err.Error(), "failed to update secret writing ssl:")
 	})
 }
