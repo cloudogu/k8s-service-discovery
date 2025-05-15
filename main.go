@@ -9,6 +9,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController"
+	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -101,6 +102,10 @@ func startManager() error {
 	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
 	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
 	globalConfigRepo := repository.NewGlobalConfigRepository(configMapInterface)
+
+	if err = handleCertificateKeyDeletionOutOfGlobalConfig(serviceDiscManager, globalConfigRepo); err != nil {
+		return fmt.Errorf("failed to create certificate key remover: %w", err)
+	}
 
 	if err = handleWarpMenuCreation(serviceDiscManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, globalConfigRepo); err != nil {
 		return fmt.Errorf("failed to create warp menu creator: %w", err)
@@ -223,6 +228,16 @@ func handleIngressClassCreation(k8sManager k8sManager, clientSet *kubernetes.Cli
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
 		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)
+	}
+
+	return nil
+}
+
+func handleCertificateKeyDeletionOutOfGlobalConfig(k8sManager k8sManager, globalConfigRepo controllers.GlobalConfigRepository) error {
+	certificateKeyRemover := ssl.NewCertificateKeyRemover(globalConfigRepo)
+
+	if err := k8sManager.Add(certificateKeyRemover); err != nil {
+		return fmt.Errorf("failed to add certificate key remover as runnable to the manager: %w", err)
 	}
 
 	return nil
