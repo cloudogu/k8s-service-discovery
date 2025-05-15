@@ -3,12 +3,10 @@ package ssl
 import (
 	"context"
 	"fmt"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-const certificateSecretName = "ecosystem-certificate"
-const certificateSecretPublicKey = "tls.crt"
-const certificateSecretPrivateKey = "tls.key"
 
 type sslWriter struct {
 	secretClient SecretClient
@@ -28,8 +26,8 @@ func (sw *sslWriter) WriteCertificate(ctx context.Context, cert string, key stri
 		return fmt.Errorf("failed to get secret for ssl creation: %w", err)
 	}
 
-	certificateSecret.Data[certificateSecretPublicKey] = []byte(cert)
-	certificateSecret.Data[certificateSecretPrivateKey] = []byte(key)
+	certificateSecret.Data[v1.TLSCertKey] = []byte(cert)
+	certificateSecret.Data[v1.TLSPrivateKeyKey] = []byte(key)
 
 	_, err = sw.secretClient.Update(ctx, certificateSecret, metav1.UpdateOptions{})
 	if err != nil {

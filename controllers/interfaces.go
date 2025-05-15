@@ -41,6 +41,10 @@ type NetworkPolicyUpdater interface {
 	RemoveNetworkPolicy(ctx context.Context) error
 }
 
+type certificateSynchronizer interface {
+	Synchronize(ctx context.Context) error
+}
+
 //nolint:unused
 //goland:noinspection GoUnusedType
 type doguInterface interface {

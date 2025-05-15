@@ -2,14 +2,7 @@ package controllers
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-registry-lib/errors"
-	"github.com/cloudogu/retry-lib/retry"
-
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -17,22 +10,19 @@ import (
 )
 
 const (
-	certificateSecretName  = "ecosystem-certificate"
-	serverCertificateID    = "certificate/server.crt"
-	serverCertificateKeyID = "certificate/server.key"
+	certificateSecretName = "ecosystem-certificate"
+	serverCertificateID   = "certificate/server.crt"
 )
 
 // ecosystemCertificateReconciler watches the ecosystem-certificate secret in the cluster and synchronizes it to the global config.
 type ecosystemCertificateReconciler struct {
-	secretInterface  SecretClient
-	globalConfigRepo GlobalConfigRepository
+	certSync certificateSynchronizer
 }
 
 // NewEcosystemCertificateReconciler creates a new reconciler for the ecosystem-certificate secret.
-func NewEcosystemCertificateReconciler(secretInterface SecretClient, globalConfigRepo GlobalConfigRepository) *ecosystemCertificateReconciler {
+func NewEcosystemCertificateReconciler(certSync certificateSynchronizer) *ecosystemCertificateReconciler {
 	return &ecosystemCertificateReconciler{
-		secretInterface:  secretInterface,
-		globalConfigRepo: globalConfigRepo,
+		certSync: certSync,
 	}
 }
 
@@ -40,51 +30,8 @@ func NewEcosystemCertificateReconciler(secretInterface SecretClient, globalConfi
 // move the current state of the cluster closer to the desired state.
 //
 // The ecosystemCertificateReconciler is responsible to write changes of the ecosystem certificate to the global config.
-func (r *ecosystemCertificateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := ctrl.LoggerFrom(ctx)
-
-	secret, err := r.secretInterface.Get(ctx, req.Name, metav1.GetOptions{})
-	if err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(fmt.Errorf("failed to get ecosystem certificate secret: %w", err))
-	}
-
-	certificateBytes, exists := secret.Data[v1.TLSCertKey]
-	if !exists {
-		return ctrl.Result{}, fmt.Errorf("could not find certificate in ecosystem certificate secret")
-	}
-
-	logger.Info("Updating ecosystem certificate in global config...")
-	err = r.updateCertificate(ctx, certificateBytes)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update ecosystem certificate in global config: %w", err)
-	}
-
-	logger.Info("Updated ecosystem certificate in global config")
-	return ctrl.Result{}, nil
-}
-
-func (r *ecosystemCertificateReconciler) updateCertificate(ctx context.Context, certificateBytes []byte) error {
-	return retry.OnError(1000, errors.IsConflictError, func() error {
-		globalConfig, err := r.globalConfigRepo.Get(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get global config object: %w", err)
-		}
-
-		globalConfig.Config, err = globalConfig.Set(serverCertificateID, config.Value(certificateBytes))
-		if err != nil {
-			return fmt.Errorf("failed to set ecosystem certificate in global config object: %w", err)
-		}
-
-		// delete private key since it is a security risk
-		globalConfig.Config = globalConfig.Delete(serverCertificateKeyID)
-
-		_, err = r.globalConfigRepo.Update(ctx, globalConfig)
-		if err != nil {
-			return fmt.Errorf("failed write global config object: %w", err)
-		}
-
-		return nil
-	})
+func (r *ecosystemCertificateReconciler) Reconcile(ctx context.Context, _ ctrl.Request) (ctrl.Result, error) {
+	return ctrl.Result{}, r.certSync.Synchronize(ctx)
 }
 
 // SetupWithManager sets up the controller with the Manager.

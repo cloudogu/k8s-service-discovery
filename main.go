@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
@@ -11,15 +14,13 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
 	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
-	"k8s.io/client-go/kubernetes"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
-	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -102,8 +103,9 @@ func startManager() error {
 	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
 	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
 	globalConfigRepo := repository.NewGlobalConfigRepository(configMapInterface)
+	certSync := ssl.NewCertificateSynchronizer(secretInterface, globalConfigRepo)
 
-	if err = handleCertificateKeyDeletionOutOfGlobalConfig(serviceDiscManager, globalConfigRepo); err != nil {
+	if err = handleCertificateSynchronization(serviceDiscManager, certSync); err != nil {
 		return fmt.Errorf("failed to create certificate key remover: %w", err)
 	}
 
@@ -147,8 +149,7 @@ func startManager() error {
 		exposedPortUpdater,
 		networkPolicyUpdater,
 		networkpoliciesEnabled,
-		secretInterface,
-		globalConfigRepo,
+		certSync,
 	); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
@@ -169,16 +170,26 @@ func getK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	return k8sClientSet, nil
 }
 
+type certificateSynchronizer interface {
+	Synchronize(ctx context.Context) error
+}
+
 func configureManager(
 	k8sManager k8sManager,
 	ingressUpdater controllers.IngressUpdater,
 	exposedPortUpdater controllers.ExposedPortUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
-	secretInterface corev1.SecretInterface,
-	globalConfigRepo controllers.GlobalConfigRepository,
+	certSync certificateSynchronizer,
 ) error {
-	if err := configureReconciler(k8sManager, ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkPoliciesEnabled, secretInterface, globalConfigRepo); err != nil {
+	if err := configureReconciler(
+		k8sManager,
+		ingressUpdater,
+		exposedPortUpdater,
+		networkPolicyUpdater,
+		networkPoliciesEnabled,
+		certSync,
+	); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
 
@@ -233,10 +244,8 @@ func handleIngressClassCreation(k8sManager k8sManager, clientSet *kubernetes.Cli
 	return nil
 }
 
-func handleCertificateKeyDeletionOutOfGlobalConfig(k8sManager k8sManager, globalConfigRepo controllers.GlobalConfigRepository) error {
-	certificateKeyRemover := ssl.NewCertificateKeyRemover(globalConfigRepo)
-
-	if err := k8sManager.Add(certificateKeyRemover); err != nil {
+func handleCertificateSynchronization(k8sManager k8sManager, certificateSynchronizer manager.Runnable) error {
+	if err := k8sManager.Add(certificateSynchronizer); err != nil {
 		return fmt.Errorf("failed to add certificate key remover as runnable to the manager: %w", err)
 	}
 
@@ -276,7 +285,14 @@ func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater cont
 	return nil
 }
 
-func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.IngressUpdater, exposedPortUpdater controllers.ExposedPortUpdater, networkPolicyUpdater controllers.NetworkPolicyUpdater, networkPoliciesEnabled bool, secretInterface corev1.SecretInterface, globalConfigRepo controllers.GlobalConfigRepository) error {
+func configureReconciler(
+	k8sManager k8sManager,
+	ingressUpdater controllers.IngressUpdater,
+	exposedPortUpdater controllers.ExposedPortUpdater,
+	networkPolicyUpdater controllers.NetworkPolicyUpdater,
+	networkPoliciesEnabled bool,
+	certSync certificateSynchronizer,
+) error {
 	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkPoliciesEnabled)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
@@ -287,7 +303,7 @@ func configureReconciler(k8sManager k8sManager, ingressUpdater controllers.Ingre
 		return fmt.Errorf("failed to setup deployment reconciler with the manager: %w", err)
 	}
 
-	ecosystemCertificateReconciler := controllers.NewEcosystemCertificateReconciler(secretInterface, globalConfigRepo)
+	ecosystemCertificateReconciler := controllers.NewEcosystemCertificateReconciler(certSync)
 	if err := ecosystemCertificateReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup ecosystem certificate reconciler with the manager: %w", err)
 	}
