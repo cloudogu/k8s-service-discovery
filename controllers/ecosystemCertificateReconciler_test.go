@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	regErrs "github.com/cloudogu/k8s-registry-lib/errors"
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"testing"
@@ -71,14 +70,11 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "should fail to decode ecosystem certificate",
+			name: "should fail to find secret key",
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) SecretClient {
 					m := NewMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(
-						&v1.Secret{Data: map[string][]byte{
-							v1.TLSCertKey: []byte("not base64"),
-						}}, nil)
+					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -91,7 +87,7 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			},
 			want: controllerruntime.Result{},
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorContains(t, err, "failed to decode ecosystem certificate", i)
+				return assert.ErrorContains(t, err, "could not find certificate in ecosystem certificate secret", i)
 			},
 		},
 		{
@@ -99,7 +95,7 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) SecretClient {
 					m := NewMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
+					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -123,7 +119,7 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) SecretClient {
 					m := NewMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
+					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -147,13 +143,17 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) SecretClient {
 					m := NewMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
+					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
 					m := NewMockGlobalConfigRepository(t)
 					m.EXPECT().Get(testCtx).Return(config.CreateGlobalConfig(config.Entries{}), nil)
-					m.EXPECT().Update(testCtx, mock.Anything).Return(config.GlobalConfig{}, assert.AnError)
+					expectedGlobalConfig := config.CreateGlobalConfig(config.Entries{})
+					var err error
+					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.crt", "mycert")
+					assert.NoError(t, err)
+					m.EXPECT().Update(testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, assert.AnError)
 					return m
 				},
 			},
@@ -172,14 +172,18 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) SecretClient {
 					m := NewMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
+					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
 					m := NewMockGlobalConfigRepository(t)
 					m.EXPECT().Get(testCtx).Return(config.CreateGlobalConfig(config.Entries{}), nil)
-					firstCall := m.On("Update", testCtx, mock.Anything).Return(config.GlobalConfig{}, regErrs.NewConflictError(assert.AnError)).Once()
-					m.EXPECT().Update(testCtx, mock.Anything).Return(config.GlobalConfig{}, nil).NotBefore(firstCall).Once()
+					expectedGlobalConfig := config.CreateGlobalConfig(config.Entries{})
+					var err error
+					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.crt", "mycert")
+					assert.NoError(t, err)
+					firstCall := m.On("Update", testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, regErrs.NewConflictError(assert.AnError)).Once()
+					m.EXPECT().Update(testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, nil).NotBefore(firstCall).Once()
 					return m
 				},
 			},
@@ -203,6 +207,12 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "Reconcile(%v, %v)", testCtx, tt.req)
 		})
 	}
+}
+
+func createCertificateSecret() *v1.Secret {
+	return &v1.Secret{Data: map[string][]byte{
+		v1.TLSCertKey: []byte("mycert"),
+	}}
 }
 
 func TestNewEcosystemCertificateReconciler(t *testing.T) {

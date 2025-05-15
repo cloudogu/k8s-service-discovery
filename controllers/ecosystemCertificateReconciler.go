@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 
 	"github.com/cloudogu/k8s-registry-lib/config"
@@ -49,10 +48,9 @@ func (r *ecosystemCertificateReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, client.IgnoreNotFound(fmt.Errorf("failed to get ecosystem certificate secret: %w", err))
 	}
 
-	var certificateBytes []byte
-	_, err = base64.StdEncoding.Decode(certificateBytes, secret.Data[v1.TLSCertKey])
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to decode ecosystem certificate: %w", err)
+	certificateBytes, exists := secret.Data[v1.TLSCertKey]
+	if !exists {
+		return ctrl.Result{}, fmt.Errorf("could not find certificate in ecosystem certificate secret")
 	}
 
 	logger.Info("Updating ecosystem certificate in global config...")

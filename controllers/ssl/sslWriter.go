@@ -2,7 +2,6 @@ package ssl
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -29,13 +28,8 @@ func (sw *sslWriter) WriteCertificate(ctx context.Context, cert string, key stri
 		return fmt.Errorf("failed to get secret for ssl creation: %w", err)
 	}
 
-	certEncoded := make([]byte, base64.StdEncoding.EncodedLen(len(cert)))
-	keyEncoded := make([]byte, base64.StdEncoding.EncodedLen(len(key)))
-	base64.StdEncoding.Encode(certEncoded, []byte(cert))
-	base64.StdEncoding.Encode(keyEncoded, []byte(key))
-
-	certificateSecret.Data[certificateSecretPublicKey] = certEncoded
-	certificateSecret.Data[certificateSecretPrivateKey] = keyEncoded
+	certificateSecret.Data[certificateSecretPublicKey] = []byte(cert)
+	certificateSecret.Data[certificateSecretPrivateKey] = []byte(key)
 
 	_, err = sw.secretClient.Update(ctx, certificateSecret, metav1.UpdateOptions{})
 	if err != nil {

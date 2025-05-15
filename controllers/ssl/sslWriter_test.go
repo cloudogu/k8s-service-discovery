@@ -9,10 +9,8 @@ import (
 )
 
 const (
-	cert        = "cert"
-	key         = "key"
-	certEncoded = "Y2VydA=="
-	keyEncoded  = "a2V5"
+	cert = "cert"
+	key  = "key"
 )
 
 func Test_sslWriter_WriteCertificate(t *testing.T) {
@@ -24,8 +22,8 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		secretClientMock := NewMockSecretClient(t)
 		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
 		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
-			"tls.crt": []byte(certEncoded),
-			"tls.key": []byte(keyEncoded),
+			"tls.crt": []byte(cert),
+			"tls.key": []byte(key),
 		}}, v1.UpdateOptions{}).Return(nil, nil)
 
 		writer := NewSSLWriter(secretClientMock)
@@ -57,8 +55,8 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		secretClientMock := NewMockSecretClient(t)
 		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
 		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
-			"tls.crt": []byte(certEncoded),
-			"tls.key": []byte(keyEncoded),
+			"tls.crt": []byte(cert),
+			"tls.key": []byte(key),
 		}}, v1.UpdateOptions{}).Return(nil, assert.AnError)
 
 		writer := NewSSLWriter(secretClientMock)
