@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	sslLib "github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/cloudogu/k8s-registry-lib/config"
@@ -18,6 +20,7 @@ const (
 	globalFqdnPath            = "fqdn"
 	serverCertificateTypePath = "certificate/type"
 	selfsignedCertificateType = "selfsigned"
+	ecosystemCertificateName  = "ecosystem-certificate"
 )
 
 // selfsignedCertificateUpdater is responsible to update the sslLib certificate of the ecosystem.
@@ -25,6 +28,7 @@ type selfsignedCertificateUpdater struct {
 	namespace          string
 	globalConfigRepo   GlobalConfigRepository
 	certificateCreator selfSignedCertificateCreator
+	secretClient       SecretClient
 }
 
 type selfSignedCertificateCreator interface {
@@ -38,6 +42,7 @@ func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalCo
 		namespace:          namespace,
 		globalConfigRepo:   globalConfigRepo,
 		certificateCreator: ssl.NewCreator(globalConfigRepo, secretClient),
+		secretClient:       secretClient,
 	}
 }
 
@@ -88,6 +93,11 @@ func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqd
 
 func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("FQDN or domain changed in registry. Checking for selfsigned certificate...")
+	secret, err := scu.secretClient.Get(ctx, ecosystemCertificateName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get secret for ssl read: %w", err)
+	}
+
 	globalConfig, err := scu.globalConfigRepo.Get(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get global config for ssl read: %w", err)
@@ -101,12 +111,12 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 	if certType == selfsignedCertificateType {
 		ctrl.LoggerFrom(ctx).Info("Certificate is selfsigned. Regenerating certificate...")
 
-		previousCertRaw, certExists := globalConfig.Get(serverCertificateID)
-		if !certExists || !util.ContainsChars(previousCertRaw.String()) {
-			return fmt.Errorf("%q is empty or doesn't exists", serverCertificateID)
+		certificateBytes, exists := secret.Data[v1.TLSCertKey]
+		if !exists || string(certificateBytes) == "" {
+			return fmt.Errorf("could not find certificate in ecosystem certificate secret")
 		}
 
-		block, _ := pem.Decode([]byte(previousCertRaw))
+		block, _ := pem.Decode(certificateBytes)
 		if block == nil {
 			return fmt.Errorf("failed to parse certificate PEM of previous certificate")
 		}
