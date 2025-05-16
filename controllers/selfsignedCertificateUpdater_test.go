@@ -272,13 +272,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "external",
 		})
-		mockGlobalConfigRepo.EXPECT().Get(ctx).Run(func(_a0 context.Context) {
-			go func() {
-				timer := time.NewTimer(time.Second)
-				<-timer.C
-				cancelFunc()
-			}()
-		}).Return(globalConfig, nil)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
 
 		mockSecretClient := NewMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
@@ -293,10 +287,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// when
 		err := sut.Start(ctx)
 		resultChannel <- repository.GlobalConfigWatchResult{}
+		timer := time.NewTimer(2 * time.Second)
+		<-timer.C
 
 		// then
 		require.NoError(t, err)
-		<-ctx.Done()
+		cancelFunc()
 	})
 }
 
