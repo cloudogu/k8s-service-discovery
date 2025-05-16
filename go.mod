@@ -1,4 +1,4 @@
-module github.com/cloudogu/k8s-service-discovery
+module github.com/cloudogu/k8s-service-discovery/v2
 
 go 1.23.4
 

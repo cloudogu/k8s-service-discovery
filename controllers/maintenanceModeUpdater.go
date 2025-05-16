@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"strings"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"

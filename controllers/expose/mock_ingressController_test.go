@@ -5,7 +5,7 @@ package expose
 import (
 	context "context"
 
-	util "github.com/cloudogu/k8s-service-discovery/controllers/util"
+	util "github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	mock "github.com/stretchr/testify/mock"
 )
 

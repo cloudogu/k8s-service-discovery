@@ -11,8 +11,8 @@ import (
 	sslLib "github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
-	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 

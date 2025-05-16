@@ -6,8 +6,8 @@ import (
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/controllers/config"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

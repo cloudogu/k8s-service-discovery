@@ -10,11 +10,11 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/controllers/config"
-	"github.com/cloudogu/k8s-service-discovery/controllers/expose"
-	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController"
-	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -33,8 +33,8 @@ import (
 
 	"github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
 
-	"github.com/cloudogu/k8s-service-discovery/controllers"
-	"github.com/cloudogu/k8s-service-discovery/controllers/logging"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 )
 
 const (

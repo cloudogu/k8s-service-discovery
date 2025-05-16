@@ -3,7 +3,7 @@
 package warp
 
 import (
-	types "github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
+	types "github.com/cloudogu/k8s-service-discovery/v2/controllers/warp/types"
 	mock "github.com/stretchr/testify/mock"
 )
 
