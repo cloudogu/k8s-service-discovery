@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudogu/ces-commons-lib/errors"
 	"github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-registry-lib/errors"
 	"github.com/cloudogu/retry-lib/retry"
 
 	v1 "k8s.io/api/core/v1"

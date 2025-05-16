@@ -8,7 +8,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"strings"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/hashicorp/go-multierror"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"

@@ -4,15 +4,17 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"os"
 
-	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
+	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
+	"github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp"
 
@@ -20,6 +22,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -30,11 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	// +kubebuilder:scaffold:imports
-
-	"github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
-
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 )
 
 const (

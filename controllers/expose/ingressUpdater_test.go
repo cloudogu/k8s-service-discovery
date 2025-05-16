@@ -3,7 +3,7 @@ package expose
 import (
 	"context"
 	"encoding/json"
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"

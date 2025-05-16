@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	cErrs "github.com/cloudogu/ces-commons-lib/errors"
 	"github.com/cloudogu/k8s-registry-lib/config"
-	regErrs "github.com/cloudogu/k8s-registry-lib/errors"
 
 	"github.com/stretchr/testify/assert"
 
@@ -154,7 +154,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					var err error
 					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.crt", "mycert")
 					assert.NoError(t, err)
-					firstCall := m.On("Update", testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, regErrs.NewConflictError(assert.AnError)).Once()
+					firstCall := m.On("Update", testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, cErrs.NewConflictError(assert.AnError)).Once()
 					m.EXPECT().Update(testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, nil).NotBefore(firstCall).Once()
 					return m
 				},

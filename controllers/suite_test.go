@@ -6,8 +6,8 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
@@ -77,7 +77,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "vendor", "github.com", "cloudogu", "k8s-dogu-operator", "v2", "api", "v2")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "vendor", "github.com", "cloudogu", "k8s-dogu-operator", "v3", "api", "v2")},
 		ErrorIfCRDPathMissing: true,
 		Scheme:                testScheme,
 	}

@@ -3,7 +3,7 @@ package warp
 import (
 	"context"
 	_ "embed"
-	"github.com/cloudogu/k8s-registry-lib/dogu"
+	"github.com/cloudogu/ces-commons-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp/types"

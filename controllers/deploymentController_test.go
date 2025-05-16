@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

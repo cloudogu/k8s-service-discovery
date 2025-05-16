@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"

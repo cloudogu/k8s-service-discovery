@@ -7,7 +7,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/dogustart"
 	"k8s.io/api/apps/v1"
