@@ -263,11 +263,7 @@ func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.Dogu
 	return nil
 }
 
-type secretClient interface {
-	v1.SecretInterface
-}
-
-func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, secretClient secretClient) error {
+func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, secretClient v1.SecretInterface) error {
 	selfsignedCertificateUpdater := controllers.NewSelfsignedCertificateUpdater(namespace, globalConfigRepo, secretClient)
 
 	if err := k8sManager.Add(selfsignedCertificateUpdater); err != nil {
