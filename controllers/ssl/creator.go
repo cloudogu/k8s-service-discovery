@@ -26,7 +26,7 @@ type creator struct {
 }
 
 // NewCreator generates and writes selfsigned certificates to the ecosystem-certificate secret.
-func NewCreator(globalConfigRepo GlobalConfigRepository, secretClient SecretClient) *creator {
+func NewCreator(globalConfigRepo GlobalConfigRepository, secretClient secretClient) *creator {
 	return &creator{
 		globalConfigRepo: globalConfigRepo,
 		sslGenerator:     ssl.NewSSLGenerator(),

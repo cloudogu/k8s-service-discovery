@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"os"
 
 	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
@@ -262,7 +263,11 @@ func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.Dogu
 	return nil
 }
 
-func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, secretClient controllers.SecretClient) error {
+type secretClient interface {
+	v1.SecretInterface
+}
+
+func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string, globalConfigRepo controllers.GlobalConfigRepository, secretClient secretClient) error {
 	selfsignedCertificateUpdater := controllers.NewSelfsignedCertificateUpdater(namespace, globalConfigRepo, secretClient)
 
 	if err := k8sManager.Add(selfsignedCertificateUpdater); err != nil {

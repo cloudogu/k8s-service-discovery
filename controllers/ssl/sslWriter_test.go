@@ -19,7 +19,7 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 
-		secretClientMock := NewMockSecretClient(t)
+		secretClientMock := newMockSecretClient(t)
 		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
 		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte(cert),
@@ -37,7 +37,7 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("failed to get ecosystem-certificate secret", func(t *testing.T) {
 		// given
-		secretClientMock := NewMockSecretClient(t)
+		secretClientMock := newMockSecretClient(t)
 		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(nil, assert.AnError)
 
 		writer := NewSSLWriter(secretClientMock)
@@ -52,7 +52,7 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 
 	t.Run("failed to update certificate secret", func(t *testing.T) {
 		// given
-		secretClientMock := NewMockSecretClient(t)
+		secretClientMock := newMockSecretClient(t)
 		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
 		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte(cert),

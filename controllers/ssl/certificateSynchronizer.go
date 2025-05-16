@@ -20,12 +20,12 @@ const (
 	serverCertificateKeyID = "certificate/server.key"
 )
 
-func NewCertificateSynchronizer(secretInterface SecretClient, globalConfigRepo GlobalConfigRepository) *certificateSynchronizer {
+func NewCertificateSynchronizer(secretInterface secretClient, globalConfigRepo GlobalConfigRepository) *certificateSynchronizer {
 	return &certificateSynchronizer{secretInterface: secretInterface, globalConfigRepo: globalConfigRepo}
 }
 
 type certificateSynchronizer struct {
-	secretInterface  SecretClient
+	secretInterface  secretClient
 	globalConfigRepo GlobalConfigRepository
 }
 

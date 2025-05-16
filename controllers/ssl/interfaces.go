@@ -11,6 +11,6 @@ type GlobalConfigRepository interface {
 	Update(ctx context.Context, globalConfig libconfig.GlobalConfig) (libconfig.GlobalConfig, error)
 }
 
-type SecretClient interface {
+type secretClient interface {
 	corev1.SecretInterface
 }

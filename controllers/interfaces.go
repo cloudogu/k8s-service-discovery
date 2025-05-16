@@ -112,6 +112,6 @@ type ingressClassInterface interface {
 	netv1.IngressClassInterface
 }
 
-type SecretClient interface {
+type secretClient interface {
 	corev1client.SecretInterface
 }

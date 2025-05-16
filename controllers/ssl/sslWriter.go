@@ -9,11 +9,11 @@ import (
 )
 
 type sslWriter struct {
-	secretClient SecretClient
+	secretClient secretClient
 }
 
 // NewSSLWriter creates a new sslWriter instance to write certificate information to the ecosystem-certificate secret.
-func NewSSLWriter(secretClient SecretClient) *sslWriter {
+func NewSSLWriter(secretClient secretClient) *sslWriter {
 	return &sslWriter{
 		secretClient: secretClient,
 	}

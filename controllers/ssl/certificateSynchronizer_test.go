@@ -16,7 +16,7 @@ import (
 
 func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 	type fields struct {
-		secretInterfaceFn  func(t *testing.T) SecretClient
+		secretInterfaceFn  func(t *testing.T) secretClient
 		globalConfigRepoFn func(t *testing.T) GlobalConfigRepository
 	}
 	tests := []struct {
@@ -27,8 +27,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should fail to get secret",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(nil, assert.AnError)
 					return m
 				},
@@ -45,8 +45,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should return without error if secret not found",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(nil, &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}})
 					return m
 				},
@@ -60,8 +60,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should fail to find secret key",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
 					return m
 				},
@@ -77,8 +77,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should fail to get global config",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
@@ -97,8 +97,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should fail to set ecosystem certificate in global config object",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
@@ -117,8 +117,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should fail to write global config object",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
@@ -142,8 +142,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should succeed with retry on conflict",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
@@ -164,8 +164,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 		{
 			name: "should succeed and delete private key",
 			fields: fields{
-				secretInterfaceFn: func(t *testing.T) SecretClient {
-					m := NewMockSecretClient(t)
+				secretInterfaceFn: func(t *testing.T) secretClient {
+					m := newMockSecretClient(t)
 					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
@@ -208,7 +208,7 @@ func createCertificateSecret() *v1.Secret {
 }
 
 func TestNewCertificateSynchronizer(t *testing.T) {
-	secretClient := NewMockSecretClient(t)
+	secretClient := newMockSecretClient(t)
 	globalConfigRepo := NewMockGlobalConfigRepository(t)
 	synchronizer := NewCertificateSynchronizer(secretClient, globalConfigRepo)
 	assert.NotEmpty(t, synchronizer)

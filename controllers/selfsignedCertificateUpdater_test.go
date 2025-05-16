@@ -180,7 +180,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		namespace := "myTestNamespace"
@@ -229,7 +229,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(config.GlobalConfig{}, assert.AnError)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		namespace := "myTestNamespace"
@@ -274,7 +274,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		namespace := "myTestNamespace"
@@ -306,7 +306,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte("unparsableCert"),
 			"tls.key": []byte("key"),
@@ -335,7 +335,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte(pubPEMData),
 		}}, nil)
@@ -365,7 +365,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		creatorMock := newMockSelfSignedCertificateCreator(t)
 		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com"}).Return(assert.AnError)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte(serverCert),
 		}}, nil)
@@ -393,7 +393,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		sut := &selfsignedCertificateUpdater{
@@ -418,7 +418,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte(""),
 		}}, nil)
@@ -448,7 +448,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		creatorMock := newMockSelfSignedCertificateCreator(t)
 		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com"}).Return(nil)
 
-		mockSecretClient := NewMockSecretClient(t)
+		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
 			"tls.crt": []byte(serverCert),
 		}}, nil)
@@ -472,7 +472,7 @@ func TestNewSelfsignedCertificateUpdater(t *testing.T) {
 	t.Run("should return not nil", func(t *testing.T) {
 		// given
 		globalConfigRepo := NewMockGlobalConfigRepository(t)
-		secretClientMock := NewMockSecretClient(t)
+		secretClientMock := newMockSecretClient(t)
 
 		// when
 		sut := NewSelfsignedCertificateUpdater(testNamespace, globalConfigRepo, secretClientMock)

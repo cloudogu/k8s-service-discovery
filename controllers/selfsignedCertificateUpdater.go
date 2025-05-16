@@ -28,7 +28,7 @@ type selfsignedCertificateUpdater struct {
 	namespace          string
 	globalConfigRepo   GlobalConfigRepository
 	certificateCreator selfSignedCertificateCreator
-	secretClient       SecretClient
+	secretClient       secretClient
 }
 
 type selfSignedCertificateCreator interface {
@@ -37,7 +37,7 @@ type selfSignedCertificateCreator interface {
 }
 
 // NewSelfsignedCertificateUpdater creates a new updater.
-func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalConfigRepository, secretClient SecretClient) *selfsignedCertificateUpdater {
+func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalConfigRepository, secretClient secretClient) *selfsignedCertificateUpdater {
 	return &selfsignedCertificateUpdater{
 		namespace:          namespace,
 		globalConfigRepo:   globalConfigRepo,
