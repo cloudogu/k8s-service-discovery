@@ -2,13 +2,14 @@ package controllers
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-dogu-operator/v2/api/ecoSystem"
+	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -38,6 +39,10 @@ type NetworkPolicyUpdater interface {
 	UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error
 	RemoveExposedPorts(ctx context.Context, serviceName string) error
 	RemoveNetworkPolicy(ctx context.Context) error
+}
+
+type certificateSynchronizer interface {
+	Synchronize(ctx context.Context) error
 }
 
 //nolint:unused
@@ -105,4 +110,8 @@ type deploymentInterface interface {
 //goland:noinspection GoUnusedType
 type ingressClassInterface interface {
 	netv1.IngressClassInterface
+}
+
+type secretClient interface {
+	corev1client.SecretInterface
 }

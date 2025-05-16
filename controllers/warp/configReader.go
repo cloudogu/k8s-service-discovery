@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/cloudogu/k8s-service-discovery/controllers/config"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/pkg/errors"

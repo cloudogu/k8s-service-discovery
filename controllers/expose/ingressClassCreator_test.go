@@ -2,7 +2,7 @@ package expose
 
 import (
 	"context"
-	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/apps/v1"

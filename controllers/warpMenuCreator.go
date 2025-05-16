@@ -3,7 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

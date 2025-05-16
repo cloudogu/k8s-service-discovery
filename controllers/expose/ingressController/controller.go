@@ -2,7 +2,7 @@ package ingressController
 
 import (
 	"fmt"
-	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController/nginx"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController/nginx"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 

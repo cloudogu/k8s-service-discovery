@@ -2,12 +2,12 @@ package warp
 
 import (
 	"context"
+	"github.com/cloudogu/ces-commons-lib/dogu"
 	"github.com/cloudogu/cesapp-lib/core"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/controllers/config"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -33,11 +33,11 @@ type ExternalConverter interface {
 
 type DoguVersionRegistry interface {
 	WatchAllCurrent(context.Context) (<-chan dogu.CurrentVersionsWatchResult, error)
-	GetCurrentOfAll(context.Context) ([]dogu.DoguVersion, error)
+	GetCurrentOfAll(context.Context) ([]dogu.SimpleNameVersion, error)
 }
 
 type LocalDoguRepo interface {
-	GetAll(context.Context, []dogu.DoguVersion) (map[dogu.DoguVersion]*core.Dogu, error)
+	GetAll(context.Context, []dogu.SimpleNameVersion) (map[dogu.SimpleNameVersion]*core.Dogu, error)
 }
 
 type GlobalConfigRepository interface {
