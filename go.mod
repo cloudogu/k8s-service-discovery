@@ -1,6 +1,6 @@
 module github.com/cloudogu/k8s-service-discovery/v2
 
-go 1.23.4
+go 1.24.3
 
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
