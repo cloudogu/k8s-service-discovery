@@ -109,7 +109,7 @@ var _ = BeforeSuite(func() {
 
 	t := GinkgoT()
 	globalConfig := config.CreateGlobalConfig(config.Entries{
-		"certificate/server.crt": config.Value(serverCert),
+		"certificate/server.crt": "mycert",
 		"certificate/server.key": "mykey",
 		"certificate/type":       "selfsigned",
 		"fqdn":                   "example.com",
