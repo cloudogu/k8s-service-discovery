@@ -11,6 +11,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/controllers/expose"
+	"github.com/cloudogu/k8s-service-discovery/controllers/ssl"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -55,7 +56,7 @@ const (
 )
 
 var (
-	SSLChannel chan repository.GlobalConfigWatchResult
+	FqdnChannel chan repository.GlobalConfigWatchResult
 )
 
 func TestAPIs(t *testing.T) {
@@ -106,11 +107,13 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder := k8sManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	t := &testing.T{}
+	t := GinkgoT()
 	globalConfig := config.CreateGlobalConfig(config.Entries{
-		"certificate/server.crt": "mycert",
+		"certificate/server.crt": config.Value(serverCert),
 		"certificate/server.key": "mykey",
 		"certificate/type":       "selfsigned",
+		"fqdn":                   "example.com",
+		"domain":                 "example.com",
 	})
 	globalConfigRepoMock := NewMockGlobalConfigRepository(t)
 	globalConfigRepoMock.EXPECT().Get(mock.Anything).Return(globalConfig, nil)
@@ -123,6 +126,8 @@ var _ = BeforeSuite(func() {
 	ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return(mockRewriteAnnotation)
 	ingressControllerMock.EXPECT().GetProxyBodySizeKey().Return(mockProxyAnnotation)
 	ingressControllerMock.EXPECT().GetUseRegexKey().Return(mockRegexAnnotation)
+	ingressControllerMock.EXPECT().DeleteExposedPorts(mock.Anything, myNamespace, "nexus").Return(nil)
+	ingressControllerMock.EXPECT().GetName().Return("nginx-ingress")
 
 	clientSet, err := kubernetes.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
@@ -150,16 +155,34 @@ var _ = BeforeSuite(func() {
 	err = deploymentReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	secretInterface := clientSet.CoreV1().Secrets(myNamespace)
+	globalConfigRepoMock.EXPECT().Update(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, globalConfig config.GlobalConfig) (config.GlobalConfig, error) {
+		serverCrt, exists := globalConfig.Get("certificate/server.crt")
+		Expect(exists).To(BeTrue())
+		Expect(serverCrt).To(ContainSubstring("-----BEGIN CERTIFICATE-----"))
+		_, exists = globalConfig.Get("certificate/server.key")
+		Expect(exists).To(BeFalse())
+
+		return config.CreateGlobalConfig(globalConfig.GetAll()), nil
+	})
+	certSync := ssl.NewCertificateSynchronizer(secretInterface, globalConfigRepoMock)
+	certificateReconciler := NewEcosystemCertificateReconciler(certSync)
+	err = certificateReconciler.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	// create initial ingress class
 	ingressControllerMock.EXPECT().GetControllerSpec().Return("k8s.io/nginx-ingress")
 	ingressClassCreator := expose.NewIngressClassCreator(clientSet, myIngressClassName, myNamespace, eventRecorder, ingressControllerMock)
 	err = k8sManager.Add(ingressClassCreator)
 	Expect(err).ToNot(HaveOccurred())
 
-	SSLChannel = make(chan repository.GlobalConfigWatchResult)
-	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything).Return(SSLChannel, nil)
-	sslUpdater := NewSslCertificateUpdater(k8sManager.GetClient(), myNamespace, globalConfigRepoMock, eventRecorder)
-	err = k8sManager.Add(sslUpdater)
+	err = k8sManager.Add(certSync)
+	Expect(err).ToNot(HaveOccurred())
+
+	FqdnChannel = make(chan repository.GlobalConfigWatchResult)
+	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything).Return(FqdnChannel, nil)
+	updater := NewSelfsignedCertificateUpdater(myNamespace, globalConfigRepoMock, secretInterface)
+	err = k8sManager.Add(updater)
 	Expect(err).ToNot(HaveOccurred())
 
 	// create warp menu creator

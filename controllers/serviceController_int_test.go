@@ -243,29 +243,30 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 			Expect(expectedIngress.Items[1].Annotations).Should(HaveKeyWithValue("example-key", "example-value"))
 		})
 
-		It("Should create ssl cert", func() {
+		It("Should regenerate ssl cert on fqdn change", func() {
 			By("Create test data")
 			createSelfDeployment(k8sApiClient)
+			// create initial ecosystem certificate
+			err := k8sApiClient.Create(testCtx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "ecosystem-certificate", Namespace: myNamespace}, Data: map[string][]byte{
+				corev1.TLSCertKey:       []byte(serverCert),
+				corev1.TLSPrivateKeyKey: []byte("mykey"),
+			}})
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Trigger channel")
-			SSLChannel <- repository.GlobalConfigWatchResult{}
+			FqdnChannel <- repository.GlobalConfigWatchResult{}
 
 			By("Expect ssl secret")
-			Eventually(func() bool {
+			Eventually(func() string {
 				secret := &corev1.Secret{}
 				err := k8sApiClient.Get(ctx, types.NamespacedName{Name: "ecosystem-certificate", Namespace: myNamespace}, secret)
-				if err != nil {
-					return false
-				}
+				Expect(err).ToNot(HaveOccurred())
 
-				data := secret.StringData
-				if data[corev1.TLSCertKey] == "mycert" && data[corev1.TLSPrivateKeyKey] == "mykey" {
-					return true
-				}
+				data := secret.Data
+				return string(data[corev1.TLSPrivateKeyKey])
+			}, timeoutInterval, pollingInterval).Should(ContainSubstring("-----BEGIN RSA PRIVATE KEY-----"))
 
-				return true
-			}, timeoutInterval, pollingInterval).Should(BeTrue())
-			close(SSLChannel)
+			close(FqdnChannel)
 		})
 	})
 })
