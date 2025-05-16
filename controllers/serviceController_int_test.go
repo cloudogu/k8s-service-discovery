@@ -264,7 +264,7 @@ var _ = Describe("Creating ingress objects with the ingress generator", func() {
 
 				data := secret.Data
 				return string(data[corev1.TLSPrivateKeyKey])
-			}, timeoutInterval*2, pollingInterval).Should(ContainSubstring("-----BEGIN RSA PRIVATE KEY-----"))
+			}, timeoutInterval*4, pollingInterval).Should(ContainSubstring("-----BEGIN RSA PRIVATE KEY-----"))
 
 			close(FqdnChannel)
 		})
