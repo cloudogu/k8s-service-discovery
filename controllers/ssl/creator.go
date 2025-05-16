@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudogu/cesapp-lib/ssl"
-	"github.com/cloudogu/k8s-service-discovery/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 )
 
 type cesSelfSignedSSLGenerator interface {
@@ -15,8 +15,8 @@ type cesSelfSignedSSLGenerator interface {
 }
 
 type cesSSLWriter interface {
-	// WriteCertificate writes the type, cert and key to the global config
-	WriteCertificate(ctx context.Context, certType string, cert string, key string) error
+	// WriteCertificate writes the type, cert and key to the ecosystem-certificate secret
+	WriteCertificate(ctx context.Context, cert string, key string) error
 }
 
 type creator struct {
@@ -25,16 +25,16 @@ type creator struct {
 	sslWriter        cesSSLWriter
 }
 
-// NewCreator generates and writes selfsigned certificates to the ces registry.
-func NewCreator(globalConfigRepo GlobalConfigRepository) *creator {
+// NewCreator generates and writes selfsigned certificates to the ecosystem-certificate secret.
+func NewCreator(globalConfigRepo GlobalConfigRepository, secretClient secretClient) *creator {
 	return &creator{
 		globalConfigRepo: globalConfigRepo,
 		sslGenerator:     ssl.NewSSLGenerator(),
-		sslWriter:        NewSSLWriter(globalConfigRepo),
+		sslWriter:        NewSSLWriter(secretClient),
 	}
 }
 
-// CreateAndSafeCertificate generates and writes the type, cert and key to the global config.
+// CreateAndSafeCertificate generates and writes the cert and key to the ecosystem-certificate secret.
 func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays int, country string,
 	province string, locality string, altDNSNames []string) error {
 	globalConfig, err := c.globalConfigRepo.Get(ctx)
@@ -57,9 +57,9 @@ func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays i
 		return fmt.Errorf("failed to generate self-signed certificate and key: %w", err)
 	}
 
-	err = c.sslWriter.WriteCertificate(ctx, "selfsigned", cert, key)
+	err = c.sslWriter.WriteCertificate(ctx, cert, key)
 	if err != nil {
-		return fmt.Errorf("failed to write certificate to global config: %w", err)
+		return fmt.Errorf("failed to write certificate to the ecosystem-certificate secret: %w", err)
 	}
 
 	return nil

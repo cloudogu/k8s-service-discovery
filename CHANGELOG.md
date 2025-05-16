@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.0.0] - 2025-05-16
+### Changed
+- [#84] Make certificate secret leading, therefore sync it to global config
+- [#84] Remove certificate private key from global config
+### Security
+- [#84] Certificate private key can no longer be read by all dogus
+
+> [!IMPORTANT]
+> Breaking change!
+> If you previously wrote your own certificate to the global config, you now have to write it to the secret instead.
+> For certificates of type self-signed, no intervention is necessary.
+
 ## [v1.4.0] - 2025-04-23
 ### Changed
 - [#82] Set sensible resource requests and limits

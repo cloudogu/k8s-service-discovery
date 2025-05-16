@@ -1,7 +1,7 @@
 package ingressController
 
 import (
-	"github.com/cloudogu/k8s-service-discovery/controllers/expose/ingressController/nginx"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController/nginx"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

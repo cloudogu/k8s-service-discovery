@@ -3,11 +3,11 @@ package warp
 import (
 	"context"
 	_ "embed"
+	"github.com/cloudogu/ces-commons-lib/dogu"
 	"github.com/cloudogu/cesapp-lib/core"
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-registry-lib/dogu"
-	"github.com/cloudogu/k8s-service-discovery/controllers/config"
-	"github.com/cloudogu/k8s-service-discovery/controllers/warp/types"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -271,11 +271,11 @@ func TestConfigReader_readFromConfig(t *testing.T) {
 
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		redmineVersion := parseVersion(t, "5.1.3-1")
-		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
-		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion}
+		redmineDoguVersion := dogu.SimpleNameVersion{Name: "redmine", Version: *redmineVersion}
+		currentDoguVersions := []dogu.SimpleNameVersion{redmineDoguVersion}
 		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
 		doguSpecRepoMock := NewMockLocalDoguRepo(t)
-		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.DoguVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t)}, nil)
+		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.SimpleNameVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t)}, nil)
 
 		reader := &ConfigReader{
 			configuration:       &config.Configuration{Support: []config.SupportSource{}},
@@ -446,12 +446,12 @@ func TestConfigReader_dogusReader(t *testing.T) {
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		redmineVersion := parseVersion(t, "5.1.3-1")
 		jenkinsVersion := parseVersion(t, "2.452.2-1")
-		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
-		jenkinsDoguVersion := dogu.DoguVersion{Name: "jenkins", Version: *jenkinsVersion}
-		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion, jenkinsDoguVersion}
+		redmineDoguVersion := dogu.SimpleNameVersion{Name: "redmine", Version: *redmineVersion}
+		jenkinsDoguVersion := dogu.SimpleNameVersion{Name: "jenkins", Version: *jenkinsVersion}
+		currentDoguVersions := []dogu.SimpleNameVersion{redmineDoguVersion, jenkinsDoguVersion}
 		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
 		doguSpecRepoMock := NewMockLocalDoguRepo(t)
-		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.DoguVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t), jenkinsDoguVersion: readJenkinsDogu(t)}, nil)
+		doguSpecRepoMock.EXPECT().GetAll(testCtx, currentDoguVersions).Return(map[dogu.SimpleNameVersion]*core.Dogu{redmineDoguVersion: readRedmineDogu(t), jenkinsDoguVersion: readJenkinsDogu(t)}, nil)
 
 		reader := &ConfigReader{
 			configuration:       &config.Configuration{Support: []config.SupportSource{}},
@@ -499,8 +499,8 @@ func TestConfigReader_dogusReader(t *testing.T) {
 			Tag:  "warp",
 		}
 		redmineVersion := parseVersion(t, "5.1.3-1")
-		redmineDoguVersion := dogu.DoguVersion{Name: "redmine", Version: *redmineVersion}
-		currentDoguVersions := []dogu.DoguVersion{redmineDoguVersion}
+		redmineDoguVersion := dogu.SimpleNameVersion{Name: "redmine", Version: *redmineVersion}
+		currentDoguVersions := []dogu.SimpleNameVersion{redmineDoguVersion}
 		versionRegistryMock := NewMockDoguVersionRegistry(t)
 		versionRegistryMock.EXPECT().GetCurrentOfAll(testCtx).Return(currentDoguVersions, nil)
 		doguSpecMock := NewMockLocalDoguRepo(t)

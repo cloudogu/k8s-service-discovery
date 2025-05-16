@@ -3,19 +3,15 @@ package controllers
 import (
 	"context"
 	_ "embed"
-	"github.com/cloudogu/cesapp-lib/registry/mocks"
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"testing"
 	"time"
@@ -139,16 +135,11 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
 		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
 
-		recorderMock := newMockEventRecorder(t)
-
 		namespace := "myTestNamespace"
-		deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "k8s-service-discovery-controller-manager", Namespace: namespace}}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment).Build()
+
 		sut := &selfsignedCertificateUpdater{
-			client:           clientMock,
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
-			eventRecorder:    recorderMock,
 		}
 
 		// when
@@ -189,12 +180,14 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
+
 		namespace := "myTestNamespace"
 		sut := &selfsignedCertificateUpdater{
-			client:           nil,
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
-			eventRecorder:    nil,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
@@ -236,12 +229,14 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(config.GlobalConfig{}, assert.AnError)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
+
 		namespace := "myTestNamespace"
 		sut := &selfsignedCertificateUpdater{
-			client:           nil,
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
-			eventRecorder:    nil,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
@@ -279,18 +274,20 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
+
 		namespace := "myTestNamespace"
 		sut := &selfsignedCertificateUpdater{
-			client:           nil,
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
-			eventRecorder:    nil,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
 		err := sut.Start(ctx)
 		resultChannel <- repository.GlobalConfigWatchResult{}
-		timer := time.NewTimer(time.Second)
+		timer := time.NewTimer(2 * time.Second)
 		<-timer.C
 
 		// then
@@ -302,10 +299,6 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 	t.Run("should fail parsing the cert", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(nil)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type":       "selfsigned",
@@ -313,10 +306,16 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte("unparsableCert"),
+			"tls.key": []byte("key"),
+		}}, nil)
+
 		sut := &selfsignedCertificateUpdater{
-			client:           k8sClientMock,
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
@@ -329,10 +328,6 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 
 	t.Run("should fail parsing the cert block", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(nil)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type":       "selfsigned",
@@ -340,10 +335,15 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(pubPEMData),
+		}}, nil)
+
 		sut := &selfsignedCertificateUpdater{
-			client:           k8sClientMock,
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
@@ -356,25 +356,25 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 
 	t.Run("should fail to create and save certificate", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(nil)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
-			"certificate/type":       "selfsigned",
-			"certificate/server.crt": config.Value(serverCert),
+			"certificate/type": "selfsigned",
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		creatorMock := newMockSelfSignedCertificateCreator(t)
 		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com"}).Return(assert.AnError)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
 		sut := &selfsignedCertificateUpdater{
-			client:             k8sClientMock,
 			globalConfigRepo:   mockGlobalConfigRepo,
 			namespace:          testNamespace,
 			certificateCreator: creatorMock,
+			secretClient:       mockSecretClient,
 		}
 
 		// when
@@ -385,49 +385,21 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to regenerate and safe selfsigned certificate")
 	})
 
-	t.Run("should fail on error getting the deployment", func(t *testing.T) {
-		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(assert.AnError)
-		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
-		globalConfig := config.CreateGlobalConfig(config.Entries{
-			"certificate/type":       "selfsigned",
-			"certificate/server.crt": config.Value(serverCert),
-		})
-		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
-
-		sut := &selfsignedCertificateUpdater{
-			client:           k8sClientMock,
-			globalConfigRepo: mockGlobalConfigRepo,
-			namespace:        testNamespace,
-		}
-
-		// when
-		err := sut.handleFqdnChange(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "selfsigned certificate handling: failed to get deployment [k8s-service-discovery-controller-manager]")
-	})
-
 	t.Run("should fail because a non existent certificate", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(nil)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "selfsigned",
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
+
 		sut := &selfsignedCertificateUpdater{
-			client:           k8sClientMock,
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
@@ -435,26 +407,26 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "\"certificate/server.crt\" is empty or doesn't exists")
+		assert.ErrorContains(t, err, "could not find certificate in ecosystem certificate secret")
 	})
 
 	t.Run("should fail because an empty certificate", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(nil)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
-			"certificate/type":       "selfsigned",
-			"certificate/server.crt": "",
+			"certificate/type": "selfsigned",
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(""),
+		}}, nil)
+
 		sut := &selfsignedCertificateUpdater{
-			client:           k8sClientMock,
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
+			secretClient:     mockSecretClient,
 		}
 
 		// when
@@ -462,34 +434,30 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 
 		// then
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "\"certificate/server.crt\" is empty or doesn't exists")
+		assert.ErrorContains(t, err, "could not find certificate in ecosystem certificate secret")
 	})
 
 	t.Run("successfully regenerate the certificate", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(mocks.Anything,
-			types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: testNamespace}, mocks.Anything).
-			Return(nil)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
-			"certificate/type":       "selfsigned",
-			"certificate/server.crt": config.Value(serverCert),
+			"certificate/type": "selfsigned",
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		creatorMock := newMockSelfSignedCertificateCreator(t)
 		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com"}).Return(nil)
 
-		eventRecorderMock := newMockEventRecorder(t)
-		eventRecorderMock.EXPECT().Event(mock.Anything, v1.EventTypeNormal, "FQDNChange", "Selfsigned certificate regenerated.")
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
 
 		sut := &selfsignedCertificateUpdater{
-			client:             k8sClientMock,
 			globalConfigRepo:   mockGlobalConfigRepo,
 			namespace:          testNamespace,
 			certificateCreator: creatorMock,
-			eventRecorder:      eventRecorderMock,
+			secretClient:       mockSecretClient,
 		}
 
 		// when
@@ -503,18 +471,15 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 func TestNewSelfsignedCertificateUpdater(t *testing.T) {
 	t.Run("should return not nil", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
 		globalConfigRepo := NewMockGlobalConfigRepository(t)
-		eventRecordeMock := newMockEventRecorder(t)
+		secretClientMock := newMockSecretClient(t)
 
 		// when
-		sut := NewSelfsignedCertificateUpdater(k8sClientMock, testNamespace, globalConfigRepo, eventRecordeMock)
+		sut := NewSelfsignedCertificateUpdater(testNamespace, globalConfigRepo, secretClientMock)
 
 		// then
 		require.NotNil(t, sut)
-		assert.Equal(t, k8sClientMock, sut.client)
 		assert.Equal(t, globalConfigRepo, sut.globalConfigRepo)
-		assert.Equal(t, eventRecordeMock, sut.eventRecorder)
 		assert.Equal(t, testNamespace, sut.namespace)
 	})
 }

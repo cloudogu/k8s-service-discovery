@@ -1,20 +1,25 @@
-# Use of a Self-Signed SSL Certificate
+# Use of a Self-Signed SSL ertificate
 
-## Location
-
-The SSL certificate is located in the registry under the following paths in the global config:
-- `certificate/key`
-- `certificate/server.crt`
-- `certificate/server.key`
-
-## Renew an SSL certificate
-
-The `k8s-ces-setup` initially creates the certificate for the Cloudogu Ecosystem.
-The `k8s-service-discovery` provides an endpoint to renew the selfsigned certificate:
-
-```bash
-curl -I --request POST --url http://fqdn:9090/api/v1/ssl?days=<days> 
+The SSL certificate is expected in a secret as follows:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ecosystem-certificate
+  namespace: ecosystem
+type: Opaque
+data:
+  tls.crt: <public_key>
+  tls.key: <private_key>
 ```
 
-> If the FQDN is changed and a self-signed SSL certificate is used, this is automatically regenerated and applied.
-> For FQDN changes, the Dogus must additionally be restarted to receive this change.
+The k8s-service-discovery reconciles this secret and writes the public key to the global config as follows:
+- `certificate/server.crt`
+
+The secret with the certificate is therefore leading in relation to the global config.
+
+The type of certificate can be found in the global config:
+- `certificate/type`
+
+If the FQDN is changed and a self-signed SSL certificate is used, this is automatically regenerated and applied.
+In the case of FQDN changes, the Dogus must also be restarted so that they receive this change.

@@ -1,10 +1,12 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=1.4.0
+VERSION=2.0.0
 
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
-GOTAG?=1.23.4
+GOTAG?=1.24.3
 MAKEFILES_VERSION=9.9.1
+# mockery 2.52.4 for some reason supports go1.24 while the newer version in the makefiles does not
+MOCKERY_VERSION=v2.52.4
 
 ADDITIONAL_CLEAN=dist-clean
 

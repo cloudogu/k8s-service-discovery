@@ -1,11 +1,14 @@
 package ssl
 
 import (
+	"context"
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
+
+var testCtx = context.Background()
 
 func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 	t.Run("should return an error if fqdn is not set", func(t *testing.T) {
@@ -142,7 +145,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 			"DE", "Lower Saxony", "Brunswick", []string{}).Return("mycert", "mykey", nil)
 
 		sslWriterMock := newMockCesSSLWriter(t)
-		sslWriterMock.EXPECT().WriteCertificate(testCtx, "selfsigned", "mycert", "mykey").Return(assert.AnError)
+		sslWriterMock.EXPECT().WriteCertificate(testCtx, "mycert", "mykey").Return(assert.AnError)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -156,7 +159,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to write certificate to global config")
+		assert.ErrorContains(t, err, "failed to write certificate to the ecosystem-certificate secret")
 	})
 	t.Run("should succeed", func(t *testing.T) {
 		// given
@@ -174,7 +177,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 			"DE", "Lower Saxony", "Brunswick", []string{}).Return("mycert", "mykey", nil)
 
 		sslWriterMock := newMockCesSSLWriter(t)
-		sslWriterMock.EXPECT().WriteCertificate(testCtx, "selfsigned", "mycert", "mykey").Return(nil)
+		sslWriterMock.EXPECT().WriteCertificate(testCtx, "mycert", "mykey").Return(nil)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
