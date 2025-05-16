@@ -15,7 +15,7 @@ type cesSelfSignedSSLGenerator interface {
 }
 
 type cesSSLWriter interface {
-	// WriteCertificate writes the type, cert and key to the global config
+	// WriteCertificate writes the type, cert and key to the ecosystem-certificate secret
 	WriteCertificate(ctx context.Context, cert string, key string) error
 }
 
@@ -25,7 +25,7 @@ type creator struct {
 	sslWriter        cesSSLWriter
 }
 
-// NewCreator generates and writes selfsigned certificates to the ces registry.
+// NewCreator generates and writes selfsigned certificates to the ecosystem-certificate secret.
 func NewCreator(globalConfigRepo GlobalConfigRepository, secretClient SecretClient) *creator {
 	return &creator{
 		globalConfigRepo: globalConfigRepo,

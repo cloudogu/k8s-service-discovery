@@ -12,7 +12,7 @@ type sslWriter struct {
 	secretClient SecretClient
 }
 
-// NewSSLWriter creates a new sslWriter instance to write certificate information in the global config
+// NewSSLWriter creates a new sslWriter instance to write certificate information to the ecosystem-certificate secret.
 func NewSSLWriter(secretClient SecretClient) *sslWriter {
 	return &sslWriter{
 		secretClient: secretClient,
