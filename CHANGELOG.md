@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.1.0] - 2025-07-16
+### Added
+- [#86] add metadata mapping for logLevel
+
 ## [v2.0.0] - 2025-05-16
 ### Changed
 - [#84] Make certificate secret leading, therefore sync it to global config
