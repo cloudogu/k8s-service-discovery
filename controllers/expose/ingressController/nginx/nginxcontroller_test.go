@@ -1,9 +1,10 @@
 package nginx
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestNewNginxController(t *testing.T) {
