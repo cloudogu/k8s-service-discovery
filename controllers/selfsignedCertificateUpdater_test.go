@@ -3,6 +3,9 @@ package controllers
 import (
 	"context"
 	_ "embed"
+	"testing"
+	"time"
+
 	"github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/go-logr/logr"
@@ -13,8 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"testing"
-	"time"
 )
 
 //go:embed testdata/server.crt
@@ -466,6 +467,37 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		// then
 		require.NoError(t, err)
 	})
+
+	t.Run("successfully regenerate the certificate with alternative FQDNs", func(t *testing.T) {
+		// given
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"certificate/type": "selfsigned",
+			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		creatorMock := newMockSelfSignedCertificateCreator(t)
+		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com", "fqdn1.example.com", "fqdn2.example.com"}).Return(nil)
+
+		mockSecretClient := newMockSecretClient(t)
+		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo:   mockGlobalConfigRepo,
+			namespace:          testNamespace,
+			certificateCreator: creatorMock,
+			secretClient:       mockSecretClient,
+		}
+
+		// when
+		err := sut.handleFqdnChange(testCtx)
+
+		// then
+		require.NoError(t, err)
+	})
 }
 
 func TestNewSelfsignedCertificateUpdater(t *testing.T) {
@@ -481,5 +513,55 @@ func TestNewSelfsignedCertificateUpdater(t *testing.T) {
 		require.NotNil(t, sut)
 		assert.Equal(t, globalConfigRepo, sut.globalConfigRepo)
 		assert.Equal(t, testNamespace, sut.namespace)
+	})
+}
+
+func Test_getAlternativeFQDNs(t *testing.T) {
+	t.Run("should correctly parse alternativeFQDNs", func(t *testing.T) {
+		tests := []struct {
+			name                string
+			globalConfigEntries config.Entries
+			expectedFQDNs       []string
+		}{
+			{
+				name:                "no alternativeFQDNs key",
+				globalConfigEntries: config.Entries{},
+				expectedFQDNs:       []string{},
+			},
+			{
+				name: "valid alternativeFQDNs",
+				globalConfigEntries: config.Entries{
+					"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+				},
+				expectedFQDNs: []string{"fqdn1.example.com", "fqdn2.example.com"},
+			},
+			{
+				name: "empty alternativeFQDNs",
+				globalConfigEntries: config.Entries{
+					"alternativeFQDNs": "",
+				},
+				expectedFQDNs: []string{},
+			},
+			{
+				name: "malformed alternativeFQDNs",
+				globalConfigEntries: config.Entries{
+					"alternativeFQDNs": ",,fqdn1.example.com",
+				},
+				expectedFQDNs: []string{"fqdn1.example.com"},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// given
+				globalConfig := config.CreateGlobalConfig(tt.globalConfigEntries)
+
+				// when
+				result := getAlternativeFQDNs(context.Background(), globalConfig)
+
+				// then
+				assert.ElementsMatch(t, tt.expectedFQDNs, result)
+			})
+		}
 	})
 }

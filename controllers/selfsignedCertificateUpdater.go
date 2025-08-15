@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"slices"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -130,7 +132,8 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		country := getFirstOrDefault(previousCert.Subject.Country, sslLib.Country)
 		province := getFirstOrDefault(previousCert.Subject.Province, sslLib.Province)
 		locality := getFirstOrDefault(previousCert.Subject.Locality, sslLib.Locality)
-		altDnsNames := previousCert.DNSNames
+
+		altDnsNames := slices.Concat(previousCert.DNSNames, getAlternativeFQDNs(ctx, globalConfig))
 
 		err = scu.certificateCreator.CreateAndSafeCertificate(ctx, int(expireDays), country, province, locality, altDnsNames)
 		if err != nil {
@@ -141,6 +144,23 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 	}
 
 	return nil
+}
+
+func getAlternativeFQDNs(ctx context.Context, globalConfig config.GlobalConfig) []string {
+	altFQDNsString, exists := globalConfig.Get("alternativeFQDNs")
+	if !exists {
+		return []string{}
+	}
+
+	altFQDNs := util.ParseAlternativeFQDNsFromConfigString(altFQDNsString.String())
+
+	// Create a slice to hold just the names
+	fqdns := make([]string, len(altFQDNs))
+	for i, a := range altFQDNs {
+		fqdns[i] = a.FQDN
+	}
+
+	return fqdns
 }
 
 func getFirstOrDefault(items []string, defaultValue string) string {
