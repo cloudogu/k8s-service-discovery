@@ -9,11 +9,22 @@ const (
 
 type IngressController struct {
 	*ingressNginxTcpUpdExposer
+	*IngressRedirector
 }
 
-func NewNginxController(configMapInterface configMapInterface) *IngressController {
+type IngressControllerDependencies struct {
+	ConfigMapInterface configMapInterface
+	IngressInterface   ingressInterface
+	IngressClassName   string
+}
+
+func NewNginxController(deps IngressControllerDependencies) *IngressController {
 	return &IngressController{
-		ingressNginxTcpUpdExposer: NewIngressNginxTCPUDPExposer(configMapInterface),
+		ingressNginxTcpUpdExposer: NewIngressNginxTCPUDPExposer(deps.ConfigMapInterface),
+		IngressRedirector: &IngressRedirector{
+			ingressClassName: deps.IngressClassName,
+			ingressInterface: deps.IngressInterface,
+		},
 	}
 }
 

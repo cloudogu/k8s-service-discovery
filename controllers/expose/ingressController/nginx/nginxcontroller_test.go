@@ -13,7 +13,7 @@ func TestNewNginxController(t *testing.T) {
 		configMapInterfaceMock := newMockConfigMapInterface(t)
 
 		// when
-		sut := NewNginxController(configMapInterfaceMock)
+		sut := NewNginxController(IngressControllerDependencies{ConfigMapInterface: configMapInterfaceMock})
 
 		// then
 		require.NotNil(t, sut.ingressNginxTcpUpdExposer)
