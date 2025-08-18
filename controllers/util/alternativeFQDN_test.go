@@ -5,6 +5,39 @@ import (
 	"testing"
 )
 
+func TestHasCertificate(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  AlternativeFQDN
+		output bool
+	}{
+		{
+			name:   "With certificate",
+			input:  AlternativeFQDN{FQDN: "example.com", CertificateSecretName: "cert1"},
+			output: true,
+		},
+		{
+			name:   "Without certificate",
+			input:  AlternativeFQDN{FQDN: "example.com", CertificateSecretName: ""},
+			output: false,
+		},
+		{
+			name:   "With whitespace certificate name",
+			input:  AlternativeFQDN{FQDN: "example.com", CertificateSecretName: " "},
+			output: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.input.HasCertificate()
+			if result != test.output {
+				t.Errorf("For input '%#v', expected %t, but got %t", test.input, test.output, result)
+			}
+		})
+	}
+}
+
 func TestParseAlternativeFQDNsFromConfigString(t *testing.T) {
 	tests := []struct {
 		name   string

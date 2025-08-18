@@ -3,6 +3,8 @@ package ssl
 import (
 	"context"
 	"fmt"
+	"slices"
+
 	"github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 )
@@ -52,6 +54,8 @@ func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays i
 		return fmt.Errorf("domain is empty or doesn't exists: %w", err)
 	}
 
+	altDNSNames = removeDuplicatesDNSNames(altDNSNames)
+
 	cert, key, err := c.sslGenerator.GenerateSelfSignedCert(fqdn.String(), domain.String(), certExpireDays, country, province, locality, altDNSNames)
 	if err != nil {
 		return fmt.Errorf("failed to generate self-signed certificate and key: %w", err)
@@ -63,4 +67,20 @@ func (c *creator) CreateAndSafeCertificate(ctx context.Context, certExpireDays i
 	}
 
 	return nil
+}
+
+func removeDuplicatesDNSNames(input []string) []string {
+	seen := make(map[string]struct{})
+	for _, val := range input {
+		seen[val] = struct{}{}
+	}
+
+	result := make([]string, 0, len(seen))
+	for key := range seen {
+		result = append(result, key)
+	}
+
+	slices.Sort(result)
+
+	return result
 }

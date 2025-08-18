@@ -42,7 +42,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 	t.Run("should return error on error creating watch", func(t *testing.T) {
 		// given
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
-		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything).Return(nil, assert.AnError)
+		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything, mock.Anything).Return(nil, assert.AnError)
 		sut := &selfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -59,7 +59,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything, mock.Anything).Return(resultChannel, nil)
 		sut := &selfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -94,7 +94,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
 		sut := &selfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -134,7 +134,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
 
 		namespace := "myTestNamespace"
 
@@ -167,14 +167,14 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start global config watcher for ssl certificates")
 		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
-		mockLogSink.EXPECT().Info(0, "FQDN or domain changed in registry. Checking for selfsigned certificate...")
+		mockLogSink.EXPECT().Info(0, "FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
 
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
 
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "",
@@ -220,14 +220,14 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start global config watcher for ssl certificates")
 		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
-		mockLogSink.EXPECT().Info(0, "FQDN or domain changed in registry. Checking for selfsigned certificate...")
+		mockLogSink.EXPECT().Info(0, "FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
 		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...interface{}) {
 			cancelFunc()
 		})
 
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(config.GlobalConfig{}, assert.AnError)
 
 		mockSecretClient := newMockSecretClient(t)
@@ -264,11 +264,11 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Enabled(mock.Anything).Return(true)
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start global config watcher for ssl certificates")
-		mockLogSink.EXPECT().Info(0, "FQDN or domain changed in registry. Checking for selfsigned certificate...")
+		mockLogSink.EXPECT().Info(0, "FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
 
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
 
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "external",
@@ -557,7 +557,7 @@ func Test_getAlternativeFQDNs(t *testing.T) {
 				globalConfig := config.CreateGlobalConfig(tt.globalConfigEntries)
 
 				// when
-				result := getAlternativeFQDNs(context.Background(), globalConfig)
+				result := getAlternativeFQDNs(globalConfig)
 
 				// then
 				assert.ElementsMatch(t, tt.expectedFQDNs, result)

@@ -8,7 +8,7 @@ type AlternativeFQDN struct {
 }
 
 func (a AlternativeFQDN) HasCertificate() bool {
-	return a.CertificateSecretName != ""
+	return strings.TrimSpace(a.CertificateSecretName) != ""
 }
 
 func ParseAlternativeFQDNsFromConfigString(configString string) []AlternativeFQDN {

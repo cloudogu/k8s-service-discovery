@@ -6,6 +6,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/config"
@@ -18,11 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"os"
-	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -180,7 +181,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	FqdnChannel = make(chan repository.GlobalConfigWatchResult)
-	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything).Return(FqdnChannel, nil)
+	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything, mock.Anything).Return(FqdnChannel, nil)
 	updater := NewSelfsignedCertificateUpdater(myNamespace, globalConfigRepoMock, secretInterface)
 	err = k8sManager.Add(updater)
 	Expect(err).ToNot(HaveOccurred())

@@ -20,6 +20,7 @@ import (
 
 const (
 	globalFqdnPath            = "fqdn"
+	alternativeFQDNsPath      = "alternativeFQDNs"
 	serverCertificateTypePath = "certificate/type"
 	selfsignedCertificateType = "selfsigned"
 	ecosystemCertificateName  = "ecosystem-certificate"
@@ -57,7 +58,7 @@ func (scu *selfsignedCertificateUpdater) Start(ctx context.Context) error {
 
 func (scu *selfsignedCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("start global config watcher for ssl certificates")
-	fqdnChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(globalFqdnPath))
+	fqdnChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(globalFqdnPath), config.KeyFilter(alternativeFQDNsPath))
 	if err != nil {
 		return fmt.Errorf("failed to create fqdn watch: %w", err)
 	}
@@ -94,7 +95,7 @@ func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqd
 }
 
 func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("FQDN or domain changed in registry. Checking for selfsigned certificate...")
+	ctrl.LoggerFrom(ctx).Info("FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
 	secret, err := scu.secretClient.Get(ctx, ecosystemCertificateName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get secret for ssl read: %w", err)
@@ -133,7 +134,7 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		province := getFirstOrDefault(previousCert.Subject.Province, sslLib.Province)
 		locality := getFirstOrDefault(previousCert.Subject.Locality, sslLib.Locality)
 
-		altDnsNames := slices.Concat(previousCert.DNSNames, getAlternativeFQDNs(ctx, globalConfig))
+		altDnsNames := slices.Concat(previousCert.DNSNames, getAlternativeFQDNs(globalConfig))
 
 		err = scu.certificateCreator.CreateAndSafeCertificate(ctx, int(expireDays), country, province, locality, altDnsNames)
 		if err != nil {
@@ -146,8 +147,8 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 	return nil
 }
 
-func getAlternativeFQDNs(ctx context.Context, globalConfig config.GlobalConfig) []string {
-	altFQDNsString, exists := globalConfig.Get("alternativeFQDNs")
+func getAlternativeFQDNs(globalConfig config.GlobalConfig) []string {
+	altFQDNsString, exists := globalConfig.Get(alternativeFQDNsPath)
 	if !exists {
 		return []string{}
 	}

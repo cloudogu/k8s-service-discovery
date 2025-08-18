@@ -2,10 +2,11 @@ package ssl
 
 import (
 	"context"
+	"testing"
+
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var testCtx = context.Background()
@@ -187,6 +188,37 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 
 		// when
 		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should remove duplicates from altDNSNames", func(t *testing.T) {
+		// given
+		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
+		globalConfig := registryconfig.GlobalConfig{
+			Config: registryconfig.CreateConfig(registryconfig.Entries{
+				"fqdn":   "192.168.56.2",
+				"domain": "ces.local",
+			}),
+		}
+		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		sslGeneratorMock := newMockCesSelfSignedSSLGenerator(t)
+		sslGeneratorMock.EXPECT().GenerateSelfSignedCert("192.168.56.2", "ces.local", 1,
+			"DE", "Lower Saxony", "Brunswick", []string{"alt1.example.com", "alt2.example.com"}).Return("mycert", "mykey", nil)
+
+		sslWriterMock := newMockCesSSLWriter(t)
+		sslWriterMock.EXPECT().WriteCertificate(testCtx, "mycert", "mykey").Return(nil)
+
+		sut := &creator{
+			globalConfigRepo: globalConfigRepoMock,
+			sslGenerator:     sslGeneratorMock,
+			sslWriter:        sslWriterMock,
+		}
+
+		// when
+		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{"alt1.example.com", "alt2.example.com", "alt1.example.com"})
 
 		// then
 		require.NoError(t, err)
