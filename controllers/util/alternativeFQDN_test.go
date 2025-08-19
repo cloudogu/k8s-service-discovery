@@ -21,11 +21,6 @@ func TestHasCertificate(t *testing.T) {
 			input:  AlternativeFQDN{FQDN: "example.com", CertificateSecretName: ""},
 			output: false,
 		},
-		{
-			name:   "With whitespace certificate name",
-			input:  AlternativeFQDN{FQDN: "example.com", CertificateSecretName: " "},
-			output: false,
-		},
 	}
 
 	for _, test := range tests {
