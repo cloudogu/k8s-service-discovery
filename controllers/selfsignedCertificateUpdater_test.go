@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"crypto/x509"
 	_ "embed"
 	"testing"
 	"time"
@@ -769,5 +770,15 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 func Test_certificateHasAllDNSNames(t *testing.T) {
 	t.Run("should return true if no dnsNames given", func(t *testing.T) {
 		assert.True(t, certificateHasAllDNSNames(nil, []string{}))
+	})
+
+	t.Run("should return true", func(t *testing.T) {
+		cert := &x509.Certificate{DNSNames: []string{"a", "b", "c"}}
+		assert.True(t, certificateHasAllDNSNames(cert, []string{"a", "c"}))
+	})
+
+	t.Run("should return false", func(t *testing.T) {
+		cert := &x509.Certificate{DNSNames: []string{"a", "b", "c"}}
+		assert.False(t, certificateHasAllDNSNames(cert, []string{"a", "c", "d"}))
 	})
 }

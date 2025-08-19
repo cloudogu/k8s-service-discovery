@@ -253,14 +253,20 @@ func getFirstOrDefault(items []string, defaultValue string) string {
 
 func certificateHasAllDNSNames(certificate *x509.Certificate, dnsNames []string) bool {
 	for _, dnsName := range dnsNames {
-		for _, certificateDNSName := range certificate.DNSNames {
-			if dnsName == certificateDNSName {
-				return true
-			}
+		if !certificateHasDNSName(certificate, dnsName) {
+			return false
 		}
-
-		return false
 	}
 
 	return true
+}
+
+func certificateHasDNSName(certificate *x509.Certificate, dnsName string) bool {
+	for _, certificateDNSName := range certificate.DNSNames {
+		if dnsName == certificateDNSName {
+			return true
+		}
+	}
+
+	return false
 }
