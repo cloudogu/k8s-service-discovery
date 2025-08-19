@@ -39,10 +39,15 @@ AIU+2GKjyT3iMuzZxxFxPFMCAwEAAQ==
 and some more`
 
 func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
+	certProvidedGlobalConfig := config.CreateGlobalConfig(config.Entries{
+		"certificate/type": "provided",
+	})
+
 	t.Run("should return error on error creating watch", func(t *testing.T) {
 		// given
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
-		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything, mock.Anything).Return(nil, assert.AnError)
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(certProvidedGlobalConfig, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
 		sut := &selfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -59,7 +64,8 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(certProvidedGlobalConfig, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(testCtx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
 		sut := &selfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -93,8 +99,9 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		// given
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(certProvidedGlobalConfig, nil)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
 		sut := &selfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -134,7 +141,8 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(certProvidedGlobalConfig, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
 
 		namespace := "myTestNamespace"
 
@@ -174,15 +182,15 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(certProvidedGlobalConfig, nil).Once()
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
 
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "",
 		})
-		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil).Once()
 
 		mockSecretClient := newMockSecretClient(t)
-		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		namespace := "myTestNamespace"
 		sut := &selfsignedCertificateUpdater{
@@ -227,11 +235,11 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
-		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(config.GlobalConfig{}, assert.AnError)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(certProvidedGlobalConfig, nil).Once()
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(config.GlobalConfig{}, assert.AnError).Once()
 
 		mockSecretClient := newMockSecretClient(t)
-		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		namespace := "myTestNamespace"
 		sut := &selfsignedCertificateUpdater{
@@ -268,7 +276,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
-		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything).Return(resultChannel, nil)
+		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
 
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "external",
@@ -276,7 +284,6 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(globalConfig, nil)
 
 		mockSecretClient := newMockSecretClient(t)
-		mockSecretClient.EXPECT().Get(ctx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
 		namespace := "myTestNamespace"
 		sut := &selfsignedCertificateUpdater{
@@ -473,7 +480,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		globalConfig := config.CreateGlobalConfig(config.Entries{
 			"certificate/type": "selfsigned",
-			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com, fqdn3.example.com:certName3",
 		})
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
@@ -531,9 +538,9 @@ func Test_getAlternativeFQDNs(t *testing.T) {
 			{
 				name: "valid alternativeFQDNs",
 				globalConfigEntries: config.Entries{
-					"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+					"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2, fqdn3.example.com",
 				},
-				expectedFQDNs: []string{"fqdn1.example.com", "fqdn2.example.com"},
+				expectedFQDNs: []string{"fqdn1.example.com", "fqdn3.example.com"},
 			},
 			{
 				name: "empty alternativeFQDNs",
@@ -563,5 +570,204 @@ func Test_getAlternativeFQDNs(t *testing.T) {
 				assert.ElementsMatch(t, tt.expectedFQDNs, result)
 			})
 		}
+	})
+}
+
+func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing.T) {
+	t.Run("should return true", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"fqdn":             "newFQDN",
+			"certificate/type": "selfsigned",
+			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+		mSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.NoError(t, err)
+		assert.True(t, shouldUpdate)
+	})
+
+	t.Run("should fail if secret does not exist", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"fqdn":             "newFQDN",
+			"certificate/type": "selfsigned",
+			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+		mSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(nil, assert.AnError)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get current certificate: failed to get secret for ssl read: assert.AnError")
+		assert.False(t, shouldUpdate)
+	})
+
+	t.Run("should fail on error getting globalConfig", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(config.GlobalConfig{}, assert.AnError)
+
+		mSecretClient := newMockSecretClient(t)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get global config: assert.AnError")
+		assert.False(t, shouldUpdate)
+	})
+
+	t.Run("should fail on error checking cert-type", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"fqdn":             "newFQDN",
+			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to check certificate-type: \"certificate/type\" is empty or doesn't exists")
+		assert.False(t, shouldUpdate)
+	})
+
+	t.Run("should fail if fqdn does not exist", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"certificate/type": "selfsigned",
+			"alternativeFQDNs": "fqdn1.example.com, fqdn2.example.com:certName2",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+		mSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "fqdn is empty or doesn't exist")
+		assert.False(t, shouldUpdate)
+	})
+
+	t.Run("should fail if domain does not exist", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"fqdn":             "local.cloudogu.com",
+			"certificate/type": "selfsigned",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+		mSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "domain is empty or doesn't exist")
+		assert.False(t, shouldUpdate)
+	})
+
+	t.Run("should return true if domain has changed", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"fqdn":             "local.cloudogu.com",
+			"domain":           "other.cloudogu.com",
+			"certificate/type": "selfsigned",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+		mSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.NoError(t, err)
+		assert.True(t, shouldUpdate)
+	})
+
+	t.Run("should return false if nothing has changed", func(t *testing.T) {
+		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
+		globalConfig := config.CreateGlobalConfig(config.Entries{
+			"fqdn":             "local.cloudogu.com",
+			"domain":           "k3ces.local",
+			"certificate/type": "selfsigned",
+		})
+		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
+
+		mSecretClient := newMockSecretClient(t)
+		mSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
+			"tls.crt": []byte(serverCert),
+		}}, nil)
+
+		sut := &selfsignedCertificateUpdater{
+			globalConfigRepo: mockGlobalConfigRepo,
+			secretClient:     mSecretClient,
+		}
+
+		shouldUpdate, err := sut.shouldUpdateCurrentCertificate(testCtx)
+
+		require.NoError(t, err)
+		assert.False(t, shouldUpdate)
+	})
+}
+
+func Test_certificateHasAllDNSNames(t *testing.T) {
+	t.Run("should return true if no dnsNames given", func(t *testing.T) {
+		assert.True(t, certificateHasAllDNSNames(nil, []string{}))
 	})
 }

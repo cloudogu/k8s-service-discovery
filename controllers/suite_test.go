@@ -181,7 +181,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	FqdnChannel = make(chan repository.GlobalConfigWatchResult)
-	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything, mock.Anything).Return(FqdnChannel, nil)
+	globalConfigRepoMock.EXPECT().Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(FqdnChannel, nil)
 	updater := NewSelfsignedCertificateUpdater(myNamespace, globalConfigRepoMock, secretInterface)
 	err = k8sManager.Add(updater)
 	Expect(err).ToNot(HaveOccurred())
