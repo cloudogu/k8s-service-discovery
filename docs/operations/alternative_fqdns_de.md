@@ -10,7 +10,7 @@ Wird kein TLS-Zertifikat angegeben, wird das Standard-Zertifikat der Instanz ver
 Für die Konfiguration der alternativen FQDNs sollten folgende Punkte beachtet werden:
 
 - jeder Eintrag ist ein gültiger Hostname (ohne Schema/Port), z. B. `alt.example.com`
-- das referenzierte TLS-Zertifikat ist ein Kubernetes-Secret und befindet sich im gleichen Namespace
+- das referenzierte TLS-Zertifikat ist ein Kubernetes-Secret vom Typ `kubernetes.io/tls` und befindet sich im gleichen Namespace
 - Leerzeichen rund um Einträge werden toleriert (z. B. nach dem Komma)
 - keine Wildcards (*.example.com) verwenden, sofern nicht explizit unterstützt
 - doppelte FQDNs vermeiden

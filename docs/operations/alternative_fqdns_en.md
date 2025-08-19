@@ -10,7 +10,7 @@ If no TLS certificate is specified, the default certificate of the instance is u
 The following points should be considered when configuring alternative FQDNs:
 
 - Each entry is a valid hostname (without schema/port), e.g., `alt.example.com`
-- The referenced TLS certificate is a Kubernetes secret and is located in the same namespace
+- The referenced TLS certificate is a Kubernetes secret of type `kubernetes.io/tls` and is located in the same namespace
 - Spaces around entries are tolerated (e.g., after the comma)
 - Do not use wildcards (*.example.com) unless explicitly supported
 - Avoid duplicate FQDNs
