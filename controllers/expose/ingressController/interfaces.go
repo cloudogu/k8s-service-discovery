@@ -2,12 +2,19 @@ package ingressController
 
 import (
 	"context"
+
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 )
 
 type configMapInterface interface {
 	corev1.ConfigMapInterface
+}
+
+type ingressInterface interface {
+	netv1.IngressInterface
 }
 
 // tcpUpdServiceExposer is used to expose non http services.
@@ -20,10 +27,15 @@ type tcpUpdServiceExposer interface {
 	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
 }
 
+type AlternativeFQDNRedirector interface {
+	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNMap map[string][]string, setOwner func(targetObject metav1.Object) error) error
+}
+
 type IngressController interface {
 	GetName() string
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
 	tcpUpdServiceExposer
+	AlternativeFQDNRedirector
 }
