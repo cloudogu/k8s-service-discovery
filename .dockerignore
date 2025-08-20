@@ -4,6 +4,7 @@
 # Allow only resources
 !go.*
 !controllers/**/*
+!internal/**/*
 !build/**/*
 !hack/**/*.go
 !Makefile
