@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY main.go main.go
 COPY controllers/ controllers/
+COPY internal/ internal/
 
 # Copy .git files as the build process builds the current commit id into the binary via ldflags
 COPY .git .git
