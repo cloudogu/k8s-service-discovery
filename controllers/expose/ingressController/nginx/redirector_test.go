@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,17 +27,17 @@ const (
 func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 
 	tests := []struct {
-		name         string
-		inAltFQDNMap map[string][]string
-		inSetOwner   func(targetObject metav1.Object) error
-		setupMock    func(*mockIngressInterface, map[string][]string)
-		expErr       bool
-		errMsg       string
+		name          string
+		inAltFQDNList []types.AlternativeFQDN
+		inSetOwner    func(targetObject metav1.Object) error
+		setupMock     func(*mockIngressInterface, []types.AlternativeFQDN)
+		expErr        bool
+		errMsg        string
 	}{
 		{
 			name: "create new redirect ingress with single alternative testFqdn and no certificate",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return nil },
 			setupMock:  expectCreateWithAssertion(t),
@@ -45,8 +46,10 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 		},
 		{
 			name: "create new redirect ingress with multiple alternative fqdns and single certificate",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn", "test2.testFqdn", "test3.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
+				{"test2.testFqdn", defaultCertificateName},
+				{"test3.testFqdn", defaultCertificateName},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return nil },
 			setupMock:  expectCreateWithAssertion(t),
@@ -55,10 +58,10 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 		},
 		{
 			name: "create new redirect ingress with multiple alternative fqdns with different certificates",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn"},
-				"testCertificate2":     {"test2.testFqdn"},
-				"testCertificate3":     {"test3.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
+				{"test2.testFqdn", "testCertificate2"},
+				{"test3.testFqdn", "testCertificate3"},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return nil },
 			setupMock:  expectCreateWithAssertion(t),
@@ -67,10 +70,10 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 		},
 		{
 			name: "update redirect ingress when already exists",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn"},
-				"testCertificate2":     {"test2.testFqdn"},
-				"testCertificate3":     {"test3.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
+				{"test2.testFqdn", "testCertificate2"},
+				{"test3.testFqdn", "testCertificate3"},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return nil },
 			setupMock:  expectUpdateWithAssertion(t),
@@ -78,20 +81,20 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 			errMsg:     "",
 		},
 		{
-			name:         "delete redirect ingress when alternative testFqdn is empty and redirect ingress exists",
-			inAltFQDNMap: map[string][]string{},
-			inSetOwner:   func(targetObject metav1.Object) error { return nil },
-			setupMock: func(m *mockIngressInterface, m2 map[string][]string) {
+			name:          "delete redirect ingress when alternative testFqdn is empty and redirect ingress exists",
+			inAltFQDNList: []types.AlternativeFQDN{},
+			inSetOwner:    func(targetObject metav1.Object) error { return nil },
+			setupMock: func(m *mockIngressInterface, l []types.AlternativeFQDN) {
 				m.EXPECT().Delete(mock.Anything, ingressName, mock.Anything).Return(nil)
 			},
 			expErr: false,
 			errMsg: "",
 		},
 		{
-			name:         "return no error when alternative testFqdn is empty and redirect ingress does not exist",
-			inAltFQDNMap: map[string][]string{},
-			inSetOwner:   func(targetObject metav1.Object) error { return nil },
-			setupMock: func(m *mockIngressInterface, m2 map[string][]string) {
+			name:          "return no error when alternative testFqdn is empty and redirect ingress does not exist",
+			inAltFQDNList: []types.AlternativeFQDN{},
+			inSetOwner:    func(targetObject metav1.Object) error { return nil },
+			setupMock: func(m *mockIngressInterface, l []types.AlternativeFQDN) {
 				m.EXPECT().Delete(mock.Anything, ingressName, mock.Anything).Return(apierrors.NewNotFound(v1.Resource("ingress"), ingressName))
 			},
 			expErr: false,
@@ -99,11 +102,11 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 		},
 		{
 			name: "return error when redirect ingress cannot be created",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return nil },
-			setupMock: func(m *mockIngressInterface, m2 map[string][]string) {
+			setupMock: func(m *mockIngressInterface, l []types.AlternativeFQDN) {
 				m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
 			},
 			expErr: true,
@@ -111,11 +114,11 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 		},
 		{
 			name: "return error when redirect ingress cannot be updated",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return nil },
-			setupMock: func(m *mockIngressInterface, m2 map[string][]string) {
+			setupMock: func(m *mockIngressInterface, l []types.AlternativeFQDN) {
 				m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewAlreadyExists(v1.Resource("ingress"), ingressName))
 				m.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
 			},
@@ -123,10 +126,10 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 			errMsg: "failed to update redirect ingress",
 		},
 		{
-			name:         "return error when redirect ingress cannot be deleted",
-			inAltFQDNMap: map[string][]string{},
-			inSetOwner:   func(targetObject metav1.Object) error { return nil },
-			setupMock: func(m *mockIngressInterface, m2 map[string][]string) {
+			name:          "return error when redirect ingress cannot be deleted",
+			inAltFQDNList: []types.AlternativeFQDN{},
+			inSetOwner:    func(targetObject metav1.Object) error { return nil },
+			setupMock: func(m *mockIngressInterface, l []types.AlternativeFQDN) {
 				m.EXPECT().Delete(mock.Anything, ingressName, mock.Anything).Return(assert.AnError)
 			},
 			expErr: true,
@@ -134,11 +137,11 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 		},
 		{
 			name: "return error when owner cannot be set",
-			inAltFQDNMap: map[string][]string{
-				defaultCertificateName: {"test.testFqdn"},
+			inAltFQDNList: []types.AlternativeFQDN{
+				{"test.testFqdn", defaultCertificateName},
 			},
 			inSetOwner: func(targetObject metav1.Object) error { return assert.AnError },
-			setupMock:  func(m *mockIngressInterface, m2 map[string][]string) {},
+			setupMock:  func(m *mockIngressInterface, l []types.AlternativeFQDN) {},
 			expErr:     true,
 			errMsg:     "failed to set owner for redirect ingress",
 		},
@@ -147,14 +150,14 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ingressMock := newMockIngressInterface(t)
-			tt.setupMock(ingressMock, tt.inAltFQDNMap)
+			tt.setupMock(ingressMock, tt.inAltFQDNList)
 
 			redirector := &IngressRedirector{
 				ingressClassName: ingressClassName,
 				ingressInterface: ingressMock,
 			}
 
-			err := redirector.RedirectAlternativeFQDN(context.TODO(), namespace, ingressName, testFqdn, tt.inAltFQDNMap, tt.inSetOwner)
+			err := redirector.RedirectAlternativeFQDN(context.TODO(), namespace, ingressName, testFqdn, tt.inAltFQDNList, tt.inSetOwner)
 
 			if tt.expErr {
 				assert.Error(t, err)
@@ -168,8 +171,10 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 	}
 }
 
-func assertRedirectIngress(t *testing.T, ingress *v1.Ingress, altFQDNMap map[string][]string) {
+func assertRedirectIngress(t *testing.T, ingress *v1.Ingress, altFQDNList []types.AlternativeFQDN) {
 	t.Helper()
+
+	altFQDNMap := groupFQDNsBySecretName(altFQDNList)
 
 	// expected http rule
 	prefix := redirectPathType
@@ -239,23 +244,23 @@ func assertRedirectIngress(t *testing.T, ingress *v1.Ingress, altFQDNMap map[str
 	}
 }
 
-func expectCreateWithAssertion(t *testing.T) func(m *mockIngressInterface, inAltFQDNMap map[string][]string) {
-	return func(m *mockIngressInterface, inAltFQDNMap map[string][]string) {
+func expectCreateWithAssertion(t *testing.T) func(m *mockIngressInterface, inAltFQDNList []types.AlternativeFQDN) {
+	return func(m *mockIngressInterface, inAltFQDNList []types.AlternativeFQDN) {
 		m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
 			Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.CreateOptions) {
-				assertRedirectIngress(t, ingress, inAltFQDNMap)
+				assertRedirectIngress(t, ingress, inAltFQDNList)
 			}).
 			Return(&v1.Ingress{}, nil)
 	}
 }
 
-func expectUpdateWithAssertion(t *testing.T) func(m *mockIngressInterface, inAltFQDNMap map[string][]string) {
-	return func(m *mockIngressInterface, inAltFQDNMap map[string][]string) {
+func expectUpdateWithAssertion(t *testing.T) func(m *mockIngressInterface, inAltFQDNList []types.AlternativeFQDN) {
+	return func(m *mockIngressInterface, inAltFQDNList []types.AlternativeFQDN) {
 		m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewAlreadyExists(v1.Resource("ingress"), ingressName))
 
 		m.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).
 			Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) {
-				assertRedirectIngress(t, ingress, inAltFQDNMap)
+				assertRedirectIngress(t, ingress, inAltFQDNList)
 			}).
 			Return(&v1.Ingress{}, nil)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	networking "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,10 +25,10 @@ type IngressRedirector struct {
 	ingressInterface ingressInterface
 }
 
-func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNMap map[string][]string, setOwner func(targetObject metav1.Object) error) error {
+func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error {
 	logger := log.FromContext(ctx)
 
-	if len(altFQDNMap) == 0 {
+	if len(altFQDNList) == 0 {
 		if dErr := i.ingressInterface.Delete(ctx, redirectObjectName, metav1.DeleteOptions{}); dErr != nil && !apierrors.IsNotFound(dErr) {
 			return fmt.Errorf("failed to delete redirect ingress: %w", dErr)
 		}
@@ -37,7 +38,7 @@ func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespac
 		return nil
 	}
 
-	redirectIngress := i.createRedirectIngress(namespace, redirectObjectName, fqdn, altFQDNMap)
+	redirectIngress := i.createRedirectIngress(namespace, redirectObjectName, fqdn, groupFQDNsBySecretName(altFQDNList))
 
 	if oErr := setOwner(redirectIngress); oErr != nil {
 		return fmt.Errorf("failed to set owner for redirect ingress: %w", oErr)
@@ -135,4 +136,22 @@ func createIngressRules(hostList []string) []networking.IngressRule {
 	}
 
 	return rules
+}
+
+// groupFQDNsBySecretName maps a list of alternative FQDNs with a secret name to a map of secret names to a list of FQDNs.
+// *
+// Result example:
+//
+//	{
+//	  "secret1": ["fqdn1", "fqdn2"],
+//	  "secret2": ["fqdn3"]
+//	}
+func groupFQDNsBySecretName(altFQDNList []types.AlternativeFQDN) map[string][]string {
+	result := make(map[string][]string)
+
+	for _, altFQDN := range altFQDNList {
+		result[altFQDN.CertificateSecretName] = append(result[altFQDN.CertificateSecretName], altFQDN.FQDN)
+	}
+
+	return result
 }
