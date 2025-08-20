@@ -372,7 +372,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		creatorMock := newMockSelfSignedCertificateCreator(t)
-		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com"}).Return(assert.AnError)
+		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{}).Return(assert.AnError)
 
 		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
@@ -455,7 +455,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		creatorMock := newMockSelfSignedCertificateCreator(t)
-		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com"}).Return(nil)
+		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{}).Return(nil)
 
 		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
@@ -486,7 +486,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Get(testCtx).Return(globalConfig, nil)
 
 		creatorMock := newMockSelfSignedCertificateCreator(t)
-		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"192.168.56.2", "local.cloudogu.com", "fqdn1.example.com", "fqdn2.example.com"}).Return(nil)
+		creatorMock.EXPECT().CreateAndSafeCertificate(testCtx, 365, "DE", "Lower Saxony", "Brunswick", []string{"fqdn1.example.com", "fqdn2.example.com"}).Return(nil)
 
 		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{
