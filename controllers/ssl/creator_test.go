@@ -2,10 +2,11 @@ package ssl
 
 import (
 	"context"
+	"testing"
+
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var testCtx = context.Background()
