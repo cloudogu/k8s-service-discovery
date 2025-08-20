@@ -115,8 +115,14 @@ func redirectIngressPredicate() predicate.Funcs {
 				return false
 			}
 
-			oldIngress := e.ObjectOld.(*networking.Ingress)
-			newIngress := e.ObjectNew.(*networking.Ingress)
+			oldIngress, ok := e.ObjectOld.(*networking.Ingress)
+			if !ok {
+				return false
+			}
+			newIngress, ok := e.ObjectNew.(*networking.Ingress)
+			if !ok {
+				return false
+			}
 
 			if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
 				return true

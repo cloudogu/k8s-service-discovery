@@ -77,6 +77,18 @@ func Test_redirectIngressPredicate(t *testing.T) {
 		}))
 	})
 
+	t.Run("ignore when objects are not from type networkingv1.Ingress", func(t *testing.T) {
+		assert.False(t, redirectIngressPredicateFuncs.UpdateFunc(event.UpdateEvent{
+			ObjectOld: &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: redirectObjectName, Namespace: "default"}},
+			ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: redirectObjectName, Namespace: "default"}},
+		}))
+
+		assert.False(t, redirectIngressPredicateFuncs.UpdateFunc(event.UpdateEvent{
+			ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: redirectObjectName, Namespace: "default"}},
+			ObjectNew: &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: redirectObjectName, Namespace: "default"}},
+		}))
+	})
+
 	t.Run("reconcile when deleted redirected ingress", func(t *testing.T) {
 		assert.True(t, redirectIngressPredicateFuncs.DeleteFunc(event.DeleteEvent{Object: &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: redirectObjectName, Namespace: "default"}}}))
 	})
