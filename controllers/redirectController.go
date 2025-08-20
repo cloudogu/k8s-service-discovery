@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
-	"github.com/go-logr/logr"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,11 +21,6 @@ const (
 	primaryFQDNKey     = "fqdn"
 	alternativeFQDNKey = "alternativeFQDNs"
 	redirectObjectName = "redirect-alt-fqdn"
-)
-
-const (
-	altFQDNSeparator    = ","
-	secretNameSeparator = ":"
 )
 
 const (
@@ -63,52 +57,34 @@ func (r *RedirectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	altFQDNStr, _ := globalCfg.Get(alternativeFQDNKey)
-	altFQDNMap := parseAlternativeFQDNString(logger, altFQDNStr.String())
+	altFQDNList := assignDefaultCertSecrets(types.ParseAlternativeFQDNsFromConfigString(altFQDNStr.String()))
 
 	setOwnerReference := func(targetObject metav1.Object) error {
 		return ctrl.SetControllerReference(cm, targetObject, r.Client.Scheme(), controllerutil.WithBlockOwnerDeletion(false))
 	}
 
-	if rErr := r.Redirector.RedirectAlternativeFQDN(ctx, req.Namespace, redirectObjectName, fqdn.String(), altFQDNMap, setOwnerReference); rErr != nil {
+	if rErr := r.Redirector.RedirectAlternativeFQDN(ctx, req.Namespace, redirectObjectName, fqdn.String(), altFQDNList, setOwnerReference); rErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to redirect alternative fqdns: %w", rErr)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-/**
- * Parses the string of alternative FQDNs and returns a map of secret names to FQDNs.
- *
- * Result example:
- *  {
- *    "secret1": ["fqdn1", "fqdn2"],
- *    "secret2": ["fqdn3"]
- *  }
- */
-func parseAlternativeFQDNString(logger logr.Logger, altFQDNStr string) map[string][]string {
-	altFQDNList := strings.Split(altFQDNStr, altFQDNSeparator)
+func assignDefaultCertSecrets(altFQDNList []types.AlternativeFQDN) []types.AlternativeFQDN {
+	result := make([]types.AlternativeFQDN, 0, len(altFQDNList))
 
-	fqdnMap := make(map[string][]string)
-	for _, fqdnPair := range altFQDNList {
-		split := strings.Split(fqdnPair, secretNameSeparator)
-
-		if len(split) > 2 {
-			logger.Info("invalid alternative FQDN string", "entry", fqdnPair, "error", "too many separators")
-			continue
+	for _, altFQDN := range altFQDNList {
+		if altFQDN.HasCertificate() {
+			result = append(result, altFQDN)
+		} else {
+			result = append(result, types.AlternativeFQDN{
+				FQDN:                  altFQDN.FQDN,
+				CertificateSecretName: certEcosystemSecretName,
+			})
 		}
-
-		split[0] = strings.TrimSpace(split[0])
-
-		if len(split) < 2 {
-			fqdnMap[certEcosystemSecretName] = append(fqdnMap[certEcosystemSecretName], split[0])
-			continue
-		}
-
-		split[1] = strings.TrimSpace(split[1])
-		fqdnMap[split[1]] = append(fqdnMap[split[1]], split[0])
 	}
 
-	return fqdnMap
+	return result
 }
 
 // SetupWithManager sets up the global configmap controller with the Manager.

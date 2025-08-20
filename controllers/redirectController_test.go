@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -12,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -115,8 +116,8 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: "alt.cloudogu.com",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				certEcosystemSecretName: {"alt.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt.cloudogu.com", certEcosystemSecretName},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -129,8 +130,8 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: "alt.cloudogu.com:my-cert-secret",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				"my-cert-secret": {"alt.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt.cloudogu.com", "my-cert-secret"},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -143,8 +144,9 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: "alt1.cloudogu.com,alt2.cloudogu.com",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				certEcosystemSecretName: {"alt1.cloudogu.com", "alt2.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt1.cloudogu.com", certEcosystemSecretName},
+				{"alt2.cloudogu.com", certEcosystemSecretName},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -157,9 +159,9 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: "alt1.cloudogu.com:my-cert-secret,alt2.cloudogu.com:my-cert-secret2",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				"my-cert-secret":  {"alt1.cloudogu.com"},
-				"my-cert-secret2": {"alt2.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt1.cloudogu.com", "my-cert-secret"},
+				{"alt2.cloudogu.com", "my-cert-secret2"},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -172,8 +174,9 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: "alt1.cloudogu.com:my-cert-secret,alt2.cloudogu.com:my-cert-secret",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				"my-cert-secret": {"alt1.cloudogu.com", "alt2.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt1.cloudogu.com", "my-cert-secret"},
+				{"alt2.cloudogu.com", "my-cert-secret"},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -186,10 +189,12 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: "alt1.cloudogu.com,alt2.cloudogu.com:my-cert-secret,alt3.cloudogu.com,alt4.cloudogu.com:my-cert-secret,alt5.cloudogu.com:my-second-cert-secret",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				certEcosystemSecretName: {"alt1.cloudogu.com", "alt3.cloudogu.com"},
-				"my-cert-secret":        {"alt2.cloudogu.com", "alt4.cloudogu.com"},
-				"my-second-cert-secret": {"alt5.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt1.cloudogu.com", certEcosystemSecretName},
+				{"alt2.cloudogu.com", "my-cert-secret"},
+				{"alt3.cloudogu.com", certEcosystemSecretName},
+				{"alt4.cloudogu.com", "my-cert-secret"},
+				{"alt5.cloudogu.com", "my-second-cert-secret"},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -202,27 +207,26 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: " alt1.cloudogu.com    ,alt2.cloudogu.com  :  my-cert-secret,alt3.cloudogu.com  ,alt4.cloudogu.com:  my-cert-secret,  alt5.cloudogu.com  :my-second-cert-secret   ",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				certEcosystemSecretName: {"alt1.cloudogu.com", "alt3.cloudogu.com"},
-				"my-cert-secret":        {"alt2.cloudogu.com", "alt4.cloudogu.com"},
-				"my-second-cert-secret": {"alt5.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt1.cloudogu.com", certEcosystemSecretName},
+				{"alt2.cloudogu.com", "my-cert-secret"},
+				{"alt3.cloudogu.com", certEcosystemSecretName},
+				{"alt4.cloudogu.com", "my-cert-secret"},
+				{"alt5.cloudogu.com", "my-second-cert-secret"},
 			}),
 			expErr: false,
 			errMsg: "",
 		},
 		{
-			name:         "ignore alternative fqdns that reference multiple certificates",
-			inClientMock: createDefaultClientMock(globalConfigMap),
-			setupLoggerMock: func(m *MockLogSink) {
-				createDefaultLoggerMock()(m)
-				m.EXPECT().Info(0, "invalid alternative FQDN string", "entry", mock.Anything, "error", "too many separators")
-			},
+			name:            "ignore alternative fqdns that reference multiple certificates",
+			inClientMock:    createDefaultClientMock(globalConfigMap),
+			setupLoggerMock: createDefaultLoggerMock(),
 			setupGlobalConfigMock: createGlobalConfigWithEntries(map[config.Key]config.Value{
 				primaryFQDNKey:     primaryFQDN,
 				alternativeFQDNKey: " alt1.cloudogu.com,alt2.cloudogu.com:my-cert-secret:my-other-secret",
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{
-				certEcosystemSecretName: {"alt1.cloudogu.com"},
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{
+				{"alt1.cloudogu.com", certEcosystemSecretName},
 			}),
 			expErr: false,
 			errMsg: "",
@@ -234,7 +238,7 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 			setupGlobalConfigMock: createGlobalConfigWithEntries(map[config.Key]config.Value{
 				primaryFQDNKey: primaryFQDN,
 			}),
-			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNMap(map[string][]string{}),
+			setupRedirectorMock: createRedirectorMockWithExpectedRedirectAltFQDNList([]types.AlternativeFQDN{}),
 			expErr:              false,
 			errMsg:              "",
 		},
@@ -247,7 +251,7 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 			}),
 			setupRedirectorMock: func(t *testing.T, m *MockAlternativeFQDNRedirector) {
 				m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNMap map[string][]string, setOwner func(metav1.Object) error) {
+					Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(metav1.Object) error) {
 						tmpCM := &corev1.ConfigMap{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "testCM",
@@ -337,7 +341,7 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				Redirector:         redirectorMock,
 			}
 
-			request := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: globalConfigNamespace, Name: globalConfigName}}
+			request := ctrl.Request{NamespacedName: k8stypes.NamespacedName{Namespace: globalConfigNamespace, Name: globalConfigName}}
 
 			result, err := redirectReconciler.Reconcile(valuedTestCtx, request)
 
@@ -354,25 +358,17 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 	}
 }
 
-func requireEqualMap(t *testing.T, expected map[string][]string, actual map[string][]string) {
-	for k, expVals := range expected {
-		actVals, ok := actual[k]
-		require.True(t, ok, "missing key %s", k)
-		require.ElementsMatch(t, expVals, actVals)
-	}
-}
-
 func createGlobalConfigWithEntries(entries map[config.Key]config.Value) func(m *MockGlobalConfigRepository) {
 	return func(m *MockGlobalConfigRepository) {
 		m.EXPECT().Get(mock.Anything).Return(config.CreateGlobalConfig(entries), nil)
 	}
 }
 
-func createRedirectorMockWithExpectedRedirectAltFQDNMap(expAltFQDNMap map[string][]string) func(t *testing.T, m *MockAlternativeFQDNRedirector) {
+func createRedirectorMockWithExpectedRedirectAltFQDNList(expAltFQDNList []types.AlternativeFQDN) func(t *testing.T, m *MockAlternativeFQDNRedirector) {
 	return func(t *testing.T, m *MockAlternativeFQDNRedirector) {
 		m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything).
-			Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNMap map[string][]string, setOwner func(metav1.Object) error) {
-				requireEqualMap(t, expAltFQDNMap, altFQDNMap)
+			Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(metav1.Object) error) {
+				require.ElementsMatch(t, expAltFQDNList, altFQDNList)
 			}).Return(nil)
 	}
 }
