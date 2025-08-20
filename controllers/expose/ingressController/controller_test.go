@@ -1,15 +1,16 @@
 package ingressController
 
 import (
+	"testing"
+
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController/nginx"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestParseIngressController(t *testing.T) {
 	t.Run("should create nginx controller", func(t *testing.T) {
 		// when
-		controller := ParseIngressController("nginx-ingress", nil)
+		controller := ParseIngressController(Dependencies{Controller: "nginx-ingress"})
 
 		// then
 		require.IsType(t, &nginx.IngressController{}, controller)
@@ -17,7 +18,7 @@ func TestParseIngressController(t *testing.T) {
 
 	t.Run("should create nginx controller as default", func(t *testing.T) {
 		// when
-		controller := ParseIngressController("does not exists in switch case", nil)
+		controller := ParseIngressController(Dependencies{Controller: "does not exists in switch case"})
 
 		// then
 		require.IsType(t, &nginx.IngressController{}, controller)

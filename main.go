@@ -92,8 +92,15 @@ func startManager() error {
 	}
 	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
 	secretInterface := clientset.CoreV1().Secrets(watchNamespace)
+	ingressInterface := clientset.NetworkingV1().Ingresses(watchNamespace)
 	ingressControllerStr := config.ReadIngressController()
-	controller := ingressController.ParseIngressController(ingressControllerStr, configMapInterface)
+
+	controller := ingressController.ParseIngressController(ingressController.Dependencies{
+		Controller:         ingressControllerStr,
+		ConfigMapInterface: configMapInterface,
+		IngressInterface:   ingressInterface,
+		IngressClassName:   IngressClassName,
+	})
 
 	if err = handleIngressClassCreation(serviceDiscManager, clientset, watchNamespace, eventRecorder, controller); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
@@ -144,6 +151,8 @@ func startManager() error {
 
 	if err = configureManager(
 		serviceDiscManager,
+		globalConfigRepo,
+		controller,
 		ingressUpdater,
 		exposedPortUpdater,
 		networkPolicyUpdater,
@@ -175,6 +184,8 @@ type certificateSynchronizer interface {
 
 func configureManager(
 	k8sManager k8sManager,
+	globalConfigRepo controllers.GlobalConfigRepository,
+	ingressController controllers.AlternativeFQDNRedirector,
 	ingressUpdater controllers.IngressUpdater,
 	exposedPortUpdater controllers.ExposedPortUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
@@ -183,6 +194,8 @@ func configureManager(
 ) error {
 	if err := configureReconciler(
 		k8sManager,
+		globalConfigRepo,
+		ingressController,
 		ingressUpdater,
 		exposedPortUpdater,
 		networkPolicyUpdater,
@@ -286,6 +299,8 @@ func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater cont
 
 func configureReconciler(
 	k8sManager k8sManager,
+	globalConfigRepo controllers.GlobalConfigRepository,
+	ingressController controllers.AlternativeFQDNRedirector,
 	ingressUpdater controllers.IngressUpdater,
 	exposedPortUpdater controllers.ExposedPortUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
@@ -305,6 +320,16 @@ func configureReconciler(
 	ecosystemCertificateReconciler := controllers.NewEcosystemCertificateReconciler(certSync)
 	if err := ecosystemCertificateReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup ecosystem certificate reconciler with the manager: %w", err)
+	}
+
+	redirectReconciler := &controllers.RedirectReconciler{
+		Client:             k8sManager.GetClient(),
+		GlobalConfigGetter: globalConfigRepo,
+		Redirector:         ingressController,
+	}
+
+	if err := redirectReconciler.SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("failed to setup redirct reconciler with the manager: %w", err)
 	}
 
 	return nil
