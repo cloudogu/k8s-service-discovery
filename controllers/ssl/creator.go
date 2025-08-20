@@ -3,6 +3,7 @@ package ssl
 import (
 	"context"
 	"fmt"
+
 	"github.com/cloudogu/cesapp-lib/ssl"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 )

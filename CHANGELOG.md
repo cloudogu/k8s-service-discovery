@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.2.0] - 2025-08-20
+### Added
+- [#88] add logic to handle alternative fqdns in global config and to create a redirect ingress object for them
+- [#89] Alternative FQDNs will be added as SANs when creating the self-signed certificate. 
+
 ## [v2.1.0] - 2025-07-16
 ### Added
 - [#86] add metadata mapping for logLevel

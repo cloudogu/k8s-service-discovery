@@ -1,9 +1,10 @@
 package nginx
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestNewNginxController(t *testing.T) {
@@ -12,7 +13,7 @@ func TestNewNginxController(t *testing.T) {
 		configMapInterfaceMock := newMockConfigMapInterface(t)
 
 		// when
-		sut := NewNginxController(configMapInterfaceMock)
+		sut := NewNginxController(IngressControllerDependencies{ConfigMapInterface: configMapInterfaceMock})
 
 		// then
 		require.NotNil(t, sut.ingressNginxTcpUpdExposer)

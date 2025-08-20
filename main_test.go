@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/stretchr/testify/assert"
 	"os"
-	"sigs.k8s.io/controller-runtime/pkg/config"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -130,6 +131,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().GetCache().Return(nil)
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
+		k8sManager.EXPECT().GetRESTMapper().Return(nil)
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -158,6 +160,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
+		k8sManager.EXPECT().GetRESTMapper().Return(nil)
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -187,6 +190,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().Start(mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
+		k8sManager.EXPECT().GetRESTMapper().Return(nil)
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -216,6 +220,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(nil)
 		k8sManager.EXPECT().Start(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
+		k8sManager.EXPECT().GetRESTMapper().Return(nil)
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {

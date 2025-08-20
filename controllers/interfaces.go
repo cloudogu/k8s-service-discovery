@@ -2,11 +2,14 @@ package controllers
 
 import (
 	"context"
+
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -51,9 +54,13 @@ type doguInterface interface {
 	ecoSystem.DoguInterface
 }
 
+type AlternativeFQDNRedirector interface {
+	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error
+}
+
 //nolint:unused
 //goland:noinspection GoUnusedType
-type ingressController interface {
+type IngressController interface {
 	GetName() string
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
@@ -61,6 +68,7 @@ type ingressController interface {
 	GetUseRegexKey() string
 	GetProxyBodySizeKey() string
 	tcpUpdServiceExposer
+	AlternativeFQDNRedirector
 }
 
 // tcpUpdServiceExposer is used to expose non http services.

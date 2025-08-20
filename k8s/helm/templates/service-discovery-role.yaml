@@ -40,8 +40,11 @@ rules:
     resourceNames:
       - tcp-services
       - udp-services
+      - global-config
     verbs:
       - get
+      - list
+      - watch
       - update
   # create and update ingress objects for dogus
   - apiGroups:
@@ -54,3 +57,4 @@ rules:
       - watch
       - create
       - update
+      - delete
