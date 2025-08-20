@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v2.2.0] - 2025-08-20
 ### Added
 - [#88] add logic to handle alternative fqdns in global config and to create a redirect ingress object for them
 - [#89] Alternative FQDNs will be added as SANs when creating the self-signed certificate. 
