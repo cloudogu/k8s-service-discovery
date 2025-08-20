@@ -30,9 +30,9 @@ metadata:
   namespace: ecosystem
 data:
   config.yaml: |
-    alternativeFQDNs: "bmf.ecosystem.com,k008.ecosystem.com,alt.example.com:new-certificate",
-    fqdn: "cloudogu.ecosystem.com"
+    alternativeFQDNs: "bmf.example.com,k008.example.com,alt.example.com:new-certificate",
+    fqdn: "cloudogu.example.com"
 ```
 
-Im genannten Beispiel werden die alternativen FQDNs `bmf.ecosystem.com,k008.ecosystem.com,alt.example.com` auf die primäre FQDN `cloudogu.ecosystem.com` umgeleitet.
-Die FQDNs `bmf.ecosystem.com,k008.ecosystem.com` nutzen das Standard-Zertifikat der Instanz, während `alt.example.com` das Zertifikat `new-certificate` nutzt.
+Im genannten Beispiel werden die alternativen FQDNs `bmf.example.com,k008.example.com,alt.example.com` auf die primäre FQDN `cloudogu.example.com` umgeleitet.
+Die FQDNs `bmf.example.com,k008.example.com` nutzen das Standard-Zertifikat der Instanz, während `alt.example.com` das Zertifikat `new-certificate` nutzt.
