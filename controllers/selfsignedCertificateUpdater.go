@@ -14,6 +14,7 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -229,7 +230,7 @@ func getAlternativeFQDNs(globalConfig config.GlobalConfig) []string {
 		return []string{}
 	}
 
-	altFQDNs := util.ParseAlternativeFQDNsFromConfigString(altFQDNsString.String())
+	altFQDNs := types.ParseAlternativeFQDNsFromConfigString(altFQDNsString.String())
 
 	// Create a slice to hold just the names
 	fqdns := make([]string, 0)
