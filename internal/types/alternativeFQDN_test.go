@@ -81,6 +81,11 @@ func TestParseAlternativeFQDNsFromConfigString(t *testing.T) {
 			},
 		},
 		{
+			name:   "FQDN with multiple certificates separators",
+			input:  "example.com:cert1:cer2",
+			output: []AlternativeFQDN{},
+		},
+		{
 			name:   "Empty input string",
 			input:  "",
 			output: []AlternativeFQDN{},
