@@ -44,3 +44,7 @@ networkPolicies:
   enabled: true
   denyAll: true
   ingressControllerAllowedCIDR: "0.0.0.0/0"
+loadBalancerService:
+  annotations: []
+  internalTrafficPolicy: Cluster
+  externalTrafficPolicy: Local
