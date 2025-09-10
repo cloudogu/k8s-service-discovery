@@ -1,5 +1,9 @@
 package nginx
 
+import (
+	k8sv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+)
+
 const (
 	ingressRewriteTargetAnnotation = "nginx.ingress.kubernetes.io/rewrite-target"
 	ingressUseRegexAnnotation      = "nginx.ingress.kubernetes.io/use-regex"
@@ -42,4 +46,10 @@ func (c *IngressController) GetRewriteAnnotationKey() string {
 
 func (c *IngressController) GetUseRegexKey() string {
 	return ingressUseRegexAnnotation
+}
+
+func (c *IngressController) GetSelector() map[string]string {
+	return map[string]string{
+		k8sv2.DoguLabelName: nginxIngressControllerName,
+	}
 }

@@ -3,6 +3,7 @@ package nginx
 import (
 	"testing"
 
+	k8sv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,4 +72,13 @@ func Test_controller_GetUseRegexKey(t *testing.T) {
 		// then
 		require.Equal(t, "nginx.ingress.kubernetes.io/use-regex", key)
 	})
+}
+
+func TestIngressController_GetSelector(t *testing.T) {
+	sut := IngressController{}
+	exp := map[string]string{
+		k8sv2.DoguLabelName: nginxIngressControllerName,
+	}
+
+	assert.Equal(t, exp, sut.GetSelector())
 }
