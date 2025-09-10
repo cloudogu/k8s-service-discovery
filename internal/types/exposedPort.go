@@ -83,11 +83,12 @@ func (eps ExposedPorts) SetNodePorts(servicePorts []corev1.ServicePort) {
 }
 
 type ExposedPort struct {
-	Name       string          `json:"-"`
-	Protocol   corev1.Protocol `json:"protocol"`
-	Port       int32           `json:"port"`
-	TargetPort int32           `json:"targetPort"`
-	nodePort   int32
+	Name        string
+	ServiceName string
+	Protocol    corev1.Protocol
+	Port        int32
+	TargetPort  int32
+	nodePort    int32
 }
 
 func (ep ExposedPort) ToServicePort() corev1.ServicePort {
@@ -98,6 +99,10 @@ func (ep ExposedPort) ToServicePort() corev1.ServicePort {
 		TargetPort: intstr.FromInt32(ep.TargetPort),
 		NodePort:   ep.nodePort,
 	}
+}
+
+func (ep ExposedPort) PortString() string {
+	return fmt.Sprintf("%d", ep.Port)
 }
 
 func CreateDefaultPorts() ExposedPorts {
