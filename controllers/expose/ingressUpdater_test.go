@@ -3,6 +3,8 @@ package expose
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
@@ -15,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
 )
 
 func getGlobalConfigRepoMockWithMaintenance(t *testing.T, maintenanceMode bool) GlobalConfigRepository {
@@ -46,18 +47,14 @@ const (
 func TestNewIngressUpdater(t *testing.T) {
 	t.Run("successfully create ingress updater", func(t *testing.T) {
 		// given
-		clientSetMock := newMockClientSetInterface(t)
 		ingressInterfaceMock := newMockIngressInterface(t)
-		netv1Mock := newMockNetInterface(t)
-		netv1Mock.EXPECT().Ingresses(testNamespace).Return(ingressInterfaceMock)
-		clientSetMock.EXPECT().NetworkingV1().Return(netv1Mock)
-
 		doguInterfaceMock := newMockDoguInterface(t)
 		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
 		ingressControllerMock := newMockIngressController(t)
+		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
 
 		// when
-		sut := NewIngressUpdater(clientSetMock, doguInterfaceMock, globalConfigRepoMock, testNamespace, testIngressClassName, newMockEventRecorder(t), ingressControllerMock)
+		sut := NewIngressUpdater(deploymentReadyCheckerMock, ingressInterfaceMock, doguInterfaceMock, globalConfigRepoMock, testNamespace, testIngressClassName, newMockEventRecorder(t), ingressControllerMock)
 
 		// then
 		assert.NotNil(t, sut)

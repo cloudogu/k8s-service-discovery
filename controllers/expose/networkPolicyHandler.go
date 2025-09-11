@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"strings"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
@@ -12,9 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"maps"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
+)
+
+const (
+	// CesExposedPortsAnnotation can be appended to service with information of exposed ports from dogu descriptors.
+	cesExposedPortsAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports"
 )
 
 const (
@@ -365,4 +371,46 @@ func (nph *networkPolicyHandler) RemoveNetworkPolicy(ctx context.Context) error 
 	}
 
 	return nil
+}
+
+func parseExposedPortsFromService(service *corev1.Service) (util.ExposedPorts, error) {
+	cesExposedPortsStr, ok := service.Annotations[cesExposedPortsAnnotation]
+	if !ok {
+		return util.ExposedPorts{}, nil
+	}
+
+	cesExposedPorts := &util.ExposedPorts{}
+
+	err := json.Unmarshal([]byte(cesExposedPortsStr), cesExposedPorts)
+	if err != nil {
+		return util.ExposedPorts{}, fmt.Errorf("failed to unmarshal ces exposed ports annotation %q from service %q: %w", cesExposedPortsAnnotation, service.Name, err)
+	}
+
+	// Validate: Ports should be in Service Spec
+	for _, port := range *cesExposedPorts {
+		found := false
+		for _, servicePort := range service.Spec.Ports {
+			if equalsServicePortExposedPort(servicePort, port) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("invalid service annotation %q. port %q is not defined in service ports", cesExposedPortsAnnotation, port.Port)
+		}
+	}
+
+	return *cesExposedPorts, nil
+}
+
+func equalsServicePortExposedPort(servicePort corev1.ServicePort, exposedPort util.ExposedPort) bool {
+	if !strings.EqualFold(string(servicePort.Protocol), string(exposedPort.Protocol)) {
+		return false
+	}
+
+	if servicePort.Port != exposedPort.Port {
+		return false
+	}
+
+	return true
 }

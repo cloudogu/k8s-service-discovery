@@ -4,18 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
+	"strings"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"path"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strings"
 )
 
 const (
@@ -93,10 +93,7 @@ type ingressUpdater struct {
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(clientSet clientSetInterface, doguInterface doguInterface, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder, controller ingressController) *ingressUpdater {
-	ingressClient := clientSet.NetworkingV1().Ingresses(namespace)
-
-	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
+func NewIngressUpdater(deploymentReadyChecker DeploymentReadyChecker, ingressInterface ingressInterface, doguInterface doguInterface, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder, controller ingressController) *ingressUpdater {
 	return &ingressUpdater{
 		globalConfigRepo:       globalConfigRepo,
 		namespace:              namespace,
@@ -104,7 +101,7 @@ func NewIngressUpdater(clientSet clientSetInterface, doguInterface doguInterface
 		deploymentReadyChecker: deploymentReadyChecker,
 		eventRecorder:          recorder,
 		controller:             controller,
-		ingressInterface:       ingressClient,
+		ingressInterface:       ingressInterface,
 		doguInterface:          doguInterface,
 	}
 }

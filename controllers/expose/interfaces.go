@@ -6,12 +6,7 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
-	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -52,30 +47,8 @@ type ingressInterface interface {
 	netv1.IngressInterface
 }
 
-//nolint:unused
-//goland:noinspection GoUnusedType
-type clientSetInterface interface {
-	kubernetes.Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type appsv1Interface interface {
-	appsv1.AppsV1Interface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type netInterface interface {
-	netv1.NetworkingV1Interface
-}
-
 type doguInterface interface {
 	ecoSystem.DoguInterface
-}
-
-type serviceInterface interface {
-	corev1.ServiceInterface
 }
 
 type ingressController interface {
@@ -83,19 +56,6 @@ type ingressController interface {
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
-	GetSelector() map[string]string
-	tcpUpdServiceExposer
-}
-
-// tcpUpdServiceExposer is used to expose non http services.
-type tcpUpdServiceExposer interface {
-	// ExposeOrUpdateExposedPorts adds or updates the exposing of the exposed ports from the service in the cluster. These are typically
-	// entries in a configmap.
-	ExposeOrUpdateExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error
-	// DeleteExposedPorts removes the exposing of the exposed ports from the service in the cluster. These are typically
-	// entries in a configmap.
-	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
-	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference)
 }
 
 type networkPolicyInterface interface {
