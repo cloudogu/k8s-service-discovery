@@ -6,7 +6,6 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +32,6 @@ type IngressUpdater interface {
 	UpsertIngressForService(ctx context.Context, service *corev1.Service) error
 }
 
-type ExposedPortUpdater interface {
-	UpsertCesLoadbalancerService(ctx context.Context, service *corev1.Service) error
-	RemoveExposedPorts(ctx context.Context, serviceName string) error
-}
-
 type NetworkPolicyUpdater interface {
 	UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error
 	RemoveExposedPorts(ctx context.Context, serviceName string) error
@@ -58,32 +52,12 @@ type AlternativeFQDNRedirector interface {
 	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error
 }
 
-//nolint:unused
-//goland:noinspection GoUnusedType
-type IngressController interface {
-	GetName() string
-	GetControllerSpec() string
-	GetRewriteAnnotationKey() string
-	GetAdditionalConfigurationKey() string
-	GetUseRegexKey() string
-	GetProxyBodySizeKey() string
-	GetSelector() map[string]string
-	tcpUpdServiceExposer
-	AlternativeFQDNRedirector
+type PortExposer interface {
+	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error
 }
 
-// tcpUpdServiceExposer is used to expose non http services.
-//
-//nolint:unused
-//goland:noinspection GoUnusedType
-type tcpUpdServiceExposer interface {
-	// ExposeOrUpdateExposedPorts adds or updates the exposing of the exposed ports from the service in the cluster. These are typically
-	// entries in a configmap.
-	ExposeOrUpdateExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error
-	// DeleteExposedPorts removes the exposing of the exposed ports from the service in the cluster. These are typically
-	// entries in a configmap.
-	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
-	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error
+type IngressControllerSelector interface {
+	GetSelector() map[string]string
 }
 
 //nolint:unused
