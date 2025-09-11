@@ -9,17 +9,19 @@ import (
 )
 
 func TestNewNginxController(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// given
-		configMapInterfaceMock := newMockConfigMapInterface(t)
+	cfgMock := newMockConfigMapInterface(t)
+	ingressMock := newMockIngressInterface(t)
 
-		// when
-		sut := NewNginxController(IngressControllerDependencies{ConfigMapInterface: configMapInterfaceMock})
-
-		// then
-		require.NotNil(t, sut.ingressNginxTcpUpdExposer)
-		assert.Equal(t, configMapInterfaceMock, sut.ingressNginxTcpUpdExposer.configMapInterface)
+	ctrl := NewNginxController(IngressControllerDependencies{
+		ConfigMapInterface: cfgMock,
+		IngressInterface:   ingressMock,
+		IngressClassName:   "test",
 	})
+
+	require.NotNil(t, ctrl)
+	require.NotNil(t, ctrl.configMapInterface)
+	require.NotNil(t, ctrl.ingressInterface)
+	require.Equal(t, "test", ctrl.ingressClassName)
 }
 
 func Test_controller_GetName(t *testing.T) {

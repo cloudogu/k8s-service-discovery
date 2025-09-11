@@ -12,7 +12,7 @@ const (
 )
 
 type IngressController struct {
-	*ingressNginxTcpUpdExposer
+	*PortExposer
 	*IngressRedirector
 }
 
@@ -24,7 +24,9 @@ type IngressControllerDependencies struct {
 
 func NewNginxController(deps IngressControllerDependencies) *IngressController {
 	return &IngressController{
-		ingressNginxTcpUpdExposer: NewIngressNginxTCPUDPExposer(deps.ConfigMapInterface),
+		PortExposer: &PortExposer{
+			configMapInterface: deps.ConfigMapInterface,
+		},
 		IngressRedirector: &IngressRedirector{
 			ingressClassName: deps.IngressClassName,
 			ingressInterface: deps.IngressInterface,
