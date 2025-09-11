@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,6 +21,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type FieldIndexerStub struct {
+	mock.Mock
+}
+
+func (f *FieldIndexerStub) IndexField(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+	return nil
+}
 
 func Test_startManager(t *testing.T) {
 	// override default controller method to create a new manager
@@ -132,6 +141,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddHealthzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		k8sManager.EXPECT().GetRESTMapper().Return(nil)
+		k8sManager.EXPECT().GetFieldIndexer().Return(&FieldIndexerStub{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -161,6 +171,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().AddReadyzCheck(mock.Anything, mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		k8sManager.EXPECT().GetRESTMapper().Return(nil)
+		k8sManager.EXPECT().GetFieldIndexer().Return(&FieldIndexerStub{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -191,6 +202,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().Start(mock.Anything).Return(assert.AnError)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		k8sManager.EXPECT().GetRESTMapper().Return(nil)
+		k8sManager.EXPECT().GetFieldIndexer().Return(&FieldIndexerStub{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
@@ -221,6 +233,7 @@ func Test_startManager(t *testing.T) {
 		k8sManager.EXPECT().Start(mock.Anything).Return(nil)
 		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
 		k8sManager.EXPECT().GetRESTMapper().Return(nil)
+		k8sManager.EXPECT().GetFieldIndexer().Return(&FieldIndexerStub{})
 		oldNewManger := ctrl.NewManager
 		defer func() { ctrl.NewManager = oldNewManger }()
 		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {

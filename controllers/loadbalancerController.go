@@ -22,16 +22,11 @@ const (
 	exposedPortIndexKey = "k8s-service-discovery.cloudogu.com/exposedPort"
 )
 
-type ingressController interface {
-	IngressControllerSelector
-	PortExposer
-}
-
 // LoadBalancerReconciler is responsible for reconciling the ces-loadbalancer configmap and to create / update the corresponding
 // loadbalancer service. For this, it also watches Services to detect changes for exposed ports.
 type LoadBalancerReconciler struct {
 	Client            client.Client
-	IngressController ingressController
+	IngressController IngressController
 	SvcClient         serviceClient
 }
 

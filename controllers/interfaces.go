@@ -60,6 +60,12 @@ type IngressControllerSelector interface {
 	GetSelector() map[string]string
 }
 
+type IngressController interface {
+	AlternativeFQDNRedirector
+	IngressControllerSelector
+	PortExposer
+}
+
 //nolint:unused
 //goland:noinspection GoUnusedType
 type ingressInterface interface {
