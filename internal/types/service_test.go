@@ -235,6 +235,20 @@ func TestService_GetExposedPorts(t *testing.T) {
 			},
 		},
 		{
+			name: "support SCTP protocol",
+			in: Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Annotations: map[string]string{
+						exposedPortServiceAnnotation: `[{"protocol":"sctp","port":50000,"targetPort":50000}]`,
+					},
+				},
+			},
+			exp: ExposedPorts{
+				{"test-50000", "test", corev1.ProtocolSCTP, 50000, 50000, 0},
+			},
+		},
+		{
 			name: "return multiple exposed ports",
 			in: Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -310,6 +324,58 @@ func TestService_GetExposedPorts(t *testing.T) {
 			},
 			expErr:    true,
 			expErrStr: "failed to unmarshal exposed ports",
+		},
+		{
+			name: "return error when port is out of range",
+			in: Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Annotations: map[string]string{
+						exposedPortServiceAnnotation: `[{"protocol":"tcp","port":500000000000000000,"targetPort":50000}]`,
+					},
+				},
+			},
+			expErr:    true,
+			expErrStr: "port is invalid",
+		},
+		{
+			name: "return error when port is negative",
+			in: Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Annotations: map[string]string{
+						exposedPortServiceAnnotation: `[{"protocol":"tcp","port":-1,"targetPort":50000}]`,
+					},
+				},
+			},
+			expErr:    true,
+			expErrStr: "number is negative",
+		},
+		{
+			name: "return error when target port is out of range",
+			in: Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Annotations: map[string]string{
+						exposedPortServiceAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":500000000000000000}]`,
+					},
+				},
+			},
+			expErr:    true,
+			expErrStr: "targetPort is invalid",
+		},
+		{
+			name: "return error when unknown protocol is used",
+			in: Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Annotations: map[string]string{
+						exposedPortServiceAnnotation: `[{"protocol":"invalid","port":50000,"targetPort":50000}]`,
+					},
+				},
+			},
+			expErr:    true,
+			expErrStr: "unsupported protocol for exposed port",
 		},
 	}
 
