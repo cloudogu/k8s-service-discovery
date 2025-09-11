@@ -30,8 +30,28 @@ type LoadbalancerConfig struct {
 
 func ParseLoadbalancerConfig(cm *corev1.ConfigMap) (LoadbalancerConfig, error) {
 	var lbConfig LoadbalancerConfig
-	if err := yaml.Unmarshal([]byte(cm.Data[loadbalancerConfigKey]), lbConfig); err != nil {
-		return LoadbalancerConfig{}, fmt.Errorf("failed to unmarhsal loadbalancer from config map: %w", err)
+	if err := yaml.Unmarshal([]byte(cm.Data[loadbalancerConfigKey]), &lbConfig); err != nil {
+		return LoadbalancerConfig{}, fmt.Errorf("failed to unmarshal loadbalancer from config map: %w", err)
+	}
+
+	if lbConfig.ExternalTrafficPolicy == "" {
+		lbConfig.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+	}
+
+	if lbConfig.InternalTrafficPolicy == "" {
+		lbConfig.InternalTrafficPolicy = corev1.ServiceInternalTrafficPolicyCluster
+	}
+
+	switch lbConfig.InternalTrafficPolicy {
+	case corev1.ServiceInternalTrafficPolicyCluster, corev1.ServiceInternalTrafficPolicyLocal:
+	default:
+		return LoadbalancerConfig{}, fmt.Errorf("internalTrafficPolicy has invalid type %s", lbConfig.InternalTrafficPolicy)
+	}
+
+	switch lbConfig.ExternalTrafficPolicy {
+	case corev1.ServiceExternalTrafficPolicyCluster, corev1.ServiceExternalTrafficPolicyLocal:
+	default:
+		return LoadbalancerConfig{}, fmt.Errorf("externalTrafficPolicy has invalid type %s", lbConfig.InternalTrafficPolicy)
 	}
 
 	return lbConfig, nil
