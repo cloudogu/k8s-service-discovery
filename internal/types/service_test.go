@@ -226,12 +226,12 @@ func TestService_GetExposedPorts(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Annotations: map[string]string{
-						exposedPortServiceAnnotation: `[{"protocol":"TCP","port":50000,"targetPort":50000}]`,
+						exposedPortServiceAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000}]`,
 					},
 				},
 			},
 			exp: ExposedPorts{
-				{"test-50000", corev1.ProtocolTCP, 50000, 50000, 0},
+				{"test-50000", "test", corev1.ProtocolTCP, 50000, 50000, 0},
 			},
 		},
 		{
@@ -240,13 +240,13 @@ func TestService_GetExposedPorts(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Annotations: map[string]string{
-						exposedPortServiceAnnotation: `[{"protocol":"TCP","port":50000,"targetPort":50000},{"protocol":"UDP","port":1,"targetPort":1}]`,
+						exposedPortServiceAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000},{"protocol":"UDP","port":1,"targetPort":1}]`,
 					},
 				},
 			},
 			exp: ExposedPorts{
-				{"test-1", corev1.ProtocolUDP, 1, 1, 0},
-				{"test-50000", corev1.ProtocolTCP, 50000, 50000, 0},
+				{"test-1", "test", corev1.ProtocolUDP, 1, 1, 0},
+				{"test-50000", "test", corev1.ProtocolTCP, 50000, 50000, 0},
 			},
 		},
 		{
@@ -276,12 +276,12 @@ func TestService_GetExposedPorts(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Annotations: map[string]string{
-						exposedPortServiceAnnotation: `[{"Name": "PORT", "protocol":"TCP","port":50000,"targetPort":50000}]`,
+						exposedPortServiceAnnotation: `[{"Name": "PORT", "protocol":"tcp","port":50000,"targetPort":50000}]`,
 					},
 				},
 			},
 			exp: ExposedPorts{
-				{"test-50000", corev1.ProtocolTCP, 50000, 50000, 0},
+				{"test-50000", "test", corev1.ProtocolTCP, 50000, 50000, 0},
 			},
 		},
 		{
@@ -290,12 +290,12 @@ func TestService_GetExposedPorts(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Annotations: map[string]string{
-						exposedPortServiceAnnotation: `[{"protocol":"TCP","port":50000,"targetPort":50000, "nodePort": 5}]`,
+						exposedPortServiceAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000, "nodePort": 5}]`,
 					},
 				},
 			},
 			exp: ExposedPorts{
-				{"test-50000", corev1.ProtocolTCP, 50000, 50000, 0},
+				{"test-50000", "test", corev1.ProtocolTCP, 50000, 50000, 0},
 			},
 		},
 		{
