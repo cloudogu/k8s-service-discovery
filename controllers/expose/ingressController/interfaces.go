@@ -26,6 +26,7 @@ type tcpUpdServiceExposer interface {
 	// DeleteExposedPorts removes the exposing of the exposed ports in the dogu from the cluster. These are typically
 	// entries in a configmap.
 	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
+	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error
 }
 
 type AlternativeFQDNRedirector interface {
@@ -37,6 +38,7 @@ type IngressController interface {
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
+	GetSelector() map[string]string
 	tcpUpdServiceExposer
 	AlternativeFQDNRedirector
 }

@@ -67,6 +67,7 @@ type IngressController interface {
 	GetAdditionalConfigurationKey() string
 	GetUseRegexKey() string
 	GetProxyBodySizeKey() string
+	GetSelector() map[string]string
 	tcpUpdServiceExposer
 	AlternativeFQDNRedirector
 }
@@ -82,6 +83,7 @@ type tcpUpdServiceExposer interface {
 	// DeleteExposedPorts removes the exposing of the exposed ports from the service in the cluster. These are typically
 	// entries in a configmap.
 	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
+	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error
 }
 
 //nolint:unused
@@ -122,4 +124,8 @@ type ingressClassInterface interface {
 
 type secretClient interface {
 	corev1client.SecretInterface
+}
+
+type serviceClient interface {
+	corev1client.ServiceInterface
 }

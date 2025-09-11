@@ -2,10 +2,13 @@ package expose
 
 import (
 	"context"
+
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -80,6 +83,7 @@ type ingressController interface {
 	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
+	GetSelector() map[string]string
 	tcpUpdServiceExposer
 }
 
@@ -91,6 +95,7 @@ type tcpUpdServiceExposer interface {
 	// DeleteExposedPorts removes the exposing of the exposed ports from the service in the cluster. These are typically
 	// entries in a configmap.
 	DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error
+	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference)
 }
 
 type networkPolicyInterface interface {
