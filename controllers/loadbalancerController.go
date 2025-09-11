@@ -47,15 +47,20 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to get exposed dogu services: %w", err)
 	}
 
-	exposedPorts, err := createLoadBalancerExposedPorts(exposedDoguServices)
+	exposedDoguPorts, err := getExposedDoguPorts(exposedDoguServices)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create loadbalancer exposed ports from dogu services: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to get exposed ports from services: %w", err)
 	}
 
-	// TODO: Update Exposed ports in ingress controller
+	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedDoguPorts)
 
-	if uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedPorts); uErr != nil {
+	lb, uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts)
+	if uErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
+	}
+
+	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts, lb.GetOwnerReference()); eErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
 	}
 
 	return ctrl.Result{}, nil
@@ -75,34 +80,36 @@ func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]type
 	return serviceList, nil
 }
 
-func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts) error {
+func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts) (types.LoadBalancer, error) {
 	lbObj, err := r.SvcClient.Get(ctx, types.LoadbalancerName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get service for loadbalancer: %w", err)
+		return types.LoadBalancer{}, fmt.Errorf("failed to get service for loadbalancer: %w", err)
 	}
 
 	if apierrors.IsNotFound(err) {
 		newLB := types.CreateLoadBalancer(namespace, cfg, exposedPorts, r.IngressController.GetSelector())
-		if _, cErr := r.SvcClient.Create(ctx, newLB.ToK8sService(), metav1.CreateOptions{}); cErr != nil {
-			return fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
+		lbService, cErr := r.SvcClient.Create(ctx, newLB.ToK8sService(), metav1.CreateOptions{})
+		if cErr != nil {
+			return types.LoadBalancer{}, fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
 		}
 
-		return nil
+		return types.LoadBalancer(*lbService), nil
 	}
 
 	lb, ok := types.ParseLoadBalancer(lbObj)
 	if !ok {
-		return fmt.Errorf("could not parse exisiting service to LoadBalancer because of unkown type %T", lbObj)
+		return types.LoadBalancer{}, fmt.Errorf("could not parse exisiting service to LoadBalancer because of unkown type %T", lbObj)
 	}
 
 	lb.ApplyConfig(cfg)
 	lb.UpdateExposedPorts(exposedPorts)
 
-	if _, uErr := r.SvcClient.Update(ctx, lb.ToK8sService(), metav1.UpdateOptions{}); uErr != nil {
-		return fmt.Errorf("failed to update exisiting loadbalancer: %w", uErr)
+	lbService, uErr := r.SvcClient.Update(ctx, lb.ToK8sService(), metav1.UpdateOptions{})
+	if uErr != nil {
+		return types.LoadBalancer{}, fmt.Errorf("failed to update exisiting loadbalancer: %w", uErr)
 	}
 
-	return nil
+	return types.LoadBalancer(*lbService), nil
 }
 
 // SetupWithManager sets up the ces-loadbalancer configmap with the Manager.
@@ -233,19 +240,27 @@ func isExposedPortService(obj metav1.Object) bool {
 	return doguService.HasExposedPorts()
 }
 
-func createLoadBalancerExposedPorts(services []types.Service) (types.ExposedPorts, error) {
+func createLoadBalancerExposedPorts(doguPorts types.ExposedPorts) types.ExposedPorts {
 	exposedPorts := types.CreateDefaultPorts()
+	exposedPorts = append(exposedPorts, doguPorts...)
+	exposedPorts.SortByName()
+
+	return exposedPorts
+}
+
+func getExposedDoguPorts(services []types.Service) (types.ExposedPorts, error) {
+	exposedDoguPorts := make(types.ExposedPorts, 0, len(services))
 
 	for _, service := range services {
 		serviceExposedPorts, err := service.GetExposedPorts()
 		if err != nil {
-			return nil, fmt.Errorf("failred to get exposed ports from service %s: %w", service.Name, err)
+			return nil, fmt.Errorf("failed to get exposed ports from service %s: %w", service.Name, err)
 		}
 
-		exposedPorts = append(exposedPorts, serviceExposedPorts...)
+		exposedDoguPorts = append(exposedDoguPorts, serviceExposedPorts...)
 	}
 
-	exposedPorts.SortByName()
+	exposedDoguPorts.SortByName()
 
-	return exposedPorts, nil
+	return exposedDoguPorts, nil
 }
