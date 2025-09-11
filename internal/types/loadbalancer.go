@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -123,6 +124,16 @@ func (lb *LoadBalancer) equalPorts(oPorts []corev1.ServicePort) bool {
 	}
 
 	return maps.Equal(lbIndexMap, oIndexMap)
+}
+
+func (lb *LoadBalancer) GetOwnerReference() *metav1.OwnerReference {
+	return &metav1.OwnerReference{
+		APIVersion: lb.APIVersion,
+		Kind:       lb.Kind,
+		Name:       lb.Name,
+		UID:        lb.UID,
+		Controller: ptr.To(false),
+	}
 }
 
 func ParseLoadBalancer(obj metav1.Object) (LoadBalancer, bool) {
