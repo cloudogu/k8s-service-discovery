@@ -10,7 +10,9 @@ import (
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 const (
@@ -146,14 +148,19 @@ func (lb *LoadBalancer) equalPorts(oPorts []corev1.ServicePort) bool {
 	return maps.Equal(lbIndexMap, oIndexMap)
 }
 
-func (lb *LoadBalancer) GetOwnerReference() *metav1.OwnerReference {
+func (lb *LoadBalancer) GetOwnerReference(scheme *runtime.Scheme) (*metav1.OwnerReference, error) {
+	gvk, err := apiutil.GVKForObject(lb.ToK8sService(), scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GroupVersionKind for loadbalancer: %w", err)
+	}
+
 	return &metav1.OwnerReference{
-		APIVersion: lb.APIVersion,
-		Kind:       lb.Kind,
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
 		Name:       lb.Name,
 		UID:        lb.UID,
 		Controller: ptr.To(false),
-	}
+	}, nil
 }
 
 func ParseLoadBalancer(obj metav1.Object) (LoadBalancer, bool) {
