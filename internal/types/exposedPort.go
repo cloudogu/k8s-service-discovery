@@ -108,13 +108,13 @@ func (ep ExposedPort) PortString() string {
 func CreateDefaultPorts() ExposedPorts {
 	return []ExposedPort{
 		{
-			Name:       "HTTP",
+			Name:       "http",
 			Protocol:   corev1.ProtocolTCP,
 			Port:       httpPort,
 			TargetPort: httpPort,
 		},
 		{
-			Name:       "HTTPS",
+			Name:       "https",
 			Protocol:   corev1.ProtocolTCP,
 			Port:       httpsPort,
 			TargetPort: httpsPort,

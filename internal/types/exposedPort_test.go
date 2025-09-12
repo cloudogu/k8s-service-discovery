@@ -14,14 +14,14 @@ func TestCreateDefaultPorts(t *testing.T) {
 	ports := CreateDefaultPorts()
 
 	expHttpPort := ExposedPort{
-		Name:       "HTTP",
+		Name:       "http",
 		Protocol:   corev1.ProtocolTCP,
 		Port:       httpPort,
 		TargetPort: httpPort,
 	}
 
 	expHttpsPort := ExposedPort{
-		Name:       "HTTPS",
+		Name:       "https",
 		Protocol:   corev1.ProtocolTCP,
 		Port:       httpsPort,
 		TargetPort: httpsPort,
