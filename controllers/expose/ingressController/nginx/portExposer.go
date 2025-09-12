@@ -87,7 +87,7 @@ func createExposeConfigMap(namespace string, protocol corev1.Protocol, data map[
 	}
 
 	if owner != nil {
-		cm.OwnerReferences = []metav1.OwnerReference{*owner}
+		cm.SetOwnerReferences([]metav1.OwnerReference{*owner})
 	}
 
 	return cm
