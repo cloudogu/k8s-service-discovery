@@ -38,8 +38,6 @@ spec:
           value: {{ .Values.manager.env.logLevel | default "info" }}
         - name: INGRESS_CONTROLLER
           value: {{ .Values.ingress.controller | default "k8s-ces-gateway" }}
-        - name: STAGE
-          value: {{ .Values.manager.env.stage | default "production" }}
         - name: NETWORK_POLICIES_ENABLED
           value: "{{ .Values.networkPolicies.enabled | default "true" }}"
         - name: NETWORK_POLICIES_CIDR
