@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
@@ -12,6 +13,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -31,6 +33,8 @@ type LoadBalancerReconciler struct {
 }
 
 func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := ctrl.LoggerFrom(ctx)
+
 	lbConfigMap := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx, req.NamespacedName, lbConfigMap)
 	if err != nil {
@@ -40,6 +44,12 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	lbConfig, err := types.ParseLoadbalancerConfig(lbConfigMap)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("faild to parse loadbalancer config: %w", err)
+	}
+
+	setOwnerReference := func(targetObject metav1.Object) {
+		if oErr := ctrl.SetControllerReference(lbConfigMap, targetObject, r.Client.Scheme(), controllerutil.WithBlockOwnerDeletion(false)); oErr != nil {
+			logger.Info("Failed to set controller referencer", "object", targetObject.GetName(), "error", oErr)
+		}
 	}
 
 	exposedDoguServices, err := r.getExposedServices(ctx)
@@ -54,12 +64,17 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedDoguPorts)
 
-	lb, uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts)
+	lb, uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
 	if uErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
-	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts, lb.GetOwnerReference()); eErr != nil {
+	owner, err := lb.GetOwnerReference(r.Client.Scheme())
+	if err != nil {
+		logger.Info("Could not get OwnerReference from loadbalancer", "error", err)
+	}
+
+	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts, owner); eErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
 	}
 
@@ -80,7 +95,7 @@ func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]type
 	return serviceList, nil
 }
 
-func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts) (types.LoadBalancer, error) {
+func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts, setOwner func(object metav1.Object)) (types.LoadBalancer, error) {
 	lbObj, err := r.SvcClient.Get(ctx, types.LoadbalancerName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return types.LoadBalancer{}, fmt.Errorf("failed to get service for loadbalancer: %w", err)
@@ -88,6 +103,9 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 
 	if apierrors.IsNotFound(err) {
 		newLB := types.CreateLoadBalancer(namespace, cfg, exposedPorts, r.IngressController.GetSelector())
+		newLBService := newLB.ToK8sService()
+		setOwner(newLBService)
+
 		lbService, cErr := r.SvcClient.Create(ctx, newLB.ToK8sService(), metav1.CreateOptions{})
 		if cErr != nil {
 			return types.LoadBalancer{}, fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
@@ -104,12 +122,15 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 	lb.ApplyConfig(cfg)
 	lb.UpdateExposedPorts(exposedPorts)
 
-	lbService, uErr := r.SvcClient.Update(ctx, lb.ToK8sService(), metav1.UpdateOptions{})
+	updatedLBService := lb.ToK8sService()
+	setOwner(updatedLBService)
+
+	updatedLBService, uErr := r.SvcClient.Update(ctx, lb.ToK8sService(), metav1.UpdateOptions{})
 	if uErr != nil {
 		return types.LoadBalancer{}, fmt.Errorf("failed to update exisiting loadbalancer: %w", uErr)
 	}
 
-	return types.LoadBalancer(*lbService), nil
+	return types.LoadBalancer(*updatedLBService), nil
 }
 
 // SetupWithManager sets up the ces-loadbalancer configmap with the Manager.
@@ -134,6 +155,7 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Service{},
 			builder.WithPredicates(loadbalancerServicePredicate()),
 		).
+		Named("loadbalancer-configmap").
 		Complete(r)
 }
 
@@ -241,6 +263,11 @@ func isExposedPortService(obj metav1.Object) bool {
 }
 
 func createLoadBalancerExposedPorts(doguPorts types.ExposedPorts) types.ExposedPorts {
+	// Delete default ports 80 and 443 as they are handled by the loadbalancer
+	slices.DeleteFunc(doguPorts, func(port types.ExposedPort) bool {
+		return port.Port == 80 || port.Port == 443
+	})
+
 	exposedPorts := types.CreateDefaultPorts()
 	exposedPorts = append(exposedPorts, doguPorts...)
 	exposedPorts.SortByName()
