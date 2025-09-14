@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	staticContentBackendName           = "nginx-static"
+	staticContentBackendName           = "k8s-ces-assets"
 	staticContentBackendPort           = 80
 	staticContentBackendRewrite        = "/errors/503.html"
 	staticContentDoguIsStartingRewrite = "/errors/starting.html"
@@ -158,7 +158,7 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
 	}
 
-	if isMaintenanceMode && dogu.Name != staticContentBackendName {
+	if isMaintenanceMode {
 		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service, dogu)
 	}
 
