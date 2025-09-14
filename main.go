@@ -8,7 +8,6 @@ import (
 
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
-	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
@@ -17,7 +16,6 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -106,17 +104,11 @@ func startManager() error {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	doguVersionRegistry := dogu.NewDoguVersionRegistry(clientSet.configMapClient)
-	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(clientSet.configMapClient)
 	globalConfigRepo := repository.NewGlobalConfigRepository(clientSet.configMapClient)
 	certSync := ssl.NewCertificateSynchronizer(clientSet.secretClient, globalConfigRepo)
 
 	if err = handleCertificateSynchronization(serviceDiscManager, certSync); err != nil {
 		return fmt.Errorf("failed to create certificate key remover: %w", err)
-	}
-
-	if err = handleWarpMenuCreation(serviceDiscManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, globalConfigRepo); err != nil {
-		return fmt.Errorf("failed to create warp menu creator: %w", err)
 	}
 
 	if err = handleSelfsignedCertificateUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, clientSet.secretClient); err != nil {
@@ -278,16 +270,6 @@ func handleIngressClassCreation(k8sManager k8sManager, clientSet k8sClientSet, r
 func handleCertificateSynchronization(k8sManager k8sManager, certificateSynchronizer manager.Runnable) error {
 	if err := k8sManager.Add(certificateSynchronizer); err != nil {
 		return fmt.Errorf("failed to add certificate key remover as runnable to the manager: %w", err)
-	}
-
-	return nil
-}
-
-func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.DoguVersionRegistry, localDoguRepo warp.LocalDoguRepo, namespace string, recorder record.EventRecorder, globalConfigRepo warp.GlobalConfigRepository) error {
-	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), doguVersionRegistry, localDoguRepo, namespace, recorder, globalConfigRepo)
-
-	if err := k8sManager.Add(warpMenuCreator); err != nil {
-		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
 	}
 
 	return nil

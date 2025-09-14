@@ -1,27 +1,6 @@
 global:
   imagePullSecrets:
     - name: "ces-container-registries"
-cesWarpConfig:
-  warp: |
-    sources:
-      - path: /dogu
-        type: dogus
-        tag: warp
-      - path: externals
-        type: externals
-    target: /var/www/html/warp/menu.json
-    order:
-      Development Apps: 100
-    support:
-      - identifier: docsCloudoguComUrl
-        external: true
-        href: https://docs.cloudogu.com/
-      - identifier: aboutCloudoguToken
-        external: false
-        href: /info/about
-      - identifier: platform
-        external: true
-        href: https://platform.cloudogu.com
 manager:
   image:
     registry: docker.io
@@ -39,7 +18,7 @@ manager:
   replicas: 1
   imagePullPolicy: IfNotPresent
 ingress:
-  controller: nginx-ingress # currently only supported ingress controller
+  controller: k8s-ces-gateway
 networkPolicies:
   enabled: true
   denyAll: true
