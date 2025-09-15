@@ -106,7 +106,7 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 		newLBService := newLB.ToK8sService()
 		setOwner(newLBService)
 
-		lbService, cErr := r.SvcClient.Create(ctx, newLB.ToK8sService(), metav1.CreateOptions{})
+		lbService, cErr := r.SvcClient.Create(ctx, newLBService, metav1.CreateOptions{})
 		if cErr != nil {
 			return types.LoadBalancer{}, fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
 		}
@@ -125,7 +125,7 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 	updatedLBService := lb.ToK8sService()
 	setOwner(updatedLBService)
 
-	updatedLBService, uErr := r.SvcClient.Update(ctx, lb.ToK8sService(), metav1.UpdateOptions{})
+	updatedLBService, uErr := r.SvcClient.Update(ctx, updatedLBService, metav1.UpdateOptions{})
 	if uErr != nil {
 		return types.LoadBalancer{}, fmt.Errorf("failed to update exisiting loadbalancer: %w", uErr)
 	}
