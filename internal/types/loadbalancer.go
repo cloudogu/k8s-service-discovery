@@ -24,6 +24,11 @@ const (
 	configManagedAnnotationKeySeparator = ";"
 )
 
+var (
+	defaultExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+	defaultInternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyCluster)
+)
+
 type LoadbalancerConfig struct {
 	Annotations           map[string]string                   `yaml:"annotations"`
 	InternalTrafficPolicy corev1.ServiceInternalTrafficPolicy `yaml:"internalTrafficPolicy"`
@@ -80,7 +85,6 @@ func (lb *LoadBalancer) ApplyConfig(cfg LoadbalancerConfig) {
 
 func (lb *LoadBalancer) UpdateExposedPorts(ports ExposedPorts) {
 	ports.SetNodePorts(lb.Spec.Ports)
-
 	lb.Spec.Ports = ports.ToServicePorts()
 }
 
@@ -94,6 +98,10 @@ func (lb *LoadBalancer) ToK8sService() *corev1.Service {
 }
 
 func (lb *LoadBalancer) Equals(o LoadBalancer) bool {
+	if lb.Name != o.Name {
+		return false
+	}
+
 	if !lb.equalAnnotations(o.GetAnnotations()) {
 		return false
 	}
@@ -119,7 +127,7 @@ func (lb *LoadBalancer) equalAnnotations(oAnn map[string]string) bool {
 
 	for _, k := range lbConfigKeys {
 		lbValue, lbOk := lb.Annotations[k]
-		oValue, oOk := lb.Annotations[k]
+		oValue, oOk := oAnn[k]
 
 		if lbOk != oOk {
 			return false
@@ -229,6 +237,8 @@ func createConfigAnnotations(cfgAnnotations map[string]string) map[string]string
 		ann[k] = v
 		annKeys = append(annKeys, k)
 	}
+
+	slices.Sort(annKeys)
 
 	ann[configManagedAnnotationKey] = strings.Join(annKeys, configManagedAnnotationKeySeparator)
 
