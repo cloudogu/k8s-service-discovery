@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	staticContentBackendName           = "k8s-ces-assets"
+	staticContentBackendName           = "k8s-ces-assets-service"
 	staticContentBackendPort           = 80
 	staticContentBackendRewrite        = "/errors/503.html"
 	staticContentDoguIsStartingRewrite = "/errors/starting.html"
