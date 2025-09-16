@@ -470,7 +470,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			"test",
 			"/myLocation",
 			service,
-			"k8s-ces-assets",
+			"k8s-ces-assets-service",
 			80,
 			map[string]string{
 				"rewrite": "/errors/503.html",
@@ -517,7 +517,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 				Labels:    map[string]string{"dogu.name": "test"}},
 		}
 
-		expectedIngress := getTestIngress("test", "/myLocation", service, "k8s-ces-assets", 80, map[string]string{
+		expectedIngress := getTestIngress("test", "/myLocation", service, "k8s-ces-assets-service", 80, map[string]string{
 			"rewrite": "/errors/starting.html",
 		})
 

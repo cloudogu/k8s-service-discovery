@@ -8,8 +8,6 @@ import (
 	types "github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	mock "github.com/stretchr/testify/mock"
 
-	util "github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,103 +22,6 @@ type MockIngressController_Expecter struct {
 
 func (_m *MockIngressController) EXPECT() *MockIngressController_Expecter {
 	return &MockIngressController_Expecter{mock: &_m.Mock}
-}
-
-// DeleteExposedPorts provides a mock function with given fields: ctx, namespace, targetServiceName
-func (_m *MockIngressController) DeleteExposedPorts(ctx context.Context, namespace string, targetServiceName string) error {
-	ret := _m.Called(ctx, namespace, targetServiceName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteExposedPorts")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, namespace, targetServiceName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockIngressController_DeleteExposedPorts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExposedPorts'
-type MockIngressController_DeleteExposedPorts_Call struct {
-	*mock.Call
-}
-
-// DeleteExposedPorts is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-//   - targetServiceName string
-func (_e *MockIngressController_Expecter) DeleteExposedPorts(ctx interface{}, namespace interface{}, targetServiceName interface{}) *MockIngressController_DeleteExposedPorts_Call {
-	return &MockIngressController_DeleteExposedPorts_Call{Call: _e.mock.On("DeleteExposedPorts", ctx, namespace, targetServiceName)}
-}
-
-func (_c *MockIngressController_DeleteExposedPorts_Call) Run(run func(ctx context.Context, namespace string, targetServiceName string)) *MockIngressController_DeleteExposedPorts_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockIngressController_DeleteExposedPorts_Call) Return(_a0 error) *MockIngressController_DeleteExposedPorts_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockIngressController_DeleteExposedPorts_Call) RunAndReturn(run func(context.Context, string, string) error) *MockIngressController_DeleteExposedPorts_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ExposeOrUpdateExposedPorts provides a mock function with given fields: ctx, namespace, targetServiceName, exposedPorts
-func (_m *MockIngressController) ExposeOrUpdateExposedPorts(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts) error {
-	ret := _m.Called(ctx, namespace, targetServiceName, exposedPorts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ExposeOrUpdateExposedPorts")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, util.ExposedPorts) error); ok {
-		r0 = rf(ctx, namespace, targetServiceName, exposedPorts)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockIngressController_ExposeOrUpdateExposedPorts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExposeOrUpdateExposedPorts'
-type MockIngressController_ExposeOrUpdateExposedPorts_Call struct {
-	*mock.Call
-}
-
-// ExposeOrUpdateExposedPorts is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-//   - targetServiceName string
-//   - exposedPorts util.ExposedPorts
-func (_e *MockIngressController_Expecter) ExposeOrUpdateExposedPorts(ctx interface{}, namespace interface{}, targetServiceName interface{}, exposedPorts interface{}) *MockIngressController_ExposeOrUpdateExposedPorts_Call {
-	return &MockIngressController_ExposeOrUpdateExposedPorts_Call{Call: _e.mock.On("ExposeOrUpdateExposedPorts", ctx, namespace, targetServiceName, exposedPorts)}
-}
-
-func (_c *MockIngressController_ExposeOrUpdateExposedPorts_Call) Run(run func(ctx context.Context, namespace string, targetServiceName string, exposedPorts util.ExposedPorts)) *MockIngressController_ExposeOrUpdateExposedPorts_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(util.ExposedPorts))
-	})
-	return _c
-}
-
-func (_c *MockIngressController_ExposeOrUpdateExposedPorts_Call) Return(_a0 error) *MockIngressController_ExposeOrUpdateExposedPorts_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockIngressController_ExposeOrUpdateExposedPorts_Call) RunAndReturn(run func(context.Context, string, string, util.ExposedPorts) error) *MockIngressController_ExposeOrUpdateExposedPorts_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // ExposePorts provides a mock function with given fields: ctx, namespace, exposedPorts, owner
