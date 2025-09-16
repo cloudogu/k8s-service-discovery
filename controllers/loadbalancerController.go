@@ -116,7 +116,7 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 
 	lb, ok := types.ParseLoadBalancer(lbObj)
 	if !ok {
-		return types.LoadBalancer{}, fmt.Errorf("could not parse exisiting service to LoadBalancer because of unkown type %T", lbObj)
+		return types.LoadBalancer{}, fmt.Errorf("could not parse existing service to LoadBalancer because of unkown type %T", lbObj)
 	}
 
 	lb.ApplyConfig(cfg)
@@ -127,7 +127,7 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 
 	updatedLBService, uErr := r.SvcClient.Update(ctx, updatedLBService, metav1.UpdateOptions{})
 	if uErr != nil {
-		return types.LoadBalancer{}, fmt.Errorf("failed to update exisiting loadbalancer: %w", uErr)
+		return types.LoadBalancer{}, fmt.Errorf("failed to update existing loadbalancer: %w", uErr)
 	}
 
 	return types.LoadBalancer(*updatedLBService), nil
