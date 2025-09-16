@@ -43,7 +43,7 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	lbConfig, err := types.ParseLoadbalancerConfig(lbConfigMap)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("faild to parse loadbalancer config: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to parse loadbalancer config: %w", err)
 	}
 
 	setOwnerReference := func(targetObject metav1.Object) {
