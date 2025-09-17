@@ -65,7 +65,7 @@ func NewNginxController(deps IngressControllerDependencies) *IngressController {
 }
 
 func (c *IngressController) GetName() string {
-	return c.controllerType.String()
+	return c.String()
 }
 
 func (c *IngressController) GetControllerSpec() string {
