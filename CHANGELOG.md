@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - support for custom annotations for the loadbalancer
   - idempotent update for loadbalancer 
 - [#92] Add support for k8s-ces-gateway
+- [#92] Create ecosystem-certificate on start when it does not exist
 
 ### Changed
 - [#92] k8s-ces-assets is used as static file backend
