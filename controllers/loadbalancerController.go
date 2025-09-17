@@ -32,8 +32,23 @@ type LoadBalancerReconciler struct {
 	SvcClient         serviceClient
 }
 
+// Reconcile implements the controller-runtime reconcile loop for the
+// LoadBalancerReconciler. It ensures that a single operator-managed
+// LoadBalancer Service and related ingress configuration are kept in sync
+// with the desired state derived from Dogu Services and the global
+// loadbalancer configuration ConfigMap.
+//
+// Typical reconcile triggers:
+// • Changes to the loadbalancer ConfigMap.
+// • Changes to Dogu ClusterIP Services that declare exposed ports.
+// • Changes to the LoadBalancer Service itself (for drift correction).
+//
+// Reconciliation is idempotent: calling Reconcile repeatedly with the same
+// cluster state will not produce further changes.
 func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := ctrl.LoggerFrom(ctx)
+
+	logger.Info("Reconciling loadbalancer")
 
 	lbConfigMap := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx, req.NamespacedName, lbConfigMap)
@@ -69,6 +84,8 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
+	logger.Info("Successfully applied new state to loadbalancer.")
+
 	owner, err := lb.GetOwnerReference(r.Client.Scheme())
 	if err != nil {
 		logger.Info("Could not get OwnerReference from loadbalancer", "error", err)
@@ -77,6 +94,8 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts, owner); eErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
 	}
+
+	logger.Info("Successfully exposed ports in IngressController.")
 
 	return ctrl.Result{}, nil
 }
@@ -264,7 +283,7 @@ func isExposedPortService(obj metav1.Object) bool {
 
 func createLoadBalancerExposedPorts(doguPorts types.ExposedPorts) types.ExposedPorts {
 	// Delete default ports 80 and 443 as they are handled by the loadbalancer
-	slices.DeleteFunc(doguPorts, func(port types.ExposedPort) bool {
+	doguPorts = slices.DeleteFunc(doguPorts, func(port types.ExposedPort) bool {
 		return port.Port == 80 || port.Port == 443
 	})
 
