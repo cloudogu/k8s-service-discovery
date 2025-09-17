@@ -17,6 +17,11 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+var (
+	defaultExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+	defaultInternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyCluster)
+)
+
 func createManagedKeyCfg(s ...string) string {
 	return strings.Join(s, configManagedAnnotationKeySeparator)
 }

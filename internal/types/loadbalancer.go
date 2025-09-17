@@ -24,17 +24,15 @@ const (
 	configManagedAnnotationKeySeparator = ";"
 )
 
-var (
-	defaultExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
-	defaultInternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyCluster)
-)
-
+// LoadbalancerConfig is the config used for the loadbalancer. Usually provided by the values.yaml
 type LoadbalancerConfig struct {
 	Annotations           map[string]string                   `yaml:"annotations"`
 	InternalTrafficPolicy corev1.ServiceInternalTrafficPolicy `yaml:"internalTrafficPolicy"`
 	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `yaml:"externalTrafficPolicy"`
 }
 
+// ParseLoadbalancerConfig parses a given config map containing the loadbalancer config as yaml to the LoadbalancerConfig
+// struct. It validates a valid yaml and set default values for empty options.
 func ParseLoadbalancerConfig(cm *corev1.ConfigMap) (LoadbalancerConfig, error) {
 	var lbConfig LoadbalancerConfig
 	if err := yaml.Unmarshal([]byte(cm.Data[loadbalancerConfigKey]), &lbConfig); err != nil {
@@ -64,8 +62,11 @@ func ParseLoadbalancerConfig(cm *corev1.ConfigMap) (LoadbalancerConfig, error) {
 	return lbConfig, nil
 }
 
+// LoadBalancer service used for the ces ecosystem.
 type LoadBalancer corev1.Service
 
+// ApplyConfig applies the LoadbalancerConfig to the LoadBalancer.
+// This function is idempotent as old config gets overwritten by the new one.
 func (lb *LoadBalancer) ApplyConfig(cfg LoadbalancerConfig) {
 	lbAnnotations := lb.GetAnnotations()
 
@@ -83,11 +84,13 @@ func (lb *LoadBalancer) ApplyConfig(cfg LoadbalancerConfig) {
 	lb.Spec.InternalTrafficPolicy = &cfg.InternalTrafficPolicy
 }
 
+// UpdateExposedPorts sets the ports of the LoadBalancer with the given ExposedPorts.
 func (lb *LoadBalancer) UpdateExposedPorts(ports ExposedPorts) {
 	ports.SetNodePorts(lb.Spec.Ports)
 	lb.Spec.Ports = ports.ToServicePorts()
 }
 
+// ToK8sService map the LoadBalancer to a Kubernetes service.
 func (lb *LoadBalancer) ToK8sService() *corev1.Service {
 	if lb == nil {
 		return nil
@@ -97,6 +100,23 @@ func (lb *LoadBalancer) ToK8sService() *corev1.Service {
 	return &svc
 }
 
+// Equals reports whether the current LoadBalancer and the given LoadBalancer
+// should be considered semantically equal for reconciliation purposes.
+//
+// Equality is defined as follows:
+//   - Metadata.Name must match.
+//   - Only managed annotations are compared. For each
+//     such key, both presence and value must match between the two objects.
+//     Other annotations are ignored.
+//   - Spec.ExternalTrafficPolicy and Spec.InternalTrafficPolicy must be equal.
+//   - The set of ports in Spec.Ports must be equal. Equality is based on an
+//     index consisting of each port (name, protocol, port,
+//     targetPort), so ordering of the slice does not matter. NodePorts and
+//     other mutable fields are deliberately ignored.
+//
+// This method is typically used by the reconciler to decide whether an
+// existing Service already matches the desired state, in which case no update
+// is required.
 func (lb *LoadBalancer) Equals(o LoadBalancer) bool {
 	if lb.Name != o.Name {
 		return false
@@ -156,6 +176,7 @@ func (lb *LoadBalancer) equalPorts(oPorts []corev1.ServicePort) bool {
 	return maps.Equal(lbIndexMap, oIndexMap)
 }
 
+// GetOwnerReference returns an OwnerReference for the current LoadBalancer
 func (lb *LoadBalancer) GetOwnerReference(scheme *runtime.Scheme) (*metav1.OwnerReference, error) {
 	gvk, err := apiutil.GVKForObject(lb.ToK8sService(), scheme)
 	if err != nil {
@@ -171,6 +192,26 @@ func (lb *LoadBalancer) GetOwnerReference(scheme *runtime.Scheme) (*metav1.Owner
 	}, nil
 }
 
+// ParseLoadBalancer attempts to interpret the given metav1.Object as a
+// LoadBalancer Service under operator control.
+//
+// Validation steps:
+//   - The object's metadata.Name must equal the global LoadbalancerName
+//     constant; otherwise the object is ignored.
+//   - The object must be a *corev1.Service. Non-Service objects are rejected.
+//   - The Service's spec.type must be corev1.ServiceTypeLoadBalancer.
+//   - Ensures Annotations is non-nil by allocating an empty map if needed.
+//     This guarantees subsequent code can safely write annotations without
+//     nil checks.
+//
+// Returns
+//   - A LoadBalancer value wrapping the Service if all conditions match.
+//   - A boolean indicating success. On failure, returns the zero-value
+//     LoadBalancer and false.
+//
+// This function is typically used in event handlers or watch filters to
+// detect whether an incoming Kubernetes object corresponds to the singleton
+// LoadBalancer Service managed by the operator.
 func ParseLoadBalancer(obj metav1.Object) (LoadBalancer, bool) {
 	if obj.GetName() != LoadbalancerName {
 		return LoadBalancer{}, false
@@ -195,6 +236,7 @@ func ParseLoadBalancer(obj metav1.Object) (LoadBalancer, bool) {
 	return LoadBalancer(*lbService), true
 }
 
+// CreateLoadBalancer create a LoadBalancer with the config provided.
 func CreateLoadBalancer(namespace string, cfg LoadbalancerConfig, exposedPorts ExposedPorts, selector map[string]string) LoadBalancer {
 	ipSingleStackPolicy := corev1.IPFamilyPolicySingleStack
 	loadbalancerService := corev1.Service{
