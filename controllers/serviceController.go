@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,18 +16,16 @@ import (
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
 	ingressUpdater         IngressUpdater
-	exposedPortUpdater     ExposedPortUpdater
 	networkPolicyUpdater   NetworkPolicyUpdater
 	client                 client.Client
 	networkPoliciesEnabled bool
 }
 
 // NewServiceReconciler creates a new service reconciler.
-func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, exposedPortUpdater ExposedPortUpdater, networkPolicyUpdater NetworkPolicyUpdater, networkPoliciesEnabled bool) *serviceReconciler {
+func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, networkPolicyUpdater NetworkPolicyUpdater, networkPoliciesEnabled bool) *serviceReconciler {
 	return &serviceReconciler{
 		client:                 client,
 		ingressUpdater:         ingressUpdater,
-		exposedPortUpdater:     exposedPortUpdater,
 		networkPolicyUpdater:   networkPolicyUpdater,
 		networkPoliciesEnabled: networkPoliciesEnabled,
 	}
@@ -71,11 +70,6 @@ func (r *serviceReconciler) handleUpsert(ctx context.Context, service *corev1.Se
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", service.Name, err)
 	}
 
-	err = r.exposedPortUpdater.UpsertCesLoadbalancerService(ctx, service)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create/update exposed ports for service [%s]: %w", service.Name, err)
-	}
-
 	if r.networkPoliciesEnabled {
 		logger.Info("networkpolicy support is enabled")
 		err = r.networkPolicyUpdater.UpsertNetworkPoliciesForService(ctx, service)
@@ -90,12 +84,8 @@ func (r *serviceReconciler) handleUpsert(ctx context.Context, service *corev1.Se
 func (r *serviceReconciler) handleDelete(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("remove exposed ports")
-	exposeErr := r.exposedPortUpdater.RemoveExposedPorts(ctx, req.Name)
+
 	var multiErr []error
-	if exposeErr != nil {
-		multiErr = append(multiErr, exposeErr)
-		logger.Error(exposeErr, fmt.Sprintf("failed to remove exposed ports for service %s", req.NamespacedName))
-	}
 
 	// Do not remove ports if networkpolicies are not enabled because the policy should be deleted anyway.
 	if r.networkPoliciesEnabled {

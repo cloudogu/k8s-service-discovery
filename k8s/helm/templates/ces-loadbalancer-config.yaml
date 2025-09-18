@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ces-loadbalancer-config
+  labels:
+    {{- include "k8s-service-discovery.labels" . | nindent 4 }}
+data:
+  config.yaml: {{ .Values.loadBalancerService | toYaml | quote }}

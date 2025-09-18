@@ -3,6 +3,7 @@ package expose
 import (
 	"context"
 	"fmt"
+
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,16 +28,13 @@ type ingressClassCreator struct {
 }
 
 // NewIngressClassCreator creates a new ingress class creator.
-func NewIngressClassCreator(clientset clientSetInterface, className string, namespace string, recorder eventRecorder, controller ingressController) *ingressClassCreator {
-	icInterface := clientset.NetworkingV1().IngressClasses()
-	deployInterface := clientset.AppsV1().Deployments(namespace)
-
+func NewIngressClassCreator(ingressClassInterface ingressClassInterface, deploymentInterface deploymentInterface, className string, recorder eventRecorder, controller ingressController) *ingressClassCreator {
 	return &ingressClassCreator{
 		className:             className,
 		eventRecorder:         recorder,
 		ingressController:     controller,
-		ingressClassInterface: icInterface,
-		deploymentInterface:   deployInterface,
+		ingressClassInterface: ingressClassInterface,
+		deploymentInterface:   deploymentInterface,
 	}
 }
 

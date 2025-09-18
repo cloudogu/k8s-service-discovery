@@ -16,6 +16,8 @@ rules:
       - list
       - get
       - watch
+      - create
+      - update
   - apiGroups:
       - k8s.cloudogu.com
     resources:
@@ -37,14 +39,11 @@ rules:
       - ""
     resources:
       - configmaps
-    resourceNames:
-      - tcp-services
-      - udp-services
-      - global-config
     verbs:
       - get
       - list
       - watch
+      - create
       - update
   # create and update ingress objects for dogus
   - apiGroups:

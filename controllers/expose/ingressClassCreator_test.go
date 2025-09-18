@@ -2,13 +2,14 @@ package expose
 
 import (
 	"context"
+	"testing"
+
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
 
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,17 +20,19 @@ import (
 var testCtx = context.Background()
 
 func TestNewIngressClassCreator(t *testing.T) {
-	namespace := "test"
-	clientSetMock := newMockClientSetInterface(t)
-	appsv1Mock := newMockAppsv1Interface(t)
-	appsv1Mock.EXPECT().Deployments(namespace).Return(newMockDeploymentInterface(t))
-	clientSetMock.EXPECT().AppsV1().Return(appsv1Mock)
-	netv1Mock := newMockNetInterface(t)
-	netv1Mock.EXPECT().IngressClasses().Return(newMockIngressClassInterface(t))
-	clientSetMock.EXPECT().NetworkingV1().Return(netv1Mock)
-	creator := NewIngressClassCreator(clientSetMock, "my-ingress-class", namespace, newMockEventRecorder(t), nil)
+	ingressClassMock := newMockIngressClassInterface(t)
+	deploymentMock := newMockDeploymentInterface(t)
+	ingressControllerMock := newMockIngressController(t)
+
+	creator := NewIngressClassCreator(ingressClassMock, deploymentMock, "my-ingress-class", newMockEventRecorder(t), ingressControllerMock)
 
 	require.NotNil(t, creator)
+	require.NotNil(t, creator.ingressClassInterface)
+	require.NotNil(t, creator.deploymentInterface)
+	require.NotNil(t, creator.eventRecorder)
+	require.NotNil(t, creator.ingressController)
+
+	require.Equal(t, "my-ingress-class", creator.className)
 }
 
 func TestIngressClassCreator_CreateIngressClass(t *testing.T) {

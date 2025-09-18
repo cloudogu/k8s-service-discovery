@@ -3,6 +3,8 @@ package expose
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
@@ -15,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
 )
 
 func getGlobalConfigRepoMockWithMaintenance(t *testing.T, maintenanceMode bool) GlobalConfigRepository {
@@ -46,18 +47,23 @@ const (
 func TestNewIngressUpdater(t *testing.T) {
 	t.Run("successfully create ingress updater", func(t *testing.T) {
 		// given
-		clientSetMock := newMockClientSetInterface(t)
 		ingressInterfaceMock := newMockIngressInterface(t)
-		netv1Mock := newMockNetInterface(t)
-		netv1Mock.EXPECT().Ingresses(testNamespace).Return(ingressInterfaceMock)
-		clientSetMock.EXPECT().NetworkingV1().Return(netv1Mock)
-
 		doguInterfaceMock := newMockDoguInterface(t)
 		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
 		ingressControllerMock := newMockIngressController(t)
+		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
 
 		// when
-		sut := NewIngressUpdater(clientSetMock, doguInterfaceMock, globalConfigRepoMock, testNamespace, testIngressClassName, newMockEventRecorder(t), ingressControllerMock)
+		sut := NewIngressUpdater(IngressUpdaterDependencies{
+			deploymentReadyCheckerMock,
+			ingressInterfaceMock,
+			doguInterfaceMock,
+			globalConfigRepoMock,
+			testNamespace,
+			testIngressClassName,
+			newMockEventRecorder(t),
+			ingressControllerMock,
+		})
 
 		// then
 		assert.NotNil(t, sut)
@@ -456,61 +462,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "failed to get addtional ingress annotations from dogu service 'test': invalid character '{' looking for beginning of object key string")
 	})
-	t.Run("Create default ingress for nginx-static dogu even when maintenance mode is active", func(t *testing.T) {
-		doguName := "nginx-static"
 
-		// given
-		cesServiceWithOneWebapp := CesService{
-			Name:     doguName,
-			Port:     12345,
-			Location: "/myLocation",
-			Pass:     "/myPass",
-		}
-		service := corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      doguName,
-				Namespace: testNamespace,
-				Labels:    map[string]string{"dogu.name": doguName}},
-		}
-
-		expectedIngress := getTestIngress(doguName, "/myLocation(/|$)(.*)", service, service.Name, 12345, map[string]string{
-			"rewrite": "/myPass/$2",
-			"regex":   "true",
-		})
-
-		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: doguName, Namespace: testNamespace}}
-		doguInterfaceMock := newMockDoguInterface(t)
-		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(dogu, nil)
-		recorderMock := newMockEventRecorder(t)
-		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", doguName)
-
-		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
-		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
-
-		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
-		deploymentReadyChecker.EXPECT().IsReady(testCtx, doguName).Return(true, nil)
-
-		ingressInterfaceMock := newMockIngressInterface(t)
-		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
-
-		sut := ingressUpdater{
-			deploymentReadyChecker: deploymentReadyChecker,
-			doguInterface:          doguInterfaceMock,
-			controller:             ingressControllerMock,
-			ingressInterface:       ingressInterfaceMock,
-			namespace:              testNamespace,
-			ingressClassName:       testIngressClassName,
-			eventRecorder:          recorderMock,
-		}
-
-		// when
-		err := sut.upsertIngressForCesService(testCtx, cesServiceWithOneWebapp, &service, true)
-
-		// then
-		require.NoError(t, err)
-	})
 	t.Run("Create ingress resource for a single ces service while maintenance mode is active", func(t *testing.T) {
 		// given
 		cesServiceWithOneWebapp := CesService{
@@ -527,7 +479,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			"test",
 			"/myLocation",
 			service,
-			"nginx-static",
+			"k8s-ces-assets-service",
 			80,
 			map[string]string{
 				"rewrite": "/errors/503.html",
@@ -574,7 +526,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 				Labels:    map[string]string{"dogu.name": "test"}},
 		}
 
-		expectedIngress := getTestIngress("test", "/myLocation", service, "nginx-static", 80, map[string]string{
+		expectedIngress := getTestIngress("test", "/myLocation", service, "k8s-ces-assets-service", 80, map[string]string{
 			"rewrite": "/errors/starting.html",
 		})
 

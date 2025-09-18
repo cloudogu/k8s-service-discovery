@@ -8,15 +8,16 @@ import (
 
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
-	"github.com/cloudogu/k8s-registry-lib/dogu"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/warp"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -77,8 +78,9 @@ func startManager() error {
 		return fmt.Errorf("failed to read watch namespace: %w", err)
 	}
 
-	options := getK8sManagerOptions(watchNamespace)
+	ingressControllerStr := config.ReadIngressController()
 
+	options := getK8sManagerOptions(watchNamespace)
 	serviceDiscManager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		return fmt.Errorf("failed to create new manager: %w", err)
@@ -86,40 +88,30 @@ func startManager() error {
 
 	eventRecorder := serviceDiscManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
-	clientset, err := getK8sClientSet(serviceDiscManager.GetConfig())
+	clientSet, err := getK8sClientSet(serviceDiscManager.GetConfig(), watchNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client set: %w", err)
 	}
-	configMapInterface := clientset.CoreV1().ConfigMaps(watchNamespace)
-	secretInterface := clientset.CoreV1().Secrets(watchNamespace)
-	ingressInterface := clientset.NetworkingV1().Ingresses(watchNamespace)
-	ingressControllerStr := config.ReadIngressController()
 
 	controller := ingressController.ParseIngressController(ingressController.Dependencies{
 		Controller:         ingressControllerStr,
-		ConfigMapInterface: configMapInterface,
-		IngressInterface:   ingressInterface,
+		ConfigMapInterface: clientSet.configMapClient,
+		IngressInterface:   clientSet.ingressClient,
 		IngressClassName:   IngressClassName,
 	})
 
-	if err = handleIngressClassCreation(serviceDiscManager, clientset, watchNamespace, eventRecorder, controller); err != nil {
+	if err = handleIngressClassCreation(serviceDiscManager, clientSet, eventRecorder, controller); err != nil {
 		return fmt.Errorf("failed to create ingress class creator: %w", err)
 	}
 
-	doguVersionRegistry := dogu.NewDoguVersionRegistry(configMapInterface)
-	localDoguRepo := dogu.NewLocalDoguDescriptorRepository(configMapInterface)
-	globalConfigRepo := repository.NewGlobalConfigRepository(configMapInterface)
-	certSync := ssl.NewCertificateSynchronizer(secretInterface, globalConfigRepo)
+	globalConfigRepo := repository.NewGlobalConfigRepository(clientSet.configMapClient)
+	certSync := ssl.NewCertificateSynchronizer(clientSet.secretClient, globalConfigRepo)
 
 	if err = handleCertificateSynchronization(serviceDiscManager, certSync); err != nil {
 		return fmt.Errorf("failed to create certificate key remover: %w", err)
 	}
 
-	if err = handleWarpMenuCreation(serviceDiscManager, doguVersionRegistry, localDoguRepo, watchNamespace, eventRecorder, globalConfigRepo); err != nil {
-		return fmt.Errorf("failed to create warp menu creator: %w", err)
-	}
-
-	if err = handleSelfsignedCertificateUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, secretInterface); err != nil {
+	if err = handleSelfsignedCertificateUpdates(serviceDiscManager, watchNamespace, globalConfigRepo, clientSet.secretClient); err != nil {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
@@ -128,15 +120,23 @@ func startManager() error {
 		return fmt.Errorf("failed to create ecosystem client set: %w", err)
 	}
 
-	ingressUpdater := expose.NewIngressUpdater(clientset, ecoSystemClientSet.Dogus(watchNamespace), globalConfigRepo, watchNamespace, IngressClassName, eventRecorder, controller)
+	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
+
+	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
+		DeploymentReadyChecker: deploymentReadyChecker,
+		IngressInterface:       clientSet.ingressClient,
+		DoguInterface:          ecoSystemClientSet.Dogus(watchNamespace),
+		GlobalConfigRepo:       globalConfigRepo,
+		Namespace:              watchNamespace,
+		IngressClassName:       IngressClassName,
+		Recorder:               eventRecorder,
+		Controller:             controller,
+	})
 
 	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
 		return err
 	}
 
-	serviceInterface := clientset.CoreV1().Services(watchNamespace)
-	exposedPortUpdater := expose.NewExposedPortHandler(serviceInterface, controller, watchNamespace)
-	networkPolicyInterface := clientset.NetworkingV1().NetworkPolicies(watchNamespace)
 	cidr, err := config.ReadNetworkPolicyCIDR()
 	if err != nil {
 		return err
@@ -147,14 +147,14 @@ func startManager() error {
 		return err
 	}
 
-	networkPolicyUpdater := expose.NewNetworkPolicyHandler(networkPolicyInterface, controller, cidr)
+	networkPolicyUpdater := expose.NewNetworkPolicyHandler(clientSet.networkPolicyClient, controller, cidr)
 
 	if err = configureManager(
 		serviceDiscManager,
+		clientSet,
 		globalConfigRepo,
 		controller,
 		ingressUpdater,
-		exposedPortUpdater,
 		networkPolicyUpdater,
 		networkpoliciesEnabled,
 		certSync,
@@ -169,13 +169,33 @@ func startManager() error {
 	return nil
 }
 
-func getK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
-	k8sClientSet, err := kubernetes.NewForConfig(config)
+type k8sClientSet struct {
+	k8sClient           *kubernetes.Clientset
+	configMapClient     v1.ConfigMapInterface
+	secretClient        v1.SecretInterface
+	serviceClient       v1.ServiceInterface
+	deploymentClient    appsv1.DeploymentInterface
+	ingressClient       networkingv1.IngressInterface
+	ingressClassClient  networkingv1.IngressClassInterface
+	networkPolicyClient networkingv1.NetworkPolicyInterface
+}
+
+func getK8sClientSet(config *rest.Config, namespace string) (k8sClientSet, error) {
+	k8sClients, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create k8s client set: %w", err)
+		return k8sClientSet{}, fmt.Errorf("failed to create k8s client set: %w", err)
 	}
 
-	return k8sClientSet, nil
+	return k8sClientSet{
+		k8sClient:           k8sClients,
+		configMapClient:     k8sClients.CoreV1().ConfigMaps(namespace),
+		secretClient:        k8sClients.CoreV1().Secrets(namespace),
+		serviceClient:       k8sClients.CoreV1().Services(namespace),
+		deploymentClient:    k8sClients.AppsV1().Deployments(namespace),
+		ingressClient:       k8sClients.NetworkingV1().Ingresses(namespace),
+		ingressClassClient:  k8sClients.NetworkingV1().IngressClasses(),
+		networkPolicyClient: k8sClients.NetworkingV1().NetworkPolicies(namespace),
+	}, nil
 }
 
 type certificateSynchronizer interface {
@@ -184,20 +204,20 @@ type certificateSynchronizer interface {
 
 func configureManager(
 	k8sManager k8sManager,
+	k8sClients k8sClientSet,
 	globalConfigRepo controllers.GlobalConfigRepository,
-	ingressController controllers.AlternativeFQDNRedirector,
+	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
-	exposedPortUpdater controllers.ExposedPortUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
 ) error {
 	if err := configureReconciler(
 		k8sManager,
+		k8sClients,
 		globalConfigRepo,
 		ingressController,
 		ingressUpdater,
-		exposedPortUpdater,
 		networkPolicyUpdater,
 		networkPoliciesEnabled,
 		certSync,
@@ -246,8 +266,8 @@ func startK8sManager(k8sManager k8sManager) error {
 	return nil
 }
 
-func handleIngressClassCreation(k8sManager k8sManager, clientSet *kubernetes.Clientset, namespace string, recorder record.EventRecorder, controller ingressController.IngressController) error {
-	ingressClassCreator := expose.NewIngressClassCreator(clientSet, IngressClassName, namespace, recorder, controller)
+func handleIngressClassCreation(k8sManager k8sManager, clientSet k8sClientSet, recorder record.EventRecorder, controller ingressController.IngressController) error {
+	ingressClassCreator := expose.NewIngressClassCreator(clientSet.ingressClassClient, clientSet.deploymentClient, IngressClassName, recorder, controller)
 
 	if err := k8sManager.Add(ingressClassCreator); err != nil {
 		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)
@@ -259,16 +279,6 @@ func handleIngressClassCreation(k8sManager k8sManager, clientSet *kubernetes.Cli
 func handleCertificateSynchronization(k8sManager k8sManager, certificateSynchronizer manager.Runnable) error {
 	if err := k8sManager.Add(certificateSynchronizer); err != nil {
 		return fmt.Errorf("failed to add certificate key remover as runnable to the manager: %w", err)
-	}
-
-	return nil
-}
-
-func handleWarpMenuCreation(k8sManager k8sManager, doguVersionRegistry warp.DoguVersionRegistry, localDoguRepo warp.LocalDoguRepo, namespace string, recorder record.EventRecorder, globalConfigRepo warp.GlobalConfigRepository) error {
-	warpMenuCreator := controllers.NewWarpMenuCreator(k8sManager.GetClient(), doguVersionRegistry, localDoguRepo, namespace, recorder, globalConfigRepo)
-
-	if err := k8sManager.Add(warpMenuCreator); err != nil {
-		return fmt.Errorf("failed to add warp menu creator as runnable to the manager: %w", err)
 	}
 
 	return nil
@@ -299,15 +309,15 @@ func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater cont
 
 func configureReconciler(
 	k8sManager k8sManager,
+	k8sClients k8sClientSet,
 	globalConfigRepo controllers.GlobalConfigRepository,
-	ingressController controllers.AlternativeFQDNRedirector,
+	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
-	exposedPortUpdater controllers.ExposedPortUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
 ) error {
-	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, exposedPortUpdater, networkPolicyUpdater, networkPoliciesEnabled)
+	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater, networkPoliciesEnabled)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
 	}
@@ -330,6 +340,16 @@ func configureReconciler(
 
 	if err := redirectReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup redirct reconciler with the manager: %w", err)
+	}
+
+	loadbalacnerReconciler := &controllers.LoadBalancerReconciler{
+		Client:            k8sManager.GetClient(),
+		IngressController: ingressController,
+		SvcClient:         k8sClients.serviceClient,
+	}
+
+	if err := loadbalacnerReconciler.SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("failed to setup loadbalancer reconciler with the manager: %w", err)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -11,7 +12,6 @@ import (
 
 const (
 	certificateSecretName = "ecosystem-certificate"
-	serverCertificateID   = "certificate/server.crt"
 )
 
 // ecosystemCertificateReconciler watches the ecosystem-certificate secret in the cluster and synchronizes it to the global config.

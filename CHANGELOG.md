@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v3.0.0] - 2025-09-18
+### Added
+- [#92] Create and manage loadbalancer service
+  - config for loadbalancer can be provided via values.yaml
+  - support for custom annotations for the loadbalancer
+  - idempotent update for loadbalancer 
+- [#92] Add support for k8s-ces-gateway
+- [#92] Create ecosystem-certificate on start when it does not exist
+
+### Changed
+- [#92] k8s-ces-assets is used as static file backend
+
+### Removed
+- [#92] removed logic for creating warp menu
+
+> [!IMPORTANT]
+> Breaking change!
+> k8s-ces-assets is now needed as static file backend.
+
 ## [v2.2.0] - 2025-08-20
 ### Added
 - [#88] add logic to handle alternative fqdns in global config and to create a redirect ingress object for them
