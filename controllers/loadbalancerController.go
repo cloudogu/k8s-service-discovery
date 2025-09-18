@@ -179,7 +179,7 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func enqueueLoadBalancerConfig(_ context.Context, object client.Object) []reconcile.Request {
-	return []reconcile.Request{{apitypes.NamespacedName{
+	return []reconcile.Request{{NamespacedName: apitypes.NamespacedName{
 		Namespace: object.GetNamespace(),
 		Name:      types.LoadBalancerConfigName,
 	}}}

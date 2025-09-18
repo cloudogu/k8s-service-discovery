@@ -54,7 +54,16 @@ func TestNewIngressUpdater(t *testing.T) {
 		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
 
 		// when
-		sut := NewIngressUpdater(deploymentReadyCheckerMock, ingressInterfaceMock, doguInterfaceMock, globalConfigRepoMock, testNamespace, testIngressClassName, newMockEventRecorder(t), ingressControllerMock)
+		sut := NewIngressUpdater(IngressUpdaterDependencies{
+			deploymentReadyCheckerMock,
+			ingressInterfaceMock,
+			doguInterfaceMock,
+			globalConfigRepoMock,
+			testNamespace,
+			testIngressClassName,
+			newMockEventRecorder(t),
+			ingressControllerMock,
+		})
 
 		// then
 		assert.NotNil(t, sut)

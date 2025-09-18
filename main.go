@@ -122,7 +122,16 @@ func startManager() error {
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 
-	ingressUpdater := expose.NewIngressUpdater(deploymentReadyChecker, clientSet.ingressClient, ecoSystemClientSet.Dogus(watchNamespace), globalConfigRepo, watchNamespace, IngressClassName, eventRecorder, controller)
+	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
+		DeploymentReadyChecker: deploymentReadyChecker,
+		IngressInterface:       clientSet.ingressClient,
+		DoguInterface:          ecoSystemClientSet.Dogus(watchNamespace),
+		GlobalConfigRepo:       globalConfigRepo,
+		Namespace:              watchNamespace,
+		IngressClassName:       IngressClassName,
+		Recorder:               eventRecorder,
+		Controller:             controller,
+	})
 
 	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
 		return err

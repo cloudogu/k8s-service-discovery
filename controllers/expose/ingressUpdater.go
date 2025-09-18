@@ -92,17 +92,28 @@ type ingressUpdater struct {
 	doguInterface          doguInterface
 }
 
+type IngressUpdaterDependencies struct {
+	DeploymentReadyChecker DeploymentReadyChecker
+	IngressInterface       ingressInterface
+	DoguInterface          doguInterface
+	GlobalConfigRepo       GlobalConfigRepository
+	Namespace              string
+	IngressClassName       string
+	Recorder               eventRecorder
+	Controller             ingressController
+}
+
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(deploymentReadyChecker DeploymentReadyChecker, ingressInterface ingressInterface, doguInterface doguInterface, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder, controller ingressController) *ingressUpdater {
+func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 	return &ingressUpdater{
-		globalConfigRepo:       globalConfigRepo,
-		namespace:              namespace,
-		ingressClassName:       ingressClassName,
-		deploymentReadyChecker: deploymentReadyChecker,
-		eventRecorder:          recorder,
-		controller:             controller,
-		ingressInterface:       ingressInterface,
-		doguInterface:          doguInterface,
+		globalConfigRepo:       deps.GlobalConfigRepo,
+		namespace:              deps.Namespace,
+		ingressClassName:       deps.IngressClassName,
+		deploymentReadyChecker: deps.DeploymentReadyChecker,
+		eventRecorder:          deps.Recorder,
+		controller:             deps.Controller,
+		ingressInterface:       deps.IngressInterface,
+		doguInterface:          deps.DoguInterface,
 	}
 }
 
