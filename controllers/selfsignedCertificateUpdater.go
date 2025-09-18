@@ -5,8 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	sslLib "github.com/cloudogu/cesapp-lib/ssl"
@@ -25,6 +27,8 @@ const (
 	serverCertificateTypePath = "certificate/type"
 	selfsignedCertificateType = "selfsigned"
 	ecosystemCertificateName  = "ecosystem-certificate"
+
+	defaultExpireDays = 365 * 24 * time.Hour
 )
 
 // selfsignedCertificateUpdater is responsible to update the sslLib certificate of the ecosystem.
@@ -45,7 +49,7 @@ func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalCo
 	return &selfsignedCertificateUpdater{
 		namespace:          namespace,
 		globalConfigRepo:   globalConfigRepo,
-		certificateCreator: ssl.NewCreator(globalConfigRepo, secretClient),
+		certificateCreator: ssl.NewCreator(globalConfigRepo, secretClient, namespace),
 		secretClient:       secretClient,
 	}
 }
@@ -109,7 +113,8 @@ func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqd
 }
 
 func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
 
 	globalConfig, err := scu.globalConfigRepo.Get(ctx)
 	if err != nil {
@@ -125,8 +130,14 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 		ctrl.LoggerFrom(ctx).Info("Certificate is selfsigned. Regenerating certificate...")
 
 		previousCert, err := scu.getCurrentCertificate(ctx)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get current certificate: %w", err)
+		}
+
+		if apierrors.IsNotFound(err) {
+			now := time.Now()
+			previousCert = &x509.Certificate{NotBefore: now, NotAfter: now.Add(defaultExpireDays)}
+			logger.Info("Could not find certificate, create a new one.")
 		}
 
 		expireDays := previousCert.NotAfter.Sub(previousCert.NotBefore).Hours() / 24
@@ -172,8 +183,12 @@ func (scu *selfsignedCertificateUpdater) shouldUpdateCurrentCertificate(ctx cont
 	}
 
 	certificate, err := scu.getCurrentCertificate(ctx)
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return false, fmt.Errorf("failed to get current certificate: %w", err)
+	}
+
+	if apierrors.IsNotFound(err) {
+		return true, nil
 	}
 
 	fqdn, exists := globalConfig.Get(globalFqdnPath)

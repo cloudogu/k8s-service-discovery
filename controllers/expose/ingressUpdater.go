@@ -4,22 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
+	"strings"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/dogustart"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"path"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strings"
 )
 
 const (
-	staticContentBackendName           = "nginx-static"
+	staticContentBackendName           = "k8s-ces-assets-service"
 	staticContentBackendPort           = 80
 	staticContentBackendRewrite        = "/errors/503.html"
 	staticContentDoguIsStartingRewrite = "/errors/starting.html"
@@ -92,20 +92,28 @@ type ingressUpdater struct {
 	doguInterface          doguInterface
 }
 
-// NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(clientSet clientSetInterface, doguInterface doguInterface, globalConfigRepo GlobalConfigRepository, namespace string, ingressClassName string, recorder eventRecorder, controller ingressController) *ingressUpdater {
-	ingressClient := clientSet.NetworkingV1().Ingresses(namespace)
+type IngressUpdaterDependencies struct {
+	DeploymentReadyChecker DeploymentReadyChecker
+	IngressInterface       ingressInterface
+	DoguInterface          doguInterface
+	GlobalConfigRepo       GlobalConfigRepository
+	Namespace              string
+	IngressClassName       string
+	Recorder               eventRecorder
+	Controller             ingressController
+}
 
-	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet, namespace)
+// NewIngressUpdater creates a new instance responsible for updating ingress objects.
+func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 	return &ingressUpdater{
-		globalConfigRepo:       globalConfigRepo,
-		namespace:              namespace,
-		ingressClassName:       ingressClassName,
-		deploymentReadyChecker: deploymentReadyChecker,
-		eventRecorder:          recorder,
-		controller:             controller,
-		ingressInterface:       ingressClient,
-		doguInterface:          doguInterface,
+		globalConfigRepo:       deps.GlobalConfigRepo,
+		namespace:              deps.Namespace,
+		ingressClassName:       deps.IngressClassName,
+		deploymentReadyChecker: deps.DeploymentReadyChecker,
+		eventRecorder:          deps.Recorder,
+		controller:             deps.Controller,
+		ingressInterface:       deps.IngressInterface,
+		doguInterface:          deps.DoguInterface,
 	}
 }
 
@@ -161,7 +169,7 @@ func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesServ
 		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
 	}
 
-	if isMaintenanceMode && dogu.Name != staticContentBackendName {
+	if isMaintenanceMode {
 		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service, dogu)
 	}
 

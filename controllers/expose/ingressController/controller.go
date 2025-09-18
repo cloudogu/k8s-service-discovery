@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	DefaultIngressController = NginxIngressController
-	NginxIngressController   = "nginx-ingress"
+	DefaultIngressController = nginx.GatewayControllerName
 )
 
 type Dependencies struct {
@@ -21,11 +20,19 @@ type Dependencies struct {
 
 func ParseIngressController(deps Dependencies) IngressController {
 	switch deps.Controller {
-	case NginxIngressController:
+	case nginx.GatewayControllerName:
 		return nginx.NewNginxController(nginx.IngressControllerDependencies{
 			ConfigMapInterface: deps.ConfigMapInterface,
 			IngressInterface:   deps.IngressInterface,
 			IngressClassName:   deps.IngressClassName,
+			ControllerType:     nginx.GatewayControllerName,
+		})
+	case nginx.IngressControllerName:
+		return nginx.NewNginxController(nginx.IngressControllerDependencies{
+			ConfigMapInterface: deps.ConfigMapInterface,
+			IngressInterface:   deps.IngressInterface,
+			IngressClassName:   deps.IngressClassName,
+			ControllerType:     nginx.IngressControllerName,
 		})
 	default:
 		ctrl.Log.WithName("k8s-service-discovery.ParseIngressController").Error(fmt.Errorf("could not parse ingress controller %q. using default: %q", deps.Controller, DefaultIngressController), "unknown ingress controller")
@@ -33,6 +40,7 @@ func ParseIngressController(deps Dependencies) IngressController {
 			ConfigMapInterface: deps.ConfigMapInterface,
 			IngressInterface:   deps.IngressInterface,
 			IngressClassName:   deps.IngressClassName,
+			ControllerType:     DefaultIngressController,
 		})
 	}
 }

@@ -1,32 +1,34 @@
 package ssl
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
-	cert = "cert"
-	key  = "key"
+	sslWriterNamespace = "default"
+	cert               = "cert"
+	key                = "key"
 )
 
 func Test_sslWriter_WriteCertificate(t *testing.T) {
 	t.Parallel()
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("success- create new certificate", func(t *testing.T) {
 		// given
 
 		secretClientMock := newMockSecretClient(t)
-		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
-		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
-			"tls.crt": []byte(cert),
-			"tls.key": []byte(key),
-		}}, v1.UpdateOptions{}).Return(nil, nil)
+		secretClientMock.EXPECT().Update(testCtx, mock.Anything, v1.UpdateOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, assert.AnError.Error()))
 
-		writer := NewSSLWriter(secretClientMock)
+		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
+
+		secretClientMock.EXPECT().Create(testCtx, writer.createCertificateSecret(cert, key), v1.CreateOptions{}).Return(nil, nil)
 
 		// when
 		err := writer.WriteCertificate(testCtx, cert, key)
@@ -35,37 +37,52 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("failed to get ecosystem-certificate secret", func(t *testing.T) {
+	t.Run("success- update certificate", func(t *testing.T) {
 		// given
-		secretClientMock := newMockSecretClient(t)
-		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(nil, assert.AnError)
 
-		writer := NewSSLWriter(secretClientMock)
+		secretClientMock := newMockSecretClient(t)
+		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
+
+		secretClientMock.EXPECT().Update(testCtx, writer.createCertificateSecret(cert, key), v1.UpdateOptions{}).Return(nil, nil)
 
 		// when
 		err := writer.WriteCertificate(testCtx, cert, key)
 
 		// then
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get secret for ssl creation: ")
+		require.NoError(t, err)
 	})
 
-	t.Run("failed to update certificate secret", func(t *testing.T) {
+	t.Run("failed to create new certificate", func(t *testing.T) {
 		// given
-		secretClientMock := newMockSecretClient(t)
-		secretClientMock.EXPECT().Get(testCtx, "ecosystem-certificate", v1.GetOptions{}).Return(&corev1.Secret{Data: map[string][]byte{}}, nil)
-		secretClientMock.EXPECT().Update(testCtx, &corev1.Secret{Data: map[string][]byte{
-			"tls.crt": []byte(cert),
-			"tls.key": []byte(key),
-		}}, v1.UpdateOptions{}).Return(nil, assert.AnError)
 
-		writer := NewSSLWriter(secretClientMock)
+		secretClientMock := newMockSecretClient(t)
+		secretClientMock.EXPECT().Update(testCtx, mock.Anything, v1.UpdateOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, assert.AnError.Error()))
+
+		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
+
+		secretClientMock.EXPECT().Create(testCtx, writer.createCertificateSecret(cert, key), v1.CreateOptions{}).Return(nil, assert.AnError)
 
 		// when
 		err := writer.WriteCertificate(testCtx, cert, key)
 
 		// then
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to update secret writing ssl:")
+		require.ErrorContains(t, err, "failed to create new secret for ecosystem certificate")
+	})
+
+	t.Run("failed to update certificate", func(t *testing.T) {
+		// given
+
+		secretClientMock := newMockSecretClient(t)
+		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
+
+		secretClientMock.EXPECT().Update(testCtx, writer.createCertificateSecret(cert, key), v1.UpdateOptions{}).Return(nil, assert.AnError)
+
+		// when
+		err := writer.WriteCertificate(testCtx, cert, key)
+
+		// then
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to update secret for ecosystem certificate")
 	})
 }
