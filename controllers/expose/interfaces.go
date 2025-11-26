@@ -37,12 +37,6 @@ type deploymentInterface interface {
 
 //nolint:unused
 //goland:noinspection GoUnusedType
-type ingressClassInterface interface {
-	netv1.IngressClassInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
 type ingressInterface interface {
 	netv1.IngressInterface
 }

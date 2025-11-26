@@ -37,6 +37,7 @@ import (
 )
 
 const (
+	// TODO Should be configurable because other component creates it
 	IngressClassName = "k8s-ecosystem-ces-service"
 )
 
@@ -99,10 +100,6 @@ func startManager() error {
 		IngressInterface:   clientSet.ingressClient,
 		IngressClassName:   IngressClassName,
 	})
-
-	if err = handleIngressClassCreation(serviceDiscManager, clientSet, eventRecorder, controller); err != nil {
-		return fmt.Errorf("failed to create ingress class creator: %w", err)
-	}
 
 	globalConfigRepo := repository.NewGlobalConfigRepository(clientSet.configMapClient)
 	certSync := ssl.NewCertificateSynchronizer(clientSet.secretClient, globalConfigRepo)
@@ -176,7 +173,6 @@ type k8sClientSet struct {
 	serviceClient       v1.ServiceInterface
 	deploymentClient    appsv1.DeploymentInterface
 	ingressClient       networkingv1.IngressInterface
-	ingressClassClient  networkingv1.IngressClassInterface
 	networkPolicyClient networkingv1.NetworkPolicyInterface
 }
 
@@ -193,7 +189,6 @@ func getK8sClientSet(config *rest.Config, namespace string) (k8sClientSet, error
 		serviceClient:       k8sClients.CoreV1().Services(namespace),
 		deploymentClient:    k8sClients.AppsV1().Deployments(namespace),
 		ingressClient:       k8sClients.NetworkingV1().Ingresses(namespace),
-		ingressClassClient:  k8sClients.NetworkingV1().IngressClasses(),
 		networkPolicyClient: k8sClients.NetworkingV1().NetworkPolicies(namespace),
 	}, nil
 }
@@ -261,16 +256,6 @@ func startK8sManager(k8sManager k8sManager) error {
 	err := k8sManager.Start(ctrl.SetupSignalHandler())
 	if err != nil {
 		return fmt.Errorf("failed to start service discovery manager: %w", err)
-	}
-
-	return nil
-}
-
-func handleIngressClassCreation(k8sManager k8sManager, clientSet k8sClientSet, recorder record.EventRecorder, controller ingressController.IngressController) error {
-	ingressClassCreator := expose.NewIngressClassCreator(clientSet.ingressClassClient, clientSet.deploymentClient, IngressClassName, recorder, controller)
-
-	if err := k8sManager.Add(ingressClassCreator); err != nil {
-		return fmt.Errorf("failed to add ingress class creator as runnable to the manager: %w", err)
 	}
 
 	return nil
