@@ -37,7 +37,6 @@ import (
 )
 
 const (
-	// TODO Should be configurable because other component creates it
 	IngressClassName = "k8s-ecosystem-ces-service"
 )
 
