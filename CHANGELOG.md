@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v4.0.0] - 2025-11-27
+### Removed
+- [#94] remove logic to create the ingressclass required by the ecosystem.
+
+> [!IMPORTANT]
+> Breaking change!
+> k8s-ces-gateway 2.x.x is now needed because it is used to create the ingressclass.
+
 ## [v3.0.0] - 2025-09-18
 ### Added
 - [#92] Create and manage loadbalancer service

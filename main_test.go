@@ -105,27 +105,6 @@ func Test_startManager(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to create new manager")
 	})
 
-	t.Run("fail setup when error on Add", func(t *testing.T) {
-		// given
-		k8sManager := NewMockManager(t)
-		k8sManager.EXPECT().Add(mock.Anything).Return(assert.AnError)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
-		k8sManager.EXPECT().GetConfig().Return(&rest.Config{})
-		oldNewManger := ctrl.NewManager
-		defer func() { ctrl.NewManager = oldNewManger }()
-		ctrl.NewManager = func(config *rest.Config, options manager.Options) (manager.Manager, error) {
-			return k8sManager, nil
-		}
-		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-
-		// when
-		err := startManager()
-
-		// then
-		require.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to create ingress class creator: failed to add ingress class creator as runnable to the manager")
-	})
-
 	skipNameValidation := true
 
 	t.Run("fail setup when error on AddHealthzCheck", func(t *testing.T) {
