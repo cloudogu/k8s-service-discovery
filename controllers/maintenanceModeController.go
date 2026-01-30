@@ -3,24 +3,22 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"strings"
 
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
+
 	"github.com/hashicorp/go-multierror"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-const (
-	maintenanceModeGlobalKey = "maintenance"
 )
 
 const (
@@ -41,77 +39,89 @@ type k8sClient interface {
 
 // maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeUpdater struct {
-	client           k8sClient
-	namespace        string
-	ingressUpdater   IngressUpdater
-	eventRecorder    eventRecorder
-	serviceRewriter  serviceRewriter
-	globalConfigRepo GlobalConfigRepository
+	client          k8sClient
+	namespace       string
+	ingressUpdater  IngressUpdater
+	eventRecorder   eventRecorder
+	serviceRewriter serviceRewriter
+}
+
+func (mmu *maintenanceModeUpdater) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
+	err := mmu.handleMaintenanceModeUpdate(ctx)
+	if err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "failed to handle maintenance update")
+	}
+
+	return reconcile.Result{}, err
+}
+
+// SetupWithManager sets up the global configmap controller with the Manager.
+// The controller watches for changes to the global configmap and also reconciles when the redirect ingress object changes.
+func (mmu *maintenanceModeUpdater) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&v1.ConfigMap{}, builder.WithPredicates(maintenancePredicate())).
+		Complete(mmu)
+}
+
+func getMaintenanceConfig(object client.Object) *v1.ConfigMap {
+	configMap, ok := object.(*v1.ConfigMap)
+	if !ok {
+		return nil
+	}
+
+	if configMap.Name != util.MaintenanceConfigMapName {
+		return nil
+	}
+
+	return configMap
+}
+
+func maintenancePredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return getMaintenanceConfig(e.Object) != nil
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			configOld := getMaintenanceConfig(e.ObjectOld)
+			configNew := getMaintenanceConfig(e.ObjectNew)
+
+			if configOld == nil && configNew == nil {
+				return false
+			}
+
+			if configOld == nil || configNew == nil {
+				return true
+			}
+
+			return util.IsMaintenanceModeActive(configOld) !=
+				util.IsMaintenanceModeActive(configNew)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return getMaintenanceConfig(e.Object) != nil
+		},
+		GenericFunc: func(e event.TypedGenericEvent[client.Object]) bool {
+			return getMaintenanceConfig(e.Object) != nil
+		},
+	}
 }
 
 // NewMaintenanceModeUpdater creates a new maintenance mode updater.
-func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder, globalConfigRepo GlobalConfigRepository) (*maintenanceModeUpdater, error) {
+func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) *maintenanceModeUpdater {
 	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
 
 	return &maintenanceModeUpdater{
-		client:           client,
-		namespace:        namespace,
-		ingressUpdater:   ingressUpdater,
-		eventRecorder:    recorder,
-		serviceRewriter:  rewriter,
-		globalConfigRepo: globalConfigRepo,
-	}, nil
-}
-
-// Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
-func (mmu *maintenanceModeUpdater) Start(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Starting maintenance mode watcher...")
-	return mmu.startGlobalConfigWatch(ctx)
-}
-
-func (mmu *maintenanceModeUpdater) startGlobalConfigWatch(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Start global config watcher on maintenance key")
-
-	maintenanceWatchChannel, err := mmu.globalConfigRepo.Watch(ctx, config.KeyFilter(maintenanceModeGlobalKey))
-	if err != nil {
-		return fmt.Errorf("failed to start maintenance watch: %w", err)
-	}
-
-	go func() {
-		mmu.startMaintenanceWatch(ctx, maintenanceWatchChannel)
-	}()
-
-	return nil
-}
-
-func (mmu *maintenanceModeUpdater) startMaintenanceWatch(ctx context.Context, maintenanceWatchChannel <-chan repository.GlobalConfigWatchResult) {
-	for {
-		select {
-		case <-ctx.Done():
-			ctrl.LoggerFrom(ctx).Info("context done - stop global config watcher for maintenance")
-			return
-		case result, open := <-maintenanceWatchChannel:
-			if !open {
-				ctrl.LoggerFrom(ctx).Info("maintenance watch channel canceled - stop watch")
-				return
-			}
-			if result.Err != nil {
-				ctrl.LoggerFrom(ctx).Error(result.Err, "maintenance watch channel error")
-				continue
-			}
-
-			err := mmu.handleMaintenanceModeUpdate(ctx)
-			if err != nil {
-				ctrl.LoggerFrom(ctx).Error(err, "failed to handle maintenance update")
-			}
-		}
+		client:          client,
+		namespace:       namespace,
+		ingressUpdater:  ingressUpdater,
+		eventRecorder:   recorder,
+		serviceRewriter: rewriter,
 	}
 }
 
 func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := util.IsMaintenanceModeActive(ctx, mmu.globalConfigRepo)
+	isActive, err := util.GetMaintenanceModeActive(ctx, mmu.client, mmu.namespace)
 	if err != nil {
 		return err
 	}
@@ -128,35 +138,12 @@ func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 		}
 	}
 
-	err = mmu.restartStaticNginxPod(ctx)
-	if err != nil {
-		return err
-	}
-
 	deployment := &appsv1.Deployment{}
 	err = mmu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: mmu.namespace}, deployment)
 	if err != nil {
 		return fmt.Errorf("maintenance mode: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
 	}
 	mmu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed to %t.", isActive)
-
-	return nil
-}
-
-func (mmu *maintenanceModeUpdater) restartStaticNginxPod(ctx context.Context) error {
-	podList := &v1.PodList{}
-	staticNginxRequirement, _ := labels.NewRequirement(doguv2.DoguLabelName, selection.Equals, []string{"nginx-static"})
-	err := mmu.client.List(ctx, podList, &client.ListOptions{Namespace: mmu.namespace, LabelSelector: labels.NewSelector().Add(*staticNginxRequirement)})
-	if err != nil {
-		return fmt.Errorf("failed to list [%s] pods: %w", "nginx-static", err)
-	}
-
-	for _, pod := range podList.Items {
-		err := mmu.client.Delete(ctx, &pod)
-		if err != nil {
-			return fmt.Errorf("failed to delete pod [%s]: %w", pod.Name, err)
-		}
-	}
 
 	return nil
 }

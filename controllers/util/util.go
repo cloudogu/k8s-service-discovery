@@ -3,10 +3,13 @@ package util
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 var K8sCesServiceDiscoveryLabels = map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"}
@@ -15,6 +18,10 @@ const (
 	appLabelKey      = "app"
 	appLabelValueCes = "ces"
 	legacyDoguLabel  = "dogu"
+)
+
+const (
+	MaintenanceConfigMapName = "maintenance"
 )
 
 type ExposedPorts []ExposedPort
@@ -47,16 +54,19 @@ func GetAppLabel() map[string]string {
 	return map[string]string{appLabelKey: appLabelValueCes}
 }
 
-func IsMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigRepository) (bool, error) {
-	globalConfig, err := globalConfigRepo.Get(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get global config for maintenance mode: %w", err)
-	}
-
-	get, ok := globalConfig.Get("maintenance")
-	if !ok || !ContainsChars(get.String()) {
+func GetMaintenanceModeActive(ctx context.Context, client k8sClient, namespace string) (bool, error) {
+	maintenanceConfig := &corev1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{Name: MaintenanceConfigMapName, Namespace: namespace}, maintenanceConfig)
+	if errors.IsNotFound(err) {
 		return false, nil
+	} else if err != nil {
+		return false, fmt.Errorf("failed to get config for maintenance mode: %w", err)
 	}
 
-	return true, nil
+	return IsMaintenanceModeActive(maintenanceConfig), nil
+}
+
+func IsMaintenanceModeActive(config *corev1.ConfigMap) bool {
+	activeString, ok := config.Data["active"]
+	return ok && strings.TrimSpace(strings.ToLower(activeString)) == "true"
 }

@@ -9,7 +9,12 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type k8sClient interface {
+	client.Client
+}
 
 // DeploymentReadyChecker checks the readiness from deployments.
 type DeploymentReadyChecker interface {

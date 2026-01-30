@@ -78,8 +78,7 @@ func (sr *serviceRewrite) generateConfig() string {
 }
 
 type ingressUpdater struct {
-	// globalConfig is used to read the global configuration.
-	globalConfigRepo GlobalConfigRepository
+	k8sClient k8sClient
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
@@ -101,12 +100,12 @@ type IngressUpdaterDependencies struct {
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
+	K8sClient              k8sClient
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
 func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 	return &ingressUpdater{
-		globalConfigRepo:       deps.GlobalConfigRepo,
 		namespace:              deps.Namespace,
 		ingressClassName:       deps.IngressClassName,
 		deploymentReadyChecker: deps.DeploymentReadyChecker,
@@ -119,7 +118,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := util.IsMaintenanceModeActive(ctx, i.globalConfigRepo)
+	isMaintenanceMode, err := util.GetMaintenanceModeActive(ctx, i.k8sClient, i.namespace)
 	if err != nil {
 		return err
 	}
