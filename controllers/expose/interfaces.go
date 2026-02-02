@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
-	libconfig "github.com/cloudogu/k8s-registry-lib/config"
-	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
@@ -24,12 +22,6 @@ type DeploymentReadyChecker interface {
 
 type eventRecorder interface {
 	record.EventRecorder
-}
-
-type GlobalConfigRepository interface {
-	Get(context.Context) (libconfig.GlobalConfig, error)
-	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
-	Update(ctx context.Context, globalConfig libconfig.GlobalConfig) (libconfig.GlobalConfig, error)
 }
 
 // used for mocks

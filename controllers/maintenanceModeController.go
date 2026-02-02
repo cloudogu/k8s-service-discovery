@@ -37,8 +37,8 @@ type k8sClient interface {
 	client.Client
 }
 
-// maintenanceModeUpdater is responsible to update all ingress objects according to the desired maintenance mode.
-type maintenanceModeUpdater struct {
+// maintenanceModeController is responsible to update all ingress objects according to the desired maintenance mode.
+type maintenanceModeController struct {
 	client          k8sClient
 	namespace       string
 	ingressUpdater  IngressUpdater
@@ -46,7 +46,7 @@ type maintenanceModeUpdater struct {
 	serviceRewriter serviceRewriter
 }
 
-func (mmu *maintenanceModeUpdater) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
+func (mmu *maintenanceModeController) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	err := mmu.handleMaintenanceModeUpdate(ctx)
 	if err != nil {
 		ctrl.LoggerFrom(ctx).Error(err, "failed to handle maintenance update")
@@ -57,7 +57,7 @@ func (mmu *maintenanceModeUpdater) Reconcile(ctx context.Context, _ reconcile.Re
 
 // SetupWithManager sets up the global configmap controller with the Manager.
 // The controller watches for changes to the global configmap and also reconciles when the redirect ingress object changes.
-func (mmu *maintenanceModeUpdater) SetupWithManager(mgr ctrl.Manager) error {
+func (mmu *maintenanceModeController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.ConfigMap{}, builder.WithPredicates(maintenancePredicate())).
 		Complete(mmu)
@@ -105,11 +105,11 @@ func maintenancePredicate() predicate.Funcs {
 	}
 }
 
-// NewMaintenanceModeUpdater creates a new maintenance mode updater.
-func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) *maintenanceModeUpdater {
+// NewMaintenanceModeController creates a new maintenance mode updater.
+func NewMaintenanceModeController(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) *maintenanceModeController {
 	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
 
-	return &maintenanceModeUpdater{
+	return &maintenanceModeController{
 		client:          client,
 		namespace:       namespace,
 		ingressUpdater:  ingressUpdater,
@@ -118,7 +118,7 @@ func NewMaintenanceModeUpdater(client k8sClient, namespace string, ingressUpdate
 	}
 }
 
-func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Context) error {
+func (mmu *maintenanceModeController) handleMaintenanceModeUpdate(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
 	isActive, err := util.GetMaintenanceModeActive(ctx, mmu.client, mmu.namespace)
@@ -148,7 +148,7 @@ func (mmu *maintenanceModeUpdater) handleMaintenanceModeUpdate(ctx context.Conte
 	return nil
 }
 
-func (mmu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1ServiceList, error) {
+func (mmu *maintenanceModeController) getAllServices(ctx context.Context) (v1ServiceList, error) {
 	serviceList := &v1.ServiceList{}
 	err := mmu.client.List(ctx, serviceList, &client.ListOptions{Namespace: mmu.namespace})
 	if err != nil {
@@ -164,7 +164,7 @@ func (mmu *maintenanceModeUpdater) getAllServices(ctx context.Context) (v1Servic
 	return modifiableServiceList, nil
 }
 
-func (mmu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context) error {
+func (mmu *maintenanceModeController) deactivateMaintenanceMode(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("Deactivate maintenance mode...")
 
 	serviceList, err := mmu.getAllServices(ctx)
@@ -188,7 +188,7 @@ func (mmu *maintenanceModeUpdater) deactivateMaintenanceMode(ctx context.Context
 	return nil
 }
 
-func (mmu *maintenanceModeUpdater) activateMaintenanceMode(ctx context.Context) error {
+func (mmu *maintenanceModeController) activateMaintenanceMode(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("Activating maintenance mode...")
 
 	serviceList, err := mmu.getAllServices(ctx)

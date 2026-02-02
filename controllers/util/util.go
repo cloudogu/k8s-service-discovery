@@ -68,5 +68,5 @@ func GetMaintenanceModeActive(ctx context.Context, client k8sClient, namespace s
 
 func IsMaintenanceModeActive(config *corev1.ConfigMap) bool {
 	activeString, ok := config.Data["active"]
-	return ok && strings.TrimSpace(strings.ToLower(activeString)) == "true"
+	return ok && strings.ToLower(strings.TrimSpace(activeString)) == "true"
 }

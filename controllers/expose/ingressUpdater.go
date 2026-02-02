@@ -95,7 +95,6 @@ type IngressUpdaterDependencies struct {
 	DeploymentReadyChecker DeploymentReadyChecker
 	IngressInterface       ingressInterface
 	DoguInterface          doguInterface
-	GlobalConfigRepo       GlobalConfigRepository
 	Namespace              string
 	IngressClassName       string
 	Recorder               eventRecorder

@@ -3,11 +3,11 @@ package expose
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"testing"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
-	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,28 +17,24 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var testCtx = context.Background()
 
-func getGlobalConfigRepoMockWithMaintenance(t *testing.T, maintenanceMode bool) GlobalConfigRepository {
-	var entries registryconfig.Entries
-
-	if maintenanceMode {
-		entries = registryconfig.Entries{
-			"maintenance": "maintenance",
+func getK8sClientMockWithMaintenance(t *testing.T, maintenanceMode bool) k8sClient {
+	mck := newMockK8sClient(t)
+	mck.EXPECT().Get(testCtx, types.NamespacedName{
+		Namespace: testNamespace,
+		Name:      util.MaintenanceConfigMapName,
+	}, &corev1.ConfigMap{}).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
+		obj.(*corev1.ConfigMap).Data = map[string]string{
+			"active": strconv.FormatBool(maintenanceMode),
 		}
-	} else {
-		entries = registryconfig.Entries{}
-	}
+	}).Return(nil)
 
-	globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-	globalConfig := registryconfig.GlobalConfig{
-		Config: registryconfig.CreateConfig(entries),
-	}
-	globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-
-	return globalConfigRepoMock
+	return mck
 }
 
 const (
@@ -51,7 +47,7 @@ func TestNewIngressUpdater(t *testing.T) {
 		// given
 		ingressInterfaceMock := newMockIngressInterface(t)
 		doguInterfaceMock := newMockDoguInterface(t)
-		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
+		k8sClientMock := newMockK8sClient(t)
 		ingressControllerMock := newMockIngressController(t)
 		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
 
@@ -60,11 +56,11 @@ func TestNewIngressUpdater(t *testing.T) {
 			deploymentReadyCheckerMock,
 			ingressInterfaceMock,
 			doguInterfaceMock,
-			globalConfigRepoMock,
 			testNamespace,
 			testIngressClassName,
 			newMockEventRecorder(t),
 			ingressControllerMock,
+			k8sClientMock,
 		})
 
 		// then
@@ -79,10 +75,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
+			namespace: testNamespace,
+			k8sClient: k8sClientMock,
 		}
 
 		// when
@@ -100,10 +97,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
+			namespace: testNamespace,
+			k8sClient: k8sClientMock,
 		}
 
 		// when
@@ -126,10 +124,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
+			namespace: testNamespace,
+			k8sClient: k8sClientMock,
 		}
 
 		// when
@@ -167,11 +166,12 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(nil, assert.AnError)
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
-			doguInterface:    doguInterfaceMock,
+			namespace:     testNamespace,
+			k8sClient:     k8sClientMock,
+			doguInterface: doguInterfaceMock,
 		}
 
 		// when
@@ -209,12 +209,13 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(false, assert.AnError)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			namespace:              testNamespace,
+			k8sClient:              k8sClientMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			doguInterface:          doguInterfaceMock,
 		}
@@ -263,7 +264,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
@@ -274,7 +275,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			k8sClient:              k8sClientMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,
@@ -333,7 +334,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
@@ -346,7 +347,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		})
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			k8sClient:              k8sClientMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,
@@ -394,14 +395,14 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
 		ingressInterfaceMock := newMockIngressInterface(t)
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			k8sClient:              k8sClientMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,

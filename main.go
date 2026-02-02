@@ -305,7 +305,7 @@ func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalC
 		return fmt.Errorf("failed to setup loadbalancer reconciler with the manager: %w", err)
 	}
 
-	if err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, ingressUpdater, recorder).
+	if err := controllers.NewMaintenanceModeController(k8sManager.GetClient(), namespace, ingressUpdater, recorder).
 		SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup maintenance mode updater with the manager: %w", err)
 	}
