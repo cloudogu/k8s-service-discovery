@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+> [!IMPORTANT]
+> Breaking change!
+
+### Changed
+- [#96] Read maintenance mode from special `maintenance` ConfigMap
+  - Previously, the maintenance mode was read from the global config, 
+    which caused Dogus to restart unnecessarily.
 
 ## [v4.0.0] - 2025-11-27
 ### Removed
