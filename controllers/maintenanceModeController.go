@@ -3,20 +3,22 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	"strings"
+
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 
 	"github.com/hashicorp/go-multierror"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -37,6 +39,19 @@ type k8sClient interface {
 	client.Client
 }
 
+// NewMaintenanceModeController creates a new maintenance mode updater.
+func NewMaintenanceModeController(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) *maintenanceModeController {
+	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
+
+	return &maintenanceModeController{
+		client:          client,
+		namespace:       namespace,
+		ingressUpdater:  ingressUpdater,
+		eventRecorder:   recorder,
+		serviceRewriter: rewriter,
+	}
+}
+
 // maintenanceModeController is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeController struct {
 	client          k8sClient
@@ -55,9 +70,71 @@ func (mmu *maintenanceModeController) Reconcile(ctx context.Context, _ reconcile
 	return reconcile.Result{}, err
 }
 
-// SetupWithManager sets up the global configmap controller with the Manager.
-// The controller watches for changes to the global configmap and also reconciles when the redirect ingress object changes.
-func (mmu *maintenanceModeController) SetupWithManager(mgr ctrl.Manager) error {
+func (mmu *maintenanceModeController) handleMaintenanceModeUpdate(ctx context.Context) error {
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
+
+	isActive, err := util.GetMaintenanceModeActive(ctx, mmu.client, mmu.namespace)
+	if err != nil {
+		return err
+	}
+
+	err = mmu.setMaintenanceMode(ctx, isActive)
+	if err != nil {
+		return err
+	}
+
+	logger.Info(fmt.Sprintf("Maintenance mode changed to %t.", isActive))
+	return nil
+}
+
+func (mmu *maintenanceModeController) getAllServices(ctx context.Context) (v1ServiceList, error) {
+	serviceList := &v1.ServiceList{}
+	err := mmu.client.List(ctx, serviceList, &client.ListOptions{Namespace: mmu.namespace})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", mmu.namespace, err)
+	}
+
+	var modifiableServiceList v1ServiceList
+	for _, svc := range serviceList.Items {
+		copySvc := svc
+		modifiableServiceList = append(modifiableServiceList, &copySvc)
+	}
+
+	return modifiableServiceList, nil
+}
+
+func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, activate bool) error {
+	verb := "deactivate"
+	if activate {
+		verb = "activate"
+	}
+	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("%s maintenance mode...", cases.Title(language.English).String(verb)))
+
+	serviceList, err := mmu.getAllServices(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to %s maintenance mode: %w", verb, err)
+	}
+
+	for _, service := range serviceList {
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
+		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
+		if err != nil {
+			return fmt.Errorf("failed to %s maintenance mode: %w", verb, err)
+		}
+	}
+
+	err = mmu.serviceRewriter.rewrite(ctx, serviceList, activate)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite services on %s maintenance mode: %w", verb, err)
+	}
+
+	return nil
+}
+
+// SetupWithManager sets up the maintenance configmap controller with the Manager.
+// The controller watches for changes to the maintenance configmap.
+func (mmu *maintenanceModeController) SetupWithManager(mgr k8sManager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.ConfigMap{}, builder.WithPredicates(maintenancePredicate())).
 		Complete(mmu)
@@ -103,113 +180,6 @@ func maintenancePredicate() predicate.Funcs {
 			return getMaintenanceConfig(e.Object) != nil
 		},
 	}
-}
-
-// NewMaintenanceModeController creates a new maintenance mode updater.
-func NewMaintenanceModeController(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) *maintenanceModeController {
-	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
-
-	return &maintenanceModeController{
-		client:          client,
-		namespace:       namespace,
-		ingressUpdater:  ingressUpdater,
-		eventRecorder:   recorder,
-		serviceRewriter: rewriter,
-	}
-}
-
-func (mmu *maintenanceModeController) handleMaintenanceModeUpdate(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
-
-	isActive, err := util.GetMaintenanceModeActive(ctx, mmu.client, mmu.namespace)
-	if err != nil {
-		return err
-	}
-
-	if isActive {
-		err := mmu.activateMaintenanceMode(ctx)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := mmu.deactivateMaintenanceMode(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	deployment := &appsv1.Deployment{}
-	err = mmu.client.Get(ctx, types.NamespacedName{Name: "k8s-service-discovery-controller-manager", Namespace: mmu.namespace}, deployment)
-	if err != nil {
-		return fmt.Errorf("maintenance mode: failed to get deployment [%s]: %w", "k8s-service-discovery-controller-manager", err)
-	}
-	mmu.eventRecorder.Eventf(deployment, v1.EventTypeNormal, maintenanceChangeEventReason, "Maintenance mode changed to %t.", isActive)
-
-	return nil
-}
-
-func (mmu *maintenanceModeController) getAllServices(ctx context.Context) (v1ServiceList, error) {
-	serviceList := &v1.ServiceList{}
-	err := mmu.client.List(ctx, serviceList, &client.ListOptions{Namespace: mmu.namespace})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", mmu.namespace, err)
-	}
-
-	var modifiableServiceList v1ServiceList
-	for _, svc := range serviceList.Items {
-		copySvc := svc
-		modifiableServiceList = append(modifiableServiceList, &copySvc)
-	}
-
-	return modifiableServiceList, nil
-}
-
-func (mmu *maintenanceModeController) deactivateMaintenanceMode(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Deactivate maintenance mode...")
-
-	serviceList, err := mmu.getAllServices(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate maintenance mode: %w", err)
-	}
-
-	for _, service := range serviceList {
-		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = mmu.serviceRewriter.rewrite(ctx, serviceList, false)
-	if err != nil {
-		return fmt.Errorf("failed to rewrite services during maintenance mode deactivation: %w", err)
-	}
-
-	return nil
-}
-
-func (mmu *maintenanceModeController) activateMaintenanceMode(ctx context.Context) error {
-	ctrl.LoggerFrom(ctx).Info("Activating maintenance mode...")
-
-	serviceList, err := mmu.getAllServices(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to activate maintenance mode: %w", err)
-	}
-
-	for _, service := range serviceList {
-		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = mmu.serviceRewriter.rewrite(ctx, serviceList, true)
-	if err != nil {
-		return fmt.Errorf("failed to rewrite services during maintenance mode activation: %w", err)
-	}
-
-	return err
 }
 
 type defaultServiceRewriter struct {

@@ -10,10 +10,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type eventRecorder interface {
 	record.EventRecorder
+}
+
+type k8sManager interface {
+	ctrl.Manager
 }
 
 type GlobalConfigRepository interface {

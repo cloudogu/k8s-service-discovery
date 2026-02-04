@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -27,22 +30,17 @@ func TestNewMaintenanceModeUpdater(t *testing.T) {
 }
 
 func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
-	t.Run("activate maintenance mode successfully", func(t *testing.T) {
+	t.Run("fail to get maintenance mode config", func(t *testing.T) {
 		// given
-		ingressUpdater := NewMockIngressUpdater(t)
-		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
-
-		namespace := "myTestNamespace"
-		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
-		serviceList := &corev1.ServiceList{Items: []corev1.Service{*testService}}
-		maintenanceConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance", Namespace: namespace}, Data: map[string]string{"active": "true"}}
-		configMapList := &corev1.ConfigMapList{Items: []corev1.ConfigMap{*maintenanceConfigMap}}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList, configMapList).Build()
+		k8sClientMock := newMockK8sClient(t)
+		k8sClientMock.EXPECT().Get(testCtx, types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      "maintenance",
+		}, &corev1.ConfigMap{}).Return(assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
-			client:         clientMock,
-			namespace:      namespace,
-			ingressUpdater: ingressUpdater,
+			namespace: testNamespace,
+			client:    k8sClientMock,
 		}
 
 		// when
@@ -50,23 +48,22 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to get config for maintenance mode")
 	})
-	t.Run("activate maintenance mode with error", func(t *testing.T) {
+	t.Run("fail to list services", func(t *testing.T) {
 		// given
-		ingressUpdater := NewMockIngressUpdater(t)
-		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
-
-		namespace := "myTestNamespace"
-		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
-		serviceList := &corev1.ServiceList{Items: []corev1.Service{*testService}}
-		maintenanceConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance", Namespace: namespace}, Data: map[string]string{"active": "true"}}
-		configMapList := &corev1.ConfigMapList{Items: []corev1.ConfigMap{*maintenanceConfigMap}}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList, configMapList).Build()
+		k8sClientMock := newMockK8sClient(t)
+		k8sClientMock.EXPECT().Get(testCtx, types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      "maintenance",
+		}, &corev1.ConfigMap{}).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
+			obj.(*corev1.ConfigMap).Data = map[string]string{"active": "true"}
+		}).Return(nil)
+		k8sClientMock.EXPECT().List(testCtx, &corev1.ServiceList{}, &client.ListOptions{Namespace: testNamespace}).Return(assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
-			client:         clientMock,
-			namespace:      namespace,
-			ingressUpdater: ingressUpdater,
+			namespace: testNamespace,
+			client:    k8sClientMock,
 		}
 
 		// when
@@ -74,9 +71,10 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to activate maintenance mode")
+		assert.ErrorContains(t, err, "failed to get list of all services in namespace [my-namespace]")
 	})
-
-	t.Run("deactivate maintenance mode with error", func(t *testing.T) {
+	t.Run("fail to upsert ingress", func(t *testing.T) {
 		// given
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
@@ -99,19 +97,28 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
+		assert.ErrorContains(t, err, "failed to deactivate maintenance mode")
 	})
-
-	t.Run("should return error on get maintenance mode error", func(t *testing.T) {
+	t.Run("fail to rewrite service", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(testCtx, types.NamespacedName{
-			Namespace: testNamespace,
-			Name:      "maintenance",
-		}, &corev1.ConfigMap{}).Return(assert.AnError)
+		ingressUpdater := NewMockIngressUpdater(t)
+		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(nil)
+
+		namespace := "myTestNamespace"
+		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace, ResourceVersion: "999"}}
+		serviceList := &corev1.ServiceList{Items: []corev1.Service{*testService}}
+		maintenanceConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance", Namespace: namespace}, Data: map[string]string{"active": "false"}}
+		configMapList := &corev1.ConfigMapList{Items: []corev1.ConfigMap{*maintenanceConfigMap}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList, configMapList).Build()
+
+		rewriterMock := newMockServiceRewriter(t)
+		rewriterMock.EXPECT().rewrite(testCtx, v1ServiceList{testService}, false).Return(assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
-			namespace: testNamespace,
-			client:    k8sClientMock,
+			client:          clientMock,
+			namespace:       namespace,
+			ingressUpdater:  ingressUpdater,
+			serviceRewriter: rewriterMock,
 		}
 
 		// when
@@ -119,9 +126,38 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get config for maintenance mode")
+		assert.ErrorContains(t, err, "failed to rewrite services on deactivate maintenance mode")
+	})
+	t.Run("success", func(t *testing.T) {
+		// given
+		ingressUpdater := NewMockIngressUpdater(t)
+		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(nil)
+
+		namespace := "myTestNamespace"
+		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace, ResourceVersion: "999"}}
+		serviceList := &corev1.ServiceList{Items: []corev1.Service{*testService}}
+		maintenanceConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance", Namespace: namespace}, Data: map[string]string{"active": "true"}}
+		configMapList := &corev1.ConfigMapList{Items: []corev1.ConfigMap{*maintenanceConfigMap}}
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList, configMapList).Build()
+
+		rewriterMock := newMockServiceRewriter(t)
+		rewriterMock.EXPECT().rewrite(testCtx, v1ServiceList{testService}, true).Return(nil)
+
+		maintenanceUpdater := &maintenanceModeController{
+			client:          clientMock,
+			namespace:       namespace,
+			ingressUpdater:  ingressUpdater,
+			serviceRewriter: rewriterMock,
+		}
+
+		// when
+		_, err := maintenanceUpdater.Reconcile(context.Background(), reconcile.Request{})
+
+		// then
+		require.NoError(t, err)
 	})
 }
+
 func Test_isServiceNginxRelated(t *testing.T) {
 	t.Run("should return true for nginx-prefixed dogu service", func(t *testing.T) {
 		svc := &corev1.Service{Spec: corev1.ServiceSpec{
@@ -363,151 +399,38 @@ func Test_defaultServiceRewriter_rewrite(t *testing.T) {
 		assert.ErrorContains(t, err, "could not rewrite service nexus")
 	})
 }
-func Test_maintenanceModeUpdater_getAllServices(t *testing.T) {
-	t.Run("should return error from the API", func(t *testing.T) {
-		// given
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
 
-		sut := &maintenanceModeController{
-			client:    clientMock,
-			namespace: "el-espacio-del-nombre",
-		}
+func Test_maintenanceModeController_SetupWithManager(t *testing.T) {
+	sut := &maintenanceModeController{}
+	managerMock := newMockK8sManager(t)
+	managerMock.EXPECT().GetControllerOptions().Return(config.Controller{})
+	managerMock.EXPECT().GetScheme().Return(getScheme())
+	managerMock.EXPECT().GetLogger().Return(logr.New(nil))
+	managerMock.EXPECT().Add(mock.Anything).Return(nil)
+	managerMock.EXPECT().GetCache().Return(nil)
 
-		// when
-		_, err := sut.getAllServices(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get list of all services in namespace [el-espacio-del-nombre]:")
-	})
-
-	t.Run("should return multiple services", func(t *testing.T) {
-		// given
-		clientMock := newMockK8sClient(t)
-		serviceA := corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "A and not equal B"}}
-		serviceB := corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "B and not equal A"}}
-		services := []corev1.Service{serviceA, serviceB}
-		serviceList := &corev1.ServiceList{Items: services}
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Run(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-			c := list.(*corev1.ServiceList)
-			c.Items = serviceList.Items
-		}).Return(nil)
-
-		sut := &maintenanceModeController{
-			client:    clientMock,
-			namespace: "el-espacio-del-nombre",
-		}
-
-		// when
-		result, err := sut.getAllServices(testCtx)
-
-		// then
-		require.NoError(t, err)
-		assert.Len(t, result, 2)
-		assert.NotEqual(t, result[0].Name, result[1].Name)
-	})
+	err := sut.SetupWithManager(managerMock)
+	assert.NoError(t, err)
 }
-func Test_maintenanceModeUpdater_deactivateMaintenanceMode(t *testing.T) {
-	t.Run("should error on listing services", func(t *testing.T) {
-		// given
-		noopRec := newMockEventRecorder(t)
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
-		updateMock := NewMockIngressUpdater(t)
-		svcRewriter := newMockServiceRewriter(t)
 
-		sut := &maintenanceModeController{
-			client:          clientMock,
-			namespace:       "el-espacio-del-nombre",
-			eventRecorder:   noopRec,
-			ingressUpdater:  updateMock,
-			serviceRewriter: svcRewriter,
-		}
+func Test_maintenancePredicate(t *testing.T) {
+	sut := maintenancePredicate()
+	assert.False(t, sut.Create(event.CreateEvent{Object: &corev1.Service{}}))
+	assert.False(t, sut.Generic(event.GenericEvent{Object: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "nginx-config"}}}))
+	assert.True(t, sut.Delete(event.DeleteEvent{Object: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}}}))
 
-		// when
-		err := sut.deactivateMaintenanceMode(testCtx)
+	updateIfBothNil := sut.Update(event.UpdateEvent{ObjectOld: &corev1.Service{}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "nginx-config"}}})
+	assert.False(t, updateIfBothNil)
 
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get list of all services")
-	})
-	t.Run("should error on rewriting service", func(t *testing.T) {
-		// given
-		noopRec := newMockEventRecorder(t)
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(nil)
-		updateMock := NewMockIngressUpdater(t)
-		svcRewriter := newMockServiceRewriter(t)
-		svcRewriter.EXPECT().rewrite(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
+	updateIfOneNonNil := sut.Update(event.UpdateEvent{ObjectOld: &corev1.Service{}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}}})
+	assert.True(t, updateIfOneNonNil)
 
-		sut := &maintenanceModeController{
-			client:          clientMock,
-			namespace:       "el-espacio-del-nombre",
-			eventRecorder:   noopRec,
-			ingressUpdater:  updateMock,
-			serviceRewriter: svcRewriter,
-		}
+	updateIfOneIsActive := sut.Update(event.UpdateEvent{ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "true"}}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "false"}}})
+	assert.True(t, updateIfOneIsActive)
 
-		// when
-		err := sut.deactivateMaintenanceMode(testCtx)
+	updateIfBothActive := sut.Update(event.UpdateEvent{ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "true"}}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "true"}}})
+	assert.False(t, updateIfBothActive)
 
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to rewrite services during maintenance mode deactivation")
-	})
-}
-func Test_maintenanceModeUpdater_activateMaintenanceMode(t *testing.T) {
-	t.Run("should error on listing services", func(t *testing.T) {
-		// given
-		noopRec := newMockEventRecorder(t)
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
-		updateMock := NewMockIngressUpdater(t)
-		svcRewriter := newMockServiceRewriter(t)
-
-		sut := &maintenanceModeController{
-			client:          clientMock,
-			namespace:       "el-espacio-del-nombre",
-			eventRecorder:   noopRec,
-			ingressUpdater:  updateMock,
-			serviceRewriter: svcRewriter,
-		}
-
-		// when
-		err := sut.activateMaintenanceMode(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get list of all services")
-	})
-	t.Run("should error on rewriting service", func(t *testing.T) {
-		// given
-		noopRec := newMockEventRecorder(t)
-		clientMock := newMockK8sClient(t)
-		clientMock.EXPECT().List(testCtx, mock.Anything, mock.Anything).Return(nil)
-		updateMock := NewMockIngressUpdater(t)
-		svcRewriter := newMockServiceRewriter(t)
-		svcRewriter.EXPECT().rewrite(testCtx, mock.Anything, mock.Anything).Return(assert.AnError)
-
-		sut := &maintenanceModeController{
-			client:          clientMock,
-			namespace:       "el-espacio-del-nombre",
-			eventRecorder:   noopRec,
-			ingressUpdater:  updateMock,
-			serviceRewriter: svcRewriter,
-		}
-
-		// when
-		err := sut.activateMaintenanceMode(testCtx)
-
-		// then
-		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to rewrite services during maintenance mode activation")
-	})
+	updateIfBothInactive := sut.Update(event.UpdateEvent{ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "false"}}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "false"}}})
+	assert.False(t, updateIfBothInactive)
 }
