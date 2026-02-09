@@ -3,10 +3,9 @@ package expose
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"testing"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/stretchr/testify/assert"
@@ -17,22 +16,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var testCtx = context.Background()
 
-func getK8sClientMockWithMaintenance(t *testing.T, maintenanceMode bool) k8sClient {
-	mck := newMockK8sClient(t)
-	mck.EXPECT().Get(testCtx, types.NamespacedName{
-		Namespace: testNamespace,
-		Name:      util.MaintenanceConfigMapName,
-	}, &corev1.ConfigMap{}).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-		obj.(*corev1.ConfigMap).Data = map[string]string{
-			"active": strconv.FormatBool(maintenanceMode),
-		}
-	}).Return(nil)
+func getMaintenanceAdapterMock(t *testing.T, maintenanceMode bool) maintenanceAdapter {
+	mck := newMockMaintenanceAdapter(t)
+	mck.EXPECT().IsActive(testCtx).Return(maintenanceMode, nil)
 
 	return mck
 }
@@ -47,7 +37,7 @@ func TestNewIngressUpdater(t *testing.T) {
 		// given
 		ingressInterfaceMock := newMockIngressInterface(t)
 		doguInterfaceMock := newMockDoguInterface(t)
-		k8sClientMock := newMockK8sClient(t)
+		maintenanceAdapterMock := newMockMaintenanceAdapter(t)
 		ingressControllerMock := newMockIngressController(t)
 		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
 
@@ -60,7 +50,7 @@ func TestNewIngressUpdater(t *testing.T) {
 			testIngressClassName,
 			newMockEventRecorder(t),
 			ingressControllerMock,
-			k8sClientMock,
+			maintenanceAdapterMock,
 		})
 
 		// then
@@ -75,11 +65,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
 
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			namespace: testNamespace,
-			k8sClient: k8sClientMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -97,11 +87,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			namespace: testNamespace,
-			k8sClient: k8sClientMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -124,11 +114,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			namespace: testNamespace,
-			k8sClient: k8sClientMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -166,12 +156,12 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(nil, assert.AnError)
 
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			namespace:     testNamespace,
-			k8sClient:     k8sClientMock,
-			doguInterface: doguInterfaceMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
+			doguInterface:      doguInterfaceMock,
 		}
 
 		// when
@@ -209,13 +199,13 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(false, assert.AnError)
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 
 		sut := ingressUpdater{
 			namespace:              testNamespace,
-			k8sClient:              k8sClientMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			doguInterface:          doguInterfaceMock,
 		}
@@ -264,7 +254,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
@@ -275,7 +265,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
 
 		sut := ingressUpdater{
-			k8sClient:              k8sClientMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,
@@ -334,7 +324,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
@@ -347,7 +337,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		})
 
 		sut := ingressUpdater{
-			k8sClient:              k8sClientMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,
@@ -395,14 +385,14 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		k8sClientMock := getK8sClientMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
 		ingressInterfaceMock := newMockIngressInterface(t)
 
 		sut := ingressUpdater{
-			k8sClient:              k8sClientMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,

@@ -3,15 +3,14 @@ package expose
 import (
 	"context"
 
-	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
+	doguClient "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type k8sClient interface {
-	client.Client
+type maintenanceAdapter interface {
+	IsActive(ctx context.Context) (bool, error)
 }
 
 // DeploymentReadyChecker checks the readiness from deployments.
@@ -39,7 +38,7 @@ type ingressInterface interface {
 }
 
 type doguInterface interface {
-	ecoSystem.DoguInterface
+	doguClient.DoguInterface
 }
 
 type ingressController interface {

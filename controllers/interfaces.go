@@ -13,6 +13,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+type MaintenanceAdapter interface {
+	IsActive(ctx context.Context) (bool, error)
+}
+
 type eventRecorder interface {
 	record.EventRecorder
 }

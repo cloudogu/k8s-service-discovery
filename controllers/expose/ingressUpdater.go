@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
@@ -78,7 +78,6 @@ func (sr *serviceRewrite) generateConfig() string {
 }
 
 type ingressUpdater struct {
-	k8sClient k8sClient
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
@@ -89,6 +88,7 @@ type ingressUpdater struct {
 	controller             ingressController
 	ingressInterface       ingressInterface
 	doguInterface          doguInterface
+	maintenanceAdapter     maintenanceAdapter
 }
 
 type IngressUpdaterDependencies struct {
@@ -99,7 +99,7 @@ type IngressUpdaterDependencies struct {
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
-	K8sClient              k8sClient
+	MaintenanceAdapter     maintenanceAdapter
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
@@ -112,12 +112,13 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 		controller:             deps.Controller,
 		ingressInterface:       deps.IngressInterface,
 		doguInterface:          deps.DoguInterface,
+		maintenanceAdapter:     deps.MaintenanceAdapter,
 	}
 }
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := util.GetMaintenanceModeActive(ctx, i.k8sClient, i.namespace)
+	isMaintenanceMode, err := i.maintenanceAdapter.IsActive(ctx)
 	if err != nil {
 		return err
 	}

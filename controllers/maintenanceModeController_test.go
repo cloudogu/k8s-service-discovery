@@ -23,7 +23,7 @@ var testCtx = context.Background()
 func TestNewMaintenanceModeUpdater(t *testing.T) {
 	t.Run("successfully create updater", func(t *testing.T) {
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).Build()
-		creator := NewMaintenanceModeController(clientMock, "test", NewMockIngressUpdater(t), newMockEventRecorder(t))
+		creator := NewMaintenanceModeController(clientMock, "test", NewMockIngressUpdater(t), NewMockMaintenanceAdapter(t), newMockEventRecorder(t))
 
 		require.NotEmpty(t, creator)
 	})
@@ -32,15 +32,11 @@ func TestNewMaintenanceModeUpdater(t *testing.T) {
 func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	t.Run("fail to get maintenance mode config", func(t *testing.T) {
 		// given
-		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(testCtx, types.NamespacedName{
-			Namespace: testNamespace,
-			Name:      "maintenance",
-		}, &corev1.ConfigMap{}).Return(assert.AnError)
+		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
+		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(false, assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
-			namespace: testNamespace,
-			client:    k8sClientMock,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -48,22 +44,19 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, assert.AnError)
-		assert.ErrorContains(t, err, "failed to get config for maintenance mode")
 	})
 	t.Run("fail to list services", func(t *testing.T) {
 		// given
+		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
+		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(true, nil)
+
 		k8sClientMock := newMockK8sClient(t)
-		k8sClientMock.EXPECT().Get(testCtx, types.NamespacedName{
-			Namespace: testNamespace,
-			Name:      "maintenance",
-		}, &corev1.ConfigMap{}).Run(func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) {
-			obj.(*corev1.ConfigMap).Data = map[string]string{"active": "true"}
-		}).Return(nil)
 		k8sClientMock.EXPECT().List(testCtx, &corev1.ServiceList{}, &client.ListOptions{Namespace: testNamespace}).Return(assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
-			namespace: testNamespace,
-			client:    k8sClientMock,
+			namespace:          testNamespace,
+			client:             k8sClientMock,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -76,20 +69,22 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	})
 	t.Run("fail to upsert ingress", func(t *testing.T) {
 		// given
+		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
+		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(false, nil)
+
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace}}
 		serviceList := &corev1.ServiceList{Items: []corev1.Service{*testService}}
-		maintenanceConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance", Namespace: namespace}, Data: map[string]string{"active": "false"}}
-		configMapList := &corev1.ConfigMapList{Items: []corev1.ConfigMap{*maintenanceConfigMap}}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList, configMapList).Build()
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList).Build()
 
 		maintenanceUpdater := &maintenanceModeController{
-			client:         clientMock,
-			namespace:      namespace,
-			ingressUpdater: ingressUpdater,
+			client:             clientMock,
+			namespace:          namespace,
+			ingressUpdater:     ingressUpdater,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -101,6 +96,9 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	})
 	t.Run("fail to rewrite service", func(t *testing.T) {
 		// given
+		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
+		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(false, nil)
+
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(nil)
 
@@ -115,10 +113,11 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 		rewriterMock.EXPECT().rewrite(testCtx, v1ServiceList{testService}, false).Return(assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
-			client:          clientMock,
-			namespace:       namespace,
-			ingressUpdater:  ingressUpdater,
-			serviceRewriter: rewriterMock,
+			client:             clientMock,
+			namespace:          namespace,
+			ingressUpdater:     ingressUpdater,
+			serviceRewriter:    rewriterMock,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -130,24 +129,26 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	})
 	t.Run("success", func(t *testing.T) {
 		// given
+		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
+		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(true, nil)
+
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(nil)
 
 		namespace := "myTestNamespace"
 		testService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "testService", Namespace: namespace, ResourceVersion: "999"}}
 		serviceList := &corev1.ServiceList{Items: []corev1.Service{*testService}}
-		maintenanceConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance", Namespace: namespace}, Data: map[string]string{"active": "true"}}
-		configMapList := &corev1.ConfigMapList{Items: []corev1.ConfigMap{*maintenanceConfigMap}}
-		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList, configMapList).Build()
+		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithLists(serviceList).Build()
 
 		rewriterMock := newMockServiceRewriter(t)
 		rewriterMock.EXPECT().rewrite(testCtx, v1ServiceList{testService}, true).Return(nil)
 
 		maintenanceUpdater := &maintenanceModeController{
-			client:          clientMock,
-			namespace:       namespace,
-			ingressUpdater:  ingressUpdater,
-			serviceRewriter: rewriterMock,
+			client:             clientMock,
+			namespace:          namespace,
+			ingressUpdater:     ingressUpdater,
+			serviceRewriter:    rewriterMock,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when

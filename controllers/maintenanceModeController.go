@@ -2,25 +2,23 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"strings"
-
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
-
-	"github.com/hashicorp/go-multierror"
 	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 )
 
 const (
@@ -40,25 +38,27 @@ type k8sClient interface {
 }
 
 // NewMaintenanceModeController creates a new maintenance mode updater.
-func NewMaintenanceModeController(client k8sClient, namespace string, ingressUpdater IngressUpdater, recorder eventRecorder) *maintenanceModeController {
+func NewMaintenanceModeController(client k8sClient, namespace string, ingressUpdater IngressUpdater, maintenanceAdapter MaintenanceAdapter, recorder eventRecorder) *maintenanceModeController {
 	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
 
 	return &maintenanceModeController{
-		client:          client,
-		namespace:       namespace,
-		ingressUpdater:  ingressUpdater,
-		eventRecorder:   recorder,
-		serviceRewriter: rewriter,
+		client:             client,
+		namespace:          namespace,
+		ingressUpdater:     ingressUpdater,
+		eventRecorder:      recorder,
+		serviceRewriter:    rewriter,
+		maintenanceAdapter: maintenanceAdapter,
 	}
 }
 
 // maintenanceModeController is responsible to update all ingress objects according to the desired maintenance mode.
 type maintenanceModeController struct {
-	client          k8sClient
-	namespace       string
-	ingressUpdater  IngressUpdater
-	eventRecorder   eventRecorder
-	serviceRewriter serviceRewriter
+	client             k8sClient
+	namespace          string
+	ingressUpdater     IngressUpdater
+	eventRecorder      eventRecorder
+	serviceRewriter    serviceRewriter
+	maintenanceAdapter MaintenanceAdapter
 }
 
 func (mmu *maintenanceModeController) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
@@ -74,7 +74,7 @@ func (mmu *maintenanceModeController) handleMaintenanceModeUpdate(ctx context.Co
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := util.GetMaintenanceModeActive(ctx, mmu.client, mmu.namespace)
+	isActive, err := mmu.maintenanceAdapter.IsActive(ctx)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func getMaintenanceConfig(object client.Object) *v1.ConfigMap {
 		return nil
 	}
 
-	if configMap.Name != util.MaintenanceConfigMapName {
+	if configMap.Name != repository.MaintenanceConfigMapName {
 		return nil
 	}
 
@@ -170,8 +170,8 @@ func maintenancePredicate() predicate.Funcs {
 				return true
 			}
 
-			return util.IsMaintenanceModeActive(configOld) !=
-				util.IsMaintenanceModeActive(configNew)
+			return repository.IsMaintenanceModeActive(configOld) !=
+				repository.IsMaintenanceModeActive(configNew)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return getMaintenanceConfig(e.Object) != nil
@@ -189,15 +189,15 @@ type defaultServiceRewriter struct {
 }
 
 func (sw *defaultServiceRewriter) rewrite(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error {
-	var err error
+	var errs []error
 	for _, service := range serviceList {
 		rewriteErr := rewriteNonSimpleServiceRoute(ctx, sw.client, sw.eventRecorder, service, activateMaintenanceMode)
 		if rewriteErr != nil {
-			err = multierror.Append(err, rewriteErr)
+			errs = append(errs, rewriteErr)
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 func rewriteNonSimpleServiceRoute(ctx context.Context, cli k8sClient, recorder eventRecorder, service *v1.Service, rewriteToMaintenance bool) error {
