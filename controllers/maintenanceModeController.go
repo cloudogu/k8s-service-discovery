@@ -137,6 +137,7 @@ func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, ac
 func (mmu *maintenanceModeController) SetupWithManager(mgr k8sManager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.ConfigMap{}, builder.WithPredicates(maintenancePredicate())).
+		Named("maintenance").
 		Complete(mmu)
 }
 
