@@ -1,14 +1,11 @@
 package util
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -18,10 +15,6 @@ const (
 	appLabelKey      = "app"
 	appLabelValueCes = "ces"
 	legacyDoguLabel  = "dogu"
-)
-
-const (
-	MaintenanceConfigMapName = "maintenance"
 )
 
 type ExposedPorts []ExposedPort
@@ -52,21 +45,4 @@ func HasDoguLabel(deployment client.Object) bool {
 
 func GetAppLabel() map[string]string {
 	return map[string]string{appLabelKey: appLabelValueCes}
-}
-
-func GetMaintenanceModeActive(ctx context.Context, client k8sClient, namespace string) (bool, error) {
-	maintenanceConfig := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Name: MaintenanceConfigMapName, Namespace: namespace}, maintenanceConfig)
-	if errors.IsNotFound(err) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("failed to get config for maintenance mode: %w", err)
-	}
-
-	return IsMaintenanceModeActive(maintenanceConfig), nil
-}
-
-func IsMaintenanceModeActive(config *corev1.ConfigMap) bool {
-	activeString, ok := config.Data["active"]
-	return ok && strings.ToLower(strings.TrimSpace(activeString)) == "true"
 }
