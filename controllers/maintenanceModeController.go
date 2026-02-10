@@ -13,7 +13,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -141,46 +140,10 @@ func (mmu *maintenanceModeController) SetupWithManager(mgr k8sManager) error {
 		Complete(mmu)
 }
 
-func getMaintenanceConfig(object client.Object) *v1.ConfigMap {
-	configMap, ok := object.(*v1.ConfigMap)
-	if !ok {
-		return nil
-	}
-
-	if configMap.Name != repository.MaintenanceConfigMapName {
-		return nil
-	}
-
-	return configMap
-}
-
 func maintenancePredicate() predicate.Funcs {
-	return predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return getMaintenanceConfig(e.Object) != nil
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			configOld := getMaintenanceConfig(e.ObjectOld)
-			configNew := getMaintenanceConfig(e.ObjectNew)
-
-			if configOld == nil && configNew == nil {
-				return false
-			}
-
-			if configOld == nil || configNew == nil {
-				return true
-			}
-
-			return repository.IsMaintenanceModeActive(configOld) !=
-				repository.IsMaintenanceModeActive(configNew)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return getMaintenanceConfig(e.Object) != nil
-		},
-		GenericFunc: func(e event.TypedGenericEvent[client.Object]) bool {
-			return getMaintenanceConfig(e.Object) != nil
-		},
-	}
+	return predicate.NewPredicateFuncs(func(object client.Object) bool {
+		return object.GetName() == repository.MaintenanceConfigMapName
+	})
 }
 
 type defaultServiceRewriter struct {
