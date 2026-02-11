@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,7 +34,7 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	t.Run("fail to get maintenance mode config", func(t *testing.T) {
 		// given
 		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
-		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(false, assert.AnError)
+		maintenanceAdapterMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, assert.AnError)
 
 		maintenanceUpdater := &maintenanceModeController{
 			maintenanceAdapter: maintenanceAdapterMock,
@@ -48,7 +49,7 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	t.Run("fail to list services", func(t *testing.T) {
 		// given
 		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
-		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(true, nil)
+		maintenanceAdapterMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 		k8sClientMock := newMockK8sClient(t)
 		k8sClientMock.EXPECT().List(testCtx, &corev1.ServiceList{}, &client.ListOptions{Namespace: testNamespace}).Return(assert.AnError)
@@ -70,7 +71,7 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	t.Run("fail to upsert ingress", func(t *testing.T) {
 		// given
 		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
-		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(false, nil)
+		maintenanceAdapterMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil)
 
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(assert.AnError)
@@ -97,7 +98,7 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	t.Run("fail to rewrite service", func(t *testing.T) {
 		// given
 		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
-		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(false, nil)
+		maintenanceAdapterMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, false, nil)
 
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(nil)
@@ -130,7 +131,7 @@ func Test_maintenanceModeUpdater_Reconcile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
 		maintenanceAdapterMock := NewMockMaintenanceAdapter(t)
-		maintenanceAdapterMock.EXPECT().IsActive(testCtx).Return(true, nil)
+		maintenanceAdapterMock.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, true, nil)
 
 		ingressUpdater := NewMockIngressUpdater(t)
 		ingressUpdater.EXPECT().UpsertIngressForService(mock.Anything, mock.Anything).Return(nil)

@@ -118,7 +118,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := i.maintenanceAdapter.IsActive(ctx)
+	_, isMaintenanceMode, err := i.maintenanceAdapter.GetStatus(ctx)
 	if err != nil {
 		return err
 	}

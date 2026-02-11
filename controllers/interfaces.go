@@ -14,7 +14,7 @@ import (
 )
 
 type MaintenanceAdapter interface {
-	IsActive(ctx context.Context) (bool, error)
+	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
 }
 
 type eventRecorder interface {

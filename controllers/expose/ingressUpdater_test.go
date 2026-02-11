@@ -7,6 +7,7 @@ import (
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,7 +23,7 @@ var testCtx = context.Background()
 
 func getMaintenanceAdapterMock(t *testing.T, maintenanceMode bool) maintenanceAdapter {
 	mck := newMockMaintenanceAdapter(t)
-	mck.EXPECT().IsActive(testCtx).Return(maintenanceMode, nil)
+	mck.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, maintenanceMode, nil)
 
 	return mck
 }

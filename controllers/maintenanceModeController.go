@@ -73,7 +73,7 @@ func (mmu *maintenanceModeController) handleMaintenanceModeUpdate(ctx context.Co
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Maintenance mode key changed in registry. Refresh ingress objects accordingly...")
 
-	isActive, err := mmu.maintenanceAdapter.IsActive(ctx)
+	_, isActive, err := mmu.maintenanceAdapter.GetStatus(ctx)
 	if err != nil {
 		return err
 	}

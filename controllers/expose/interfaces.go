@@ -4,13 +4,14 @@ import (
 	"context"
 
 	doguClient "github.com/cloudogu/k8s-dogu-lib/v2/client"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
 )
 
 type maintenanceAdapter interface {
-	IsActive(ctx context.Context) (bool, error)
+	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
 }
 
 // DeploymentReadyChecker checks the readiness from deployments.
