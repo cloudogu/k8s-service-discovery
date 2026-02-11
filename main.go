@@ -16,6 +16,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
+	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -118,6 +119,11 @@ func startManager() error {
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 
+	dynamicClient, err := dynamic.NewForConfig(serviceDiscManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
 		DeploymentReadyChecker: deploymentReadyChecker,
 		IngressInterface:       clientSet.ingressClient,
@@ -127,6 +133,7 @@ func startManager() error {
 		IngressClassName:       IngressClassName,
 		Recorder:               eventRecorder,
 		Controller:             controller,
+		DynamicClient:          dynamicClient,
 	})
 
 	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
