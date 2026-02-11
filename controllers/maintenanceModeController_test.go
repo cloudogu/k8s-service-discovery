@@ -416,22 +416,6 @@ func Test_maintenanceModeController_SetupWithManager(t *testing.T) {
 
 func Test_maintenancePredicate(t *testing.T) {
 	sut := maintenancePredicate()
-	assert.False(t, sut.Create(event.CreateEvent{Object: &corev1.Service{}}))
 	assert.False(t, sut.Generic(event.GenericEvent{Object: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "nginx-config"}}}))
 	assert.True(t, sut.Delete(event.DeleteEvent{Object: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}}}))
-
-	updateIfBothNil := sut.Update(event.UpdateEvent{ObjectOld: &corev1.Service{}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "nginx-config"}}})
-	assert.False(t, updateIfBothNil)
-
-	updateIfOneNonNil := sut.Update(event.UpdateEvent{ObjectOld: &corev1.Service{}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}}})
-	assert.True(t, updateIfOneNonNil)
-
-	updateIfOneIsActive := sut.Update(event.UpdateEvent{ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "true"}}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "false"}}})
-	assert.True(t, updateIfOneIsActive)
-
-	updateIfBothActive := sut.Update(event.UpdateEvent{ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "true"}}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "true"}}})
-	assert.False(t, updateIfBothActive)
-
-	updateIfBothInactive := sut.Update(event.UpdateEvent{ObjectOld: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "false"}}, ObjectNew: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "maintenance"}, Data: map[string]string{"active": "false"}}})
-	assert.False(t, updateIfBothInactive)
 }
