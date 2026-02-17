@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.25.4 AS builder
+FROM golang:1.26.0 AS builder
 
 WORKDIR /workspace
 
@@ -32,7 +32,7 @@ RUN make compile-generic
 FROM gcr.io/distroless/static:nonroot
 LABEL maintainer="hello@cloudogu.com" \
       NAME="k8s-service-discovery" \
-      VERSION="4.0.0"
+      VERSION="4.0.1"
 
 WORKDIR /
 
