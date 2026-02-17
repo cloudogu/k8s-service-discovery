@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	networking "k8s.io/api/networking/v1"
@@ -13,11 +14,12 @@ import (
 )
 
 const (
-	redirectAnnotation   = "nginx.ingress.kubernetes.io/server-snippet"
-	redirectIngressPath  = "/"
-	redirectPathType     = networking.PathTypePrefix
-	redirectEndpointName = "ces-loadbalancer"
-	redirectEndpointPort = 443
+	redirectAnnotation     = "traefik.ingress.kubernetes.io/router.middlewares"
+	redirectMiddlewareName = "alternative-fqdn@kubernetescrd"
+	redirectIngressPath    = "/"
+	redirectPathType       = networking.PathTypePrefix
+	redirectEndpointName   = "ces-loadbalancer"
+	redirectEndpointPort   = 443
 )
 
 type IngressRedirector struct {
@@ -25,7 +27,7 @@ type IngressRedirector struct {
 	ingressInterface ingressInterface
 }
 
-func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error {
+func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error, middlewareManager *expose.MiddlewareManager) error {
 	logger := log.FromContext(ctx)
 
 	if len(altFQDNList) == 0 {
@@ -39,6 +41,8 @@ func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespac
 	}
 
 	redirectIngress := i.createRedirectIngress(namespace, redirectObjectName, fqdn, groupFQDNsBySecretName(altFQDNList))
+
+	createRedirectMiddleware(ctx, fqdn, altFQDNList, redirectIngress, middlewareManager)
 
 	if oErr := setOwner(redirectIngress); oErr != nil {
 		return fmt.Errorf("failed to set owner for redirect ingress: %w", oErr)
@@ -55,9 +59,8 @@ func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespac
 
 func (i IngressRedirector) createRedirectIngress(namespace string, objectName string, fqdn string, altFQDNMap map[string][]string) *networking.Ingress {
 	annotations := map[string]string{
-		redirectAnnotation: fmt.Sprintf("return 308 https://%s$request_uri;", fqdn),
+		redirectAnnotation: redirectMiddlewareName,
 	}
-
 	fdns := make([]string, 0, len(altFQDNMap))
 	tlsList := make([]networking.IngressTLS, 0, len(altFQDNMap))
 	for certificateName, fqdnList := range altFQDNMap {
@@ -154,4 +157,26 @@ func groupFQDNsBySecretName(altFQDNList []types.AlternativeFQDN) map[string][]st
 	}
 
 	return result
+}
+
+// createRedirectMiddleware creates a traefik alternative-fqdn middleware for the given ingress
+func createRedirectMiddleware(ctx context.Context, primaryFqdn string, fqdnList []types.AlternativeFQDN, owner *networking.Ingress, middlewareManager *expose.MiddlewareManager) error {
+	ownerReferences := []metav1.OwnerReference{{
+		APIVersion: owner.TypeMeta.APIVersion,
+		Kind:       owner.TypeMeta.Kind,
+		Name:       owner.ObjectMeta.Name,
+		UID:        owner.ObjectMeta.UID,
+	}}
+
+	fqdns := make([]string, len(fqdnList))
+	for i, f := range fqdnList {
+		fqdns[i] = f.FQDN
+	}
+
+	_, err := middlewareManager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(ctx, fqdns, primaryFqdn, ownerReferences)
+	if err != nil {
+		return fmt.Errorf("failed to create or update traefik alternative-fqdn middleware: %w", err)
+	}
+
+	return nil
 }

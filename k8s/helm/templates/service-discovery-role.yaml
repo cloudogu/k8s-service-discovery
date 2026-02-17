@@ -57,3 +57,14 @@ rules:
       - create
       - update
       - delete
+  # create and update traefik middlewares for dogus
+  - apiGroups:
+      - traefik.io
+    resources:
+      - middlewares
+    verbs:
+      - get
+      - list
+      - create
+      - update
+      - delete

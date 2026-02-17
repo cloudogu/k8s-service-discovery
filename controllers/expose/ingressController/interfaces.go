@@ -3,6 +3,7 @@ package ingressController
 import (
 	"context"
 
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -18,7 +19,7 @@ type ingressInterface interface {
 }
 
 type AlternativeFQDNRedirector interface {
-	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error
+	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error, middlewareManager *expose.MiddlewareManager) error
 }
 
 type PortExposer interface {

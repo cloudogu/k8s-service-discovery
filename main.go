@@ -16,7 +16,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
-	"k8s.io/client-go/dynamic"
+	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -119,9 +119,9 @@ func startManager() error {
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 
-	dynamicClient, err := dynamic.NewForConfig(serviceDiscManager.GetConfig())
+	traefikClient, err := traefikv1alpha1.NewForConfig(serviceDiscManager.GetConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %w", err)
+		return fmt.Errorf("failed to create traefik client: %w", err)
 	}
 
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
@@ -133,7 +133,7 @@ func startManager() error {
 		IngressClassName:       IngressClassName,
 		Recorder:               eventRecorder,
 		Controller:             controller,
-		DynamicClient:          dynamicClient,
+		TraefikClient:          traefikClient,
 	})
 
 	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
@@ -161,6 +161,7 @@ func startManager() error {
 		networkPolicyUpdater,
 		networkpoliciesEnabled,
 		certSync,
+		watchNamespace,
 	); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
@@ -212,6 +213,7 @@ func configureManager(
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
+	namespace string,
 ) error {
 	if err := configureReconciler(
 		k8sManager,
@@ -222,6 +224,7 @@ func configureManager(
 		networkPolicyUpdater,
 		networkPoliciesEnabled,
 		certSync,
+		namespace,
 	); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
@@ -307,6 +310,7 @@ func configureReconciler(
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
+	namespace string,
 ) error {
 	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater, networkPoliciesEnabled)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
@@ -323,10 +327,17 @@ func configureReconciler(
 		return fmt.Errorf("failed to setup ecosystem certificate reconciler with the manager: %w", err)
 	}
 
+	traefikClient, err := traefikv1alpha1.NewForConfig(k8sManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create traefik client: %w", err)
+	}
+
 	redirectReconciler := &controllers.RedirectReconciler{
 		Client:             k8sManager.GetClient(),
 		GlobalConfigGetter: globalConfigRepo,
 		Redirector:         ingressController,
+		TraefikInterface:   traefikClient,
+		Namespace:          namespace,
 	}
 
 	if err := redirectReconciler.SetupWithManager(k8sManager); err != nil {

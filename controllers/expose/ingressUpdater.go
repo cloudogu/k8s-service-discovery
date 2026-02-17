@@ -10,11 +10,11 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
+	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -90,7 +90,7 @@ type ingressUpdater struct {
 	controller             ingressController
 	ingressInterface       ingressInterface
 	doguInterface          doguInterface
-	middlewareManager      *middlewareManager
+	middlewareManager      *MiddlewareManager
 }
 
 type IngressUpdaterDependencies struct {
@@ -102,7 +102,7 @@ type IngressUpdaterDependencies struct {
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
-	DynamicClient          dynamic.Interface
+	TraefikClient          traefikv1alpha1.TraefikV1alpha1Interface
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
@@ -116,7 +116,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 		controller:             deps.Controller,
 		ingressInterface:       deps.IngressInterface,
 		doguInterface:          deps.DoguInterface,
-		middlewareManager:      newMiddlewareManager(deps.DynamicClient, deps.Namespace),
+		middlewareManager:      NewMiddlewareManager(deps.TraefikClient, deps.Namespace),
 	}
 }
 

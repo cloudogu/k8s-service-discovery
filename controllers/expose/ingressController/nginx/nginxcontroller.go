@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	ingressRewriteTargetAnnotation = "nginx.ingress.kubernetes.io/rewrite-target"
+	ingressRewriteTargetAnnotation = "traefik.ingress.kubernetes.io/router.middlewares"
 	ingressUseRegexAnnotation      = "nginx.ingress.kubernetes.io/use-regex"
 	nginxIngressControllerSpec     = "k8s.io/nginx-ingress"
 
