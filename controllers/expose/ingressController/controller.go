@@ -12,43 +12,39 @@ const (
 )
 
 type Dependencies struct {
-	Controller         string
-	ConfigMapInterface configMapInterface
-	IngressInterface   ingressInterface
-	IngressClassName   string
-	TraefikInterface   traefikInterface
-	Namespace          string
+	Controller       string
+	IngressInterface ingressInterface
+	IngressClassName string
+	TraefikInterface traefikInterface
+	Namespace        string
 }
 
 func ParseIngressController(deps Dependencies) IngressController {
 	switch deps.Controller {
 	case traefik.GatewayControllerName:
 		return traefik.NewTraefikController(traefik.IngressControllerDependencies{
-			ConfigMapInterface: deps.ConfigMapInterface,
-			IngressInterface:   deps.IngressInterface,
-			IngressClassName:   deps.IngressClassName,
-			ControllerType:     traefik.GatewayControllerName,
-			TraefikInterface:   deps.TraefikInterface,
-			Namespace:          deps.Namespace,
+			IngressInterface: deps.IngressInterface,
+			IngressClassName: deps.IngressClassName,
+			ControllerType:   traefik.GatewayControllerName,
+			TraefikInterface: deps.TraefikInterface,
+			Namespace:        deps.Namespace,
 		})
 	case traefik.IngressControllerName:
 		return traefik.NewTraefikController(traefik.IngressControllerDependencies{
-			ConfigMapInterface: deps.ConfigMapInterface,
-			IngressInterface:   deps.IngressInterface,
-			IngressClassName:   deps.IngressClassName,
-			ControllerType:     traefik.IngressControllerName,
-			TraefikInterface:   deps.TraefikInterface,
-			Namespace:          deps.Namespace,
+			IngressInterface: deps.IngressInterface,
+			IngressClassName: deps.IngressClassName,
+			ControllerType:   traefik.IngressControllerName,
+			TraefikInterface: deps.TraefikInterface,
+			Namespace:        deps.Namespace,
 		})
 	default:
 		ctrl.Log.WithName("k8s-service-discovery.ParseIngressController").Error(fmt.Errorf("could not parse ingress controller %q. using default: %q", deps.Controller, DefaultIngressController), "unknown ingress controller")
 		return traefik.NewTraefikController(traefik.IngressControllerDependencies{
-			ConfigMapInterface: deps.ConfigMapInterface,
-			IngressInterface:   deps.IngressInterface,
-			IngressClassName:   deps.IngressClassName,
-			ControllerType:     DefaultIngressController,
-			TraefikInterface:   deps.TraefikInterface,
-			Namespace:          deps.Namespace,
+			IngressInterface: deps.IngressInterface,
+			IngressClassName: deps.IngressClassName,
+			ControllerType:   DefaultIngressController,
+			TraefikInterface: deps.TraefikInterface,
+			Namespace:        deps.Namespace,
 		})
 	}
 }

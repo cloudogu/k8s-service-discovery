@@ -42,20 +42,18 @@ type IngressController struct {
 }
 
 type IngressControllerDependencies struct {
-	ConfigMapInterface configMapInterface
-	IngressInterface   ingressInterface
-	IngressClassName   string
-	ControllerType     string
-	TraefikInterface   traefikInterface
-	Namespace          string
+	IngressInterface ingressInterface
+	IngressClassName string
+	ControllerType   string
+	TraefikInterface traefikInterface
+	Namespace        string
 }
 
 func NewTraefikController(deps IngressControllerDependencies) *IngressController {
 	return &IngressController{
 		PortExposer: &PortExposer{
-			configMapInterface: deps.ConfigMapInterface,
-			traefikInterface:   deps.TraefikInterface,
-			namespace:          deps.Namespace,
+			traefikInterface: deps.TraefikInterface,
+			namespace:        deps.Namespace,
 		},
 		IngressRedirector: &IngressRedirector{
 			ingressClassName: deps.IngressClassName,

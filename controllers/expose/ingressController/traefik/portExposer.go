@@ -3,98 +3,160 @@ package traefik
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
+	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type PortExposer struct {
-	configMapInterface configMapInterface
-	traefikInterface   traefikInterface
-	namespace          string
+	traefikInterface traefikInterface
+	namespace        string
 }
 
-// ExposePorts materializes the given TCP/UDP port forwards for ingress-nginx by
-// writing the controller's well-known "tcp-services" / "udp-services" ConfigMaps.
+// ExposePorts materializes the given TCP/UDP port forwards for Traefik by
+// creating or updating IngressRouteTCP / IngressRouteUDP CRDs per exposed port.
 //
-// This function is safe to call repeatedly; it overwrites the ConfigMaps
-// with the current desired mappings (actual upsert semantics depend on intue.upsertConfigMap).
+// This function is safe to call repeatedly (upsert semantics).
 //
 // Only TCP and UDP protocols are supported. Any other protocol values are logged and ignored.
-// see: https://kubernetes.github.io/ingress-nginx/user-guide/exposing-tcp-udp-services/
 func (p PortExposer) ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error {
 	logger := log.FromContext(ctx)
 
-	tcpMap := make(map[string]string, len(exposedPorts))
-	udpMap := make(map[string]string, len(exposedPorts))
-
 	for _, port := range exposedPorts {
-		targetService := fmt.Sprintf("%s/%s:%d", namespace, port.ServiceName, port.TargetPort)
-
 		switch port.Protocol {
 		case corev1.ProtocolTCP:
-			tcpMap[port.PortString()] = targetService
+			route := createIngressRouteTCP(namespace, port, owner)
+			if err := p.upsertIngressRouteTCP(ctx, namespace, route); err != nil {
+				return fmt.Errorf("failed to upsert IngressRouteTCP for port %s: %w", port.PortString(), err)
+			}
 		case corev1.ProtocolUDP:
-			udpMap[port.PortString()] = targetService
+			route := createIngressRouteUDP(namespace, port, owner)
+			if err := p.upsertIngressRouteUDP(ctx, namespace, route); err != nil {
+				return fmt.Errorf("failed to upsert IngressRouteUDP for port %s: %w", port.PortString(), err)
+			}
 		default:
 			logger.Info("unsupported protocol for exposed port, port will be ignored", "name", port.Name, "protocol", port.Protocol)
 		}
 	}
 
-	tcpCfgMap := createExposeConfigMap(namespace, corev1.ProtocolTCP, tcpMap, owner)
-	udpCfgMap := createExposeConfigMap(namespace, corev1.ProtocolUDP, udpMap, owner)
-
-	if uErr := p.upsertConfigMap(ctx, tcpCfgMap); uErr != nil {
-		return fmt.Errorf("failed to upsert exposed ports for protocol %s: %w", corev1.ProtocolTCP, uErr)
-	}
-
-	if uErr := p.upsertConfigMap(ctx, udpCfgMap); uErr != nil {
-		return fmt.Errorf("failed to upsert exposed ports for protocol %s: %w", corev1.ProtocolUDP, uErr)
-	}
-
 	return nil
 }
 
-func (p PortExposer) upsertConfigMap(ctx context.Context, cm *corev1.ConfigMap) error {
-	_, cErr := p.configMapInterface.Create(ctx, cm, metav1.CreateOptions{})
-	if cErr == nil {
+func (p PortExposer) upsertIngressRouteTCP(ctx context.Context, namespace string, route *traefikv1alpha1.IngressRouteTCP) error {
+	client := p.traefikInterface.IngressRouteTCPs(namespace)
+
+	_, err := client.Create(ctx, route, metav1.CreateOptions{})
+	if err == nil {
 		return nil
 	}
 
-	if !apierrors.IsAlreadyExists(cErr) {
-		return fmt.Errorf("failed to create configMap: %w", cErr)
+	if !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create IngressRouteTCP: %w", err)
 	}
 
-	_, uErr := p.configMapInterface.Update(ctx, cm, metav1.UpdateOptions{})
+	existing, gErr := client.Get(ctx, route.Name, metav1.GetOptions{})
+	if gErr != nil {
+		return fmt.Errorf("failed to get existing IngressRouteTCP: %w", gErr)
+	}
+
+	route.ResourceVersion = existing.ResourceVersion
+	_, uErr := client.Update(ctx, route, metav1.UpdateOptions{})
 	if uErr != nil {
-		return fmt.Errorf("failed to update configMap: %w", uErr)
+		return fmt.Errorf("failed to update IngressRouteTCP: %w", uErr)
 	}
 
 	return nil
 }
 
-func createExposeConfigMap(namespace string, protocol corev1.Protocol, data map[string]string, owner *metav1.OwnerReference) *corev1.ConfigMap {
-	cm := &corev1.ConfigMap{
+func (p PortExposer) upsertIngressRouteUDP(ctx context.Context, namespace string, route *traefikv1alpha1.IngressRouteUDP) error {
+	client := p.traefikInterface.IngressRouteUDPs(namespace)
+
+	_, err := client.Create(ctx, route, metav1.CreateOptions{})
+	if err == nil {
+		return nil
+	}
+
+	if !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create IngressRouteUDP: %w", err)
+	}
+
+	existing, gErr := client.Get(ctx, route.Name, metav1.GetOptions{})
+	if gErr != nil {
+		return fmt.Errorf("failed to get existing IngressRouteUDP: %w", gErr)
+	}
+
+	route.ResourceVersion = existing.ResourceVersion
+	_, uErr := client.Update(ctx, route, metav1.UpdateOptions{})
+	if uErr != nil {
+		return fmt.Errorf("failed to update IngressRouteUDP: %w", uErr)
+	}
+
+	return nil
+}
+
+func createIngressRouteTCP(namespace string, port types.ExposedPort, owner *metav1.OwnerReference) *traefikv1alpha1.IngressRouteTCP {
+	route := &traefikv1alpha1.IngressRouteTCP{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getConfigMapNameForProtocol(protocol),
+			Name:      fmt.Sprintf("%s-%s-tcp", port.ServiceName, port.PortString()),
 			Namespace: namespace,
 			Labels:    util.K8sCesServiceDiscoveryLabels,
 		},
-		Data: data,
+		Spec: traefikv1alpha1.IngressRouteTCPSpec{
+			EntryPoints: []string{fmt.Sprintf("tcp-%s", port.PortString())},
+			Routes: []traefikv1alpha1.RouteTCP{
+				{
+					Match: "HostSNI(`*`)",
+					Services: []traefikv1alpha1.ServiceTCP{
+						{
+							Name:      port.ServiceName,
+							Namespace: namespace,
+							Port:      intstr.FromInt32(port.TargetPort),
+						},
+					},
+				},
+			},
+		},
 	}
 
 	if owner != nil {
-		cm.SetOwnerReferences([]metav1.OwnerReference{*owner})
+		route.SetOwnerReferences([]metav1.OwnerReference{*owner})
 	}
 
-	return cm
+	return route
 }
 
-func getConfigMapNameForProtocol(protocol corev1.Protocol) string {
-	return fmt.Sprintf("%s-services", strings.ToLower(string(protocol)))
+func createIngressRouteUDP(namespace string, port types.ExposedPort, owner *metav1.OwnerReference) *traefikv1alpha1.IngressRouteUDP {
+	route := &traefikv1alpha1.IngressRouteUDP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s-udp", port.ServiceName, port.PortString()),
+			Namespace: namespace,
+			Labels:    util.K8sCesServiceDiscoveryLabels,
+		},
+		Spec: traefikv1alpha1.IngressRouteUDPSpec{
+			EntryPoints: []string{fmt.Sprintf("udp-%s", port.PortString())},
+			Routes: []traefikv1alpha1.RouteUDP{
+				{
+					Services: []traefikv1alpha1.ServiceUDP{
+						{
+							Name:      port.ServiceName,
+							Namespace: namespace,
+							Port:      intstr.FromInt32(port.TargetPort),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if owner != nil {
+		route.SetOwnerReferences([]metav1.OwnerReference{*owner})
+	}
+
+	return route
 }

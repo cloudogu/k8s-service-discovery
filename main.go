@@ -100,12 +100,11 @@ func startManager() error {
 	}
 
 	controller := ingressController.ParseIngressController(ingressController.Dependencies{
-		Controller:         ingressControllerStr,
-		ConfigMapInterface: clientSet.configMapClient,
-		IngressInterface:   clientSet.ingressClient,
-		IngressClassName:   IngressClassName,
-		TraefikInterface:   traefikClient,
-		Namespace:          watchNamespace,
+		Controller:       ingressControllerStr,
+		IngressInterface: clientSet.ingressClient,
+		IngressClassName: IngressClassName,
+		TraefikInterface: traefikClient,
+		Namespace:        watchNamespace,
 	})
 
 	globalConfigRepo := repository.NewGlobalConfigRepository(clientSet.configMapClient)

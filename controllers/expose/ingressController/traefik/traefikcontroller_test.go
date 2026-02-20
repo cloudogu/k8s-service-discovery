@@ -8,7 +8,6 @@ import (
 )
 
 func TestNewTraefikController(t *testing.T) {
-	cfgMock := newMockConfigMapInterface(t)
 	ingressMock := newMockIngressInterface(t)
 
 	tests := []struct {
@@ -36,14 +35,12 @@ func TestNewTraefikController(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := NewTraefikController(IngressControllerDependencies{
-				ConfigMapInterface: cfgMock,
-				IngressInterface:   ingressMock,
-				IngressClassName:   "test",
-				ControllerType:     tt.inControllerType,
+				IngressInterface: ingressMock,
+				IngressClassName: "test",
+				ControllerType:   tt.inControllerType,
 			})
 
 			require.NotNil(t, ctrl)
-			require.NotNil(t, ctrl.configMapInterface)
 			require.NotNil(t, ctrl.ingressInterface)
 			require.Equal(t, "test", ctrl.ingressClassName)
 			require.Equal(t, tt.expControllerType, ctrl.controllerType)

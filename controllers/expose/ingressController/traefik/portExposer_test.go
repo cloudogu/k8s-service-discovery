@@ -20,16 +20,6 @@ const (
 	testNamespace = "ecosystem"
 )
 
-func Test_getConfigMapNameForProtocol(t *testing.T) {
-	t.Run("should return the protocol in lower case with -services suffix", func(t *testing.T) {
-		// when
-		result := getConfigMapNameForProtocol(corev1.ProtocolTCP)
-
-		// then
-		require.Equal(t, "tcp-services", result)
-	})
-}
-
 func TestIngressNginxTcpUpdExposer_ExposePorts(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -180,9 +170,7 @@ func TestIngressNginxTcpUpdExposer_ExposePorts(t *testing.T) {
 			cmClientMock := newMockConfigMapInterface(t)
 			tt.setupMocks(cmClientMock, tt.expTCPMapData, tt.expUDPMapData, tt.inOwner != nil)
 
-			exposer := PortExposer{
-				configMapInterface: cmClientMock,
-			}
+			exposer := PortExposer{}
 
 			err := exposer.ExposePorts(context.TODO(), testNamespace, tt.inExposedPorts, tt.inOwner)
 
