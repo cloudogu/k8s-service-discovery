@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 > [!IMPORTANT]
 > Breaking change!
+> New compatible versions of k8s-ces-assets, k8s-backup-operator and k8s-ces-exporter are required.
 
 ### Changed
 - [#96] Read maintenance mode from special `maintenance` ConfigMap
