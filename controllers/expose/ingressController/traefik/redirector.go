@@ -25,9 +25,11 @@ const (
 type IngressRedirector struct {
 	ingressClassName string
 	ingressInterface ingressInterface
+	traefikInterface traefikInterface
+	namespace        string
 }
 
-func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error, middlewareManager *expose.MiddlewareManager) error {
+func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error {
 	logger := log.FromContext(ctx)
 
 	if len(altFQDNList) == 0 {
@@ -48,6 +50,8 @@ func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespac
 	if uErr != nil {
 		return fmt.Errorf("failed to upsert redirect ingress: %w", uErr)
 	}
+
+	middlewareManager := expose.NewMiddlewareManager(i.traefikInterface, i.namespace)
 
 	err := createRedirectMiddleware(ctx, fqdn, altFQDNList, upsertedIngress, middlewareManager)
 	if err != nil {

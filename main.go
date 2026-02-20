@@ -94,11 +94,18 @@ func startManager() error {
 		return fmt.Errorf("failed to create k8s client set: %w", err)
 	}
 
+	traefikClient, err := traefikv1alpha1.NewForConfig(serviceDiscManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create traefik client: %w", err)
+	}
+
 	controller := ingressController.ParseIngressController(ingressController.Dependencies{
 		Controller:         ingressControllerStr,
 		ConfigMapInterface: clientSet.configMapClient,
 		IngressInterface:   clientSet.ingressClient,
 		IngressClassName:   IngressClassName,
+		TraefikInterface:   traefikClient,
+		Namespace:          watchNamespace,
 	})
 
 	globalConfigRepo := repository.NewGlobalConfigRepository(clientSet.configMapClient)
@@ -118,11 +125,6 @@ func startManager() error {
 	}
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
-
-	traefikClient, err := traefikv1alpha1.NewForConfig(serviceDiscManager.GetConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create traefik client: %w", err)
-	}
 
 	middlewareManager := expose.NewMiddlewareManager(traefikClient, watchNamespace)
 
@@ -329,18 +331,10 @@ func configureReconciler(
 		return fmt.Errorf("failed to setup ecosystem certificate reconciler with the manager: %w", err)
 	}
 
-	traefikClient, err := traefikv1alpha1.NewForConfig(k8sManager.GetConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create traefik client: %w", err)
-	}
-
-	middlewareManager := expose.NewMiddlewareManager(traefikClient, namespace)
-
 	redirectReconciler := &controllers.RedirectReconciler{
 		Client:             k8sManager.GetClient(),
 		GlobalConfigGetter: globalConfigRepo,
 		Redirector:         ingressController,
-		MiddlewareManager:  middlewareManager,
 		Namespace:          namespace,
 	}
 

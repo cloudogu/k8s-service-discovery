@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
@@ -34,7 +33,6 @@ type RedirectReconciler struct {
 	Client             client.Client
 	GlobalConfigGetter GlobalConfigRepository
 	Redirector         AlternativeFQDNRedirector
-	MiddlewareManager  *expose.MiddlewareManager
 	Namespace          string
 }
 
@@ -66,7 +64,7 @@ func (r *RedirectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.SetControllerReference(cm, targetObject, r.Client.Scheme(), controllerutil.WithBlockOwnerDeletion(false))
 	}
 
-	if rErr := r.Redirector.RedirectAlternativeFQDN(ctx, req.Namespace, redirectObjectName, fqdn.String(), altFQDNList, setOwnerReference, r.MiddlewareManager); rErr != nil {
+	if rErr := r.Redirector.RedirectAlternativeFQDN(ctx, req.Namespace, redirectObjectName, fqdn.String(), altFQDNList, setOwnerReference); rErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to redirect alternative fqdns: %w", rErr)
 	}
 

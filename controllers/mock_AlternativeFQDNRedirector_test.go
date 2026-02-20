@@ -5,7 +5,6 @@ package controllers
 import (
 	context "context"
 
-	expose "github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	types "github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	mock "github.com/stretchr/testify/mock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,17 +23,17 @@ func (_m *MockAlternativeFQDNRedirector) EXPECT() *MockAlternativeFQDNRedirector
 	return &MockAlternativeFQDNRedirector_Expecter{mock: &_m.Mock}
 }
 
-// RedirectAlternativeFQDN provides a mock function with given fields: ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner, middlewareManager
-func (_m *MockAlternativeFQDNRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(v1.Object) error, middlewareManager *expose.MiddlewareManager) error {
-	ret := _m.Called(ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner, middlewareManager)
+// RedirectAlternativeFQDN provides a mock function with given fields: ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner
+func (_m *MockAlternativeFQDNRedirector) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(v1.Object) error) error {
+	ret := _m.Called(ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RedirectAlternativeFQDN")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []types.AlternativeFQDN, func(v1.Object) error, *expose.MiddlewareManager) error); ok {
-		r0 = rf(ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner, middlewareManager)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []types.AlternativeFQDN, func(v1.Object) error) error); ok {
+		r0 = rf(ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -54,14 +53,13 @@ type MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call struct {
 //   - fqdn string
 //   - altFQDNList []types.AlternativeFQDN
 //   - setOwner func(v1.Object) error
-//   - middlewareManager *expose.MiddlewareManager
-func (_e *MockAlternativeFQDNRedirector_Expecter) RedirectAlternativeFQDN(ctx interface{}, namespace interface{}, redirectObjectName interface{}, fqdn interface{}, altFQDNList interface{}, setOwner interface{}, middlewareManager interface{}) *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call {
-	return &MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call{Call: _e.mock.On("RedirectAlternativeFQDN", ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner, middlewareManager)}
+func (_e *MockAlternativeFQDNRedirector_Expecter) RedirectAlternativeFQDN(ctx interface{}, namespace interface{}, redirectObjectName interface{}, fqdn interface{}, altFQDNList interface{}, setOwner interface{}) *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call {
+	return &MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call{Call: _e.mock.On("RedirectAlternativeFQDN", ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner)}
 }
 
-func (_c *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call) Run(run func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(v1.Object) error, middlewareManager *expose.MiddlewareManager)) *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call {
+func (_c *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call) Run(run func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(v1.Object) error)) *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].([]types.AlternativeFQDN), args[5].(func(v1.Object) error), args[6].(*expose.MiddlewareManager))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].([]types.AlternativeFQDN), args[5].(func(v1.Object) error))
 	})
 	return _c
 }
@@ -71,7 +69,7 @@ func (_c *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call) Return(_a0
 	return _c
 }
 
-func (_c *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call) RunAndReturn(run func(context.Context, string, string, string, []types.AlternativeFQDN, func(v1.Object) error, *expose.MiddlewareManager) error) *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call {
+func (_c *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call) RunAndReturn(run func(context.Context, string, string, string, []types.AlternativeFQDN, func(v1.Object) error) error) *MockAlternativeFQDNRedirector_RedirectAlternativeFQDN_Call {
 	_c.Call.Return(run)
 	return _c
 }

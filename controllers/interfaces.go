@@ -5,7 +5,6 @@ import (
 
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +39,7 @@ type certificateSynchronizer interface {
 }
 
 type AlternativeFQDNRedirector interface {
-	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error, middlewareManager *expose.MiddlewareManager) error
+	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error
 }
 
 type PortExposer interface {

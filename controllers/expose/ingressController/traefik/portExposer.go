@@ -15,6 +15,8 @@ import (
 
 type PortExposer struct {
 	configMapInterface configMapInterface
+	traefikInterface   traefikInterface
+	namespace          string
 }
 
 // ExposePorts materializes the given TCP/UDP port forwards for ingress-nginx by
