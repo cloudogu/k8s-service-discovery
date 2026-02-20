@@ -10,7 +10,6 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
-	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -102,7 +101,7 @@ type IngressUpdaterDependencies struct {
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
-	TraefikClient          traefikv1alpha1.TraefikV1alpha1Interface
+	TraefikClient          traefikInterface
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.

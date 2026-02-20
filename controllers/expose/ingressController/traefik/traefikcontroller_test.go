@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewNginxController(t *testing.T) {
+func TestNewTraefikController(t *testing.T) {
 	cfgMock := newMockConfigMapInterface(t)
 	ingressMock := newMockIngressInterface(t)
 
@@ -35,7 +35,7 @@ func TestNewNginxController(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := NewNginxController(IngressControllerDependencies{
+			ctrl := NewTraefikController(IngressControllerDependencies{
 				ConfigMapInterface: cfgMock,
 				IngressInterface:   ingressMock,
 				IngressClassName:   "test",
@@ -82,19 +82,6 @@ func Test_controller_GetName(t *testing.T) {
 	}
 }
 
-func Test_controller_GetControllerSpec(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// given
-		sut := &IngressController{}
-
-		// when
-		spec := sut.GetControllerSpec()
-
-		// then
-		require.Equal(t, "k8s.io/nginx-ingress", spec)
-	})
-}
-
 func Test_controller_GetRewriteAnnotationKey(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
@@ -104,7 +91,7 @@ func Test_controller_GetRewriteAnnotationKey(t *testing.T) {
 		key := sut.GetRewriteAnnotationKey()
 
 		// then
-		require.Equal(t, "nginx.ingress.kubernetes.io/rewrite-target", key)
+		require.Equal(t, "traefik.ingress.kubernetes.io/router.middlewares", key)
 	})
 }
 

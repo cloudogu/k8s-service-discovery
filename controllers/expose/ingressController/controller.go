@@ -3,12 +3,12 @@ package ingressController
 import (
 	"fmt"
 
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController/nginx"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController/traefik"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
-	DefaultIngressController = nginx.GatewayControllerName
+	DefaultIngressController = traefik.GatewayControllerName
 )
 
 type Dependencies struct {
@@ -20,23 +20,23 @@ type Dependencies struct {
 
 func ParseIngressController(deps Dependencies) IngressController {
 	switch deps.Controller {
-	case nginx.GatewayControllerName:
-		return nginx.NewNginxController(nginx.IngressControllerDependencies{
+	case traefik.GatewayControllerName:
+		return traefik.NewTraefikController(traefik.IngressControllerDependencies{
 			ConfigMapInterface: deps.ConfigMapInterface,
 			IngressInterface:   deps.IngressInterface,
 			IngressClassName:   deps.IngressClassName,
-			ControllerType:     nginx.GatewayControllerName,
+			ControllerType:     traefik.GatewayControllerName,
 		})
-	case nginx.IngressControllerName:
-		return nginx.NewNginxController(nginx.IngressControllerDependencies{
+	case traefik.IngressControllerName:
+		return traefik.NewTraefikController(traefik.IngressControllerDependencies{
 			ConfigMapInterface: deps.ConfigMapInterface,
 			IngressInterface:   deps.IngressInterface,
 			IngressClassName:   deps.IngressClassName,
-			ControllerType:     nginx.IngressControllerName,
+			ControllerType:     traefik.IngressControllerName,
 		})
 	default:
 		ctrl.Log.WithName("k8s-service-discovery.ParseIngressController").Error(fmt.Errorf("could not parse ingress controller %q. using default: %q", deps.Controller, DefaultIngressController), "unknown ingress controller")
-		return nginx.NewNginxController(nginx.IngressControllerDependencies{
+		return traefik.NewTraefikController(traefik.IngressControllerDependencies{
 			ConfigMapInterface: deps.ConfigMapInterface,
 			IngressInterface:   deps.IngressInterface,
 			IngressClassName:   deps.IngressClassName,

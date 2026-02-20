@@ -50,7 +50,7 @@ type IngressControllerDependencies struct {
 	ControllerType     string
 }
 
-func NewNginxController(deps IngressControllerDependencies) *IngressController {
+func NewTraefikController(deps IngressControllerDependencies) *IngressController {
 	return &IngressController{
 		PortExposer: &PortExposer{
 			configMapInterface: deps.ConfigMapInterface,

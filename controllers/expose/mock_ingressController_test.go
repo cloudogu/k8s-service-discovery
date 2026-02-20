@@ -17,51 +17,6 @@ func (_m *mockIngressController) EXPECT() *mockIngressController_Expecter {
 	return &mockIngressController_Expecter{mock: &_m.Mock}
 }
 
-// GetControllerSpec provides a mock function with no fields
-func (_m *mockIngressController) GetControllerSpec() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetControllerSpec")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// mockIngressController_GetControllerSpec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetControllerSpec'
-type mockIngressController_GetControllerSpec_Call struct {
-	*mock.Call
-}
-
-// GetControllerSpec is a helper method to define mock.On call
-func (_e *mockIngressController_Expecter) GetControllerSpec() *mockIngressController_GetControllerSpec_Call {
-	return &mockIngressController_GetControllerSpec_Call{Call: _e.mock.On("GetControllerSpec")}
-}
-
-func (_c *mockIngressController_GetControllerSpec_Call) Run(run func()) *mockIngressController_GetControllerSpec_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockIngressController_GetControllerSpec_Call) Return(_a0 string) *mockIngressController_GetControllerSpec_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *mockIngressController_GetControllerSpec_Call) RunAndReturn(run func() string) *mockIngressController_GetControllerSpec_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetName provides a mock function with no fields
 func (_m *mockIngressController) GetName() string {
 	ret := _m.Called()
