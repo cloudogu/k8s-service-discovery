@@ -124,6 +124,8 @@ func startManager() error {
 		return fmt.Errorf("failed to create traefik client: %w", err)
 	}
 
+	middlewareManager := expose.NewMiddlewareManager(traefikClient, watchNamespace)
+
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
 		DeploymentReadyChecker: deploymentReadyChecker,
 		IngressInterface:       clientSet.ingressClient,
@@ -133,7 +135,7 @@ func startManager() error {
 		IngressClassName:       IngressClassName,
 		Recorder:               eventRecorder,
 		Controller:             controller,
-		TraefikClient:          traefikClient,
+		MiddlewareManager:      middlewareManager,
 	})
 
 	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {

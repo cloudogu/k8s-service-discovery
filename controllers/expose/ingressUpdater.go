@@ -89,7 +89,7 @@ type ingressUpdater struct {
 	controller             ingressController
 	ingressInterface       ingressInterface
 	doguInterface          doguInterface
-	middlewareManager      *MiddlewareManager
+	middlewareManager      middlewareManager
 }
 
 type IngressUpdaterDependencies struct {
@@ -101,7 +101,7 @@ type IngressUpdaterDependencies struct {
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
-	TraefikClient          traefikInterface
+	MiddlewareManager      middlewareManager
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
@@ -115,7 +115,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 		controller:             deps.Controller,
 		ingressInterface:       deps.IngressInterface,
 		doguInterface:          deps.DoguInterface,
-		middlewareManager:      NewMiddlewareManager(deps.TraefikClient, deps.Namespace),
+		middlewareManager:      deps.MiddlewareManager,
 	}
 }
 

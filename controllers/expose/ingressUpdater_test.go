@@ -54,7 +54,7 @@ func TestNewIngressUpdater(t *testing.T) {
 		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
 		ingressControllerMock := newMockIngressController(t)
 		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
-
+		middlewareManagerMock := newMockMiddlewareManager(t)
 		// when
 		sut := NewIngressUpdater(IngressUpdaterDependencies{
 			deploymentReadyCheckerMock,
@@ -65,6 +65,7 @@ func TestNewIngressUpdater(t *testing.T) {
 			testIngressClassName,
 			newMockEventRecorder(t),
 			ingressControllerMock,
+			middlewareManagerMock,
 		})
 
 		// then
