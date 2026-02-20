@@ -34,7 +34,7 @@ type RedirectReconciler struct {
 	Client             client.Client
 	GlobalConfigGetter GlobalConfigRepository
 	Redirector         AlternativeFQDNRedirector
-	TraefikInterface   traefikInterface
+	MiddlewareManager  *expose.MiddlewareManager
 	Namespace          string
 }
 
@@ -66,9 +66,7 @@ func (r *RedirectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.SetControllerReference(cm, targetObject, r.Client.Scheme(), controllerutil.WithBlockOwnerDeletion(false))
 	}
 
-	middlewareManager := expose.NewMiddlewareManager(r.TraefikInterface, r.Namespace)
-
-	if rErr := r.Redirector.RedirectAlternativeFQDN(ctx, req.Namespace, redirectObjectName, fqdn.String(), altFQDNList, setOwnerReference, middlewareManager); rErr != nil {
+	if rErr := r.Redirector.RedirectAlternativeFQDN(ctx, req.Namespace, redirectObjectName, fqdn.String(), altFQDNList, setOwnerReference, r.MiddlewareManager); rErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to redirect alternative fqdns: %w", rErr)
 	}
 

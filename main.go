@@ -334,11 +334,13 @@ func configureReconciler(
 		return fmt.Errorf("failed to create traefik client: %w", err)
 	}
 
+	middlewareManager := expose.NewMiddlewareManager(traefikClient, namespace)
+
 	redirectReconciler := &controllers.RedirectReconciler{
 		Client:             k8sManager.GetClient(),
 		GlobalConfigGetter: globalConfigRepo,
 		Redirector:         ingressController,
-		TraefikInterface:   traefikClient,
+		MiddlewareManager:  middlewareManager,
 		Namespace:          namespace,
 	}
 
