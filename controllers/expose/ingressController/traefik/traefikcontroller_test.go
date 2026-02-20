@@ -95,19 +95,6 @@ func Test_controller_GetRewriteAnnotationKey(t *testing.T) {
 	})
 }
 
-func Test_controller_GetUseRegexKey(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// given
-		sut := &IngressController{}
-
-		// when
-		key := sut.GetUseRegexKey()
-
-		// then
-		require.Equal(t, "nginx.ingress.kubernetes.io/use-regex", key)
-	})
-}
-
 func TestIngressController_GetSelector(t *testing.T) {
 	tests := []struct {
 		name             string

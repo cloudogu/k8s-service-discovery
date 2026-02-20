@@ -49,7 +49,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 	t.Run("failed to create ingress object of service", func(t *testing.T) {
 		// given
 		service := &corev1.Service{
-			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			TypeMeta:   metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: testNamespace},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()
@@ -72,7 +72,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 	t.Run("failed to update networkpolicy", func(t *testing.T) {
 		// given
 		service := &corev1.Service{
-			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			TypeMeta:   metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: testNamespace},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()
@@ -96,7 +96,7 @@ func Test_serviceReconciler_Reconcile(t *testing.T) {
 	t.Run("should remove networkpolicy if disabled", func(t *testing.T) {
 		// given
 		service := &corev1.Service{
-			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			TypeMeta:   metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: "my-service", Namespace: testNamespace},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(service).Build()

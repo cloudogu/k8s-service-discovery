@@ -49,7 +49,6 @@ type doguInterface interface {
 type ingressController interface {
 	GetName() string
 	GetRewriteAnnotationKey() string
-	GetUseRegexKey() string
 }
 
 type networkPolicyInterface interface {

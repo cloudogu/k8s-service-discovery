@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
@@ -262,8 +263,8 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey: primaryFQDN,
 			}),
 			setupRedirectorMock: func(t *testing.T, m *MockAlternativeFQDNRedirector) {
-				m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything).
-					Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(metav1.Object) error) {
+				m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(metav1.Object) error, manager *expose.MiddlewareManager) {
 						tmpCM := &corev1.ConfigMap{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "testCM",
@@ -322,7 +323,7 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 				primaryFQDNKey: primaryFQDN,
 			}),
 			setupRedirectorMock: func(t *testing.T, m *MockAlternativeFQDNRedirector) {
-				m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything).Return(assert.AnError)
+				m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 			},
 			expErr: true,
 			errMsg: "failed to redirect alternative fqdns",
@@ -378,8 +379,8 @@ func createGlobalConfigWithEntries(entries map[config.Key]config.Value) func(m *
 
 func createRedirectorMockWithExpectedRedirectAltFQDNList(expAltFQDNList []types.AlternativeFQDN) func(t *testing.T, m *MockAlternativeFQDNRedirector) {
 	return func(t *testing.T, m *MockAlternativeFQDNRedirector) {
-		m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything).
-			Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(metav1.Object) error) {
+		m.EXPECT().RedirectAlternativeFQDN(mock.Anything, globalConfigNamespace, redirectObjectName, primaryFQDN, mock.Anything, mock.Anything, mock.Anything).
+			Run(func(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(metav1.Object) error, manager *expose.MiddlewareManager) {
 				require.ElementsMatch(t, expAltFQDNList, altFQDNList)
 			}).Return(nil)
 	}
