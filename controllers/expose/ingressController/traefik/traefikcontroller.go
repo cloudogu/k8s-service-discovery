@@ -1,4 +1,4 @@
-package nginx
+package traefik
 
 import (
 	k8sv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
@@ -7,9 +7,8 @@ import (
 const (
 	ingressRewriteTargetAnnotation = "traefik.ingress.kubernetes.io/router.middlewares"
 	ingressUseRegexAnnotation      = "nginx.ingress.kubernetes.io/use-regex"
-	nginxIngressControllerSpec     = "k8s.io/nginx-ingress"
 
-	IngressControllerName = "nginx-ingress"
+	IngressControllerName = "traefik"
 	GatewayControllerName = "k8s-ces-gateway"
 
 	componentLabelKey = "k8s.cloudogu.com/component.name"
@@ -66,10 +65,6 @@ func NewNginxController(deps IngressControllerDependencies) *IngressController {
 
 func (c *IngressController) GetName() string {
 	return c.String()
-}
-
-func (c *IngressController) GetControllerSpec() string {
-	return nginxIngressControllerSpec
 }
 
 func (c *IngressController) GetRewriteAnnotationKey() string {

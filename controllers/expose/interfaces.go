@@ -48,7 +48,6 @@ type doguInterface interface {
 
 type ingressController interface {
 	GetName() string
-	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
 }

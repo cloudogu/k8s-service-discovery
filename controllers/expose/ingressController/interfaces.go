@@ -28,7 +28,6 @@ type PortExposer interface {
 
 type IngressController interface {
 	GetName() string
-	GetControllerSpec() string
 	GetRewriteAnnotationKey() string
 	GetUseRegexKey() string
 	GetSelector() map[string]string
