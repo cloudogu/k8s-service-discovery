@@ -6,10 +6,8 @@ import (
 
 const (
 	ingressRewriteTargetAnnotation = "traefik.ingress.kubernetes.io/router.middlewares"
-	ingressUseRegexAnnotation      = "nginx.ingress.kubernetes.io/use-regex"
-
-	IngressControllerName = "traefik"
-	GatewayControllerName = "k8s-ces-gateway"
+	IngressControllerName          = "traefik"
+	GatewayControllerName          = "k8s-ces-gateway"
 
 	componentLabelKey = "k8s.cloudogu.com/component.name"
 )
@@ -69,10 +67,6 @@ func (c *IngressController) GetName() string {
 
 func (c *IngressController) GetRewriteAnnotationKey() string {
 	return ingressRewriteTargetAnnotation
-}
-
-func (c *IngressController) GetUseRegexKey() string {
-	return ingressUseRegexAnnotation
 }
 
 func (c *IngressController) GetSelector() map[string]string {

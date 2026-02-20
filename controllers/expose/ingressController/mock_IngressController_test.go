@@ -210,51 +210,6 @@ func (_c *MockIngressController_GetSelector_Call) RunAndReturn(run func() map[st
 	return _c
 }
 
-// GetUseRegexKey provides a mock function with no fields
-func (_m *MockIngressController) GetUseRegexKey() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetUseRegexKey")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// MockIngressController_GetUseRegexKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUseRegexKey'
-type MockIngressController_GetUseRegexKey_Call struct {
-	*mock.Call
-}
-
-// GetUseRegexKey is a helper method to define mock.On call
-func (_e *MockIngressController_Expecter) GetUseRegexKey() *MockIngressController_GetUseRegexKey_Call {
-	return &MockIngressController_GetUseRegexKey_Call{Call: _e.mock.On("GetUseRegexKey")}
-}
-
-func (_c *MockIngressController_GetUseRegexKey_Call) Run(run func()) *MockIngressController_GetUseRegexKey_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockIngressController_GetUseRegexKey_Call) Return(_a0 string) *MockIngressController_GetUseRegexKey_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockIngressController_GetUseRegexKey_Call) RunAndReturn(run func() string) *MockIngressController_GetUseRegexKey_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // RedirectAlternativeFQDN provides a mock function with given fields: ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner, middlewareManager
 func (_m *MockIngressController) RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(v1.Object) error, middlewareManager *expose.MiddlewareManager) error {
 	ret := _m.Called(ctx, namespace, redirectObjectName, fqdn, altFQDNList, setOwner, middlewareManager)

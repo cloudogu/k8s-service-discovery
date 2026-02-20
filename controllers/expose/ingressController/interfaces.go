@@ -29,7 +29,6 @@ type PortExposer interface {
 type IngressController interface {
 	GetName() string
 	GetRewriteAnnotationKey() string
-	GetUseRegexKey() string
 	GetSelector() map[string]string
 	AlternativeFQDNRedirector
 	PortExposer
