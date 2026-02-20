@@ -207,7 +207,7 @@ func assertRedirectIngress(t *testing.T, ingress *v1.Ingress, altFQDNList []type
 	annotations := ingress.GetAnnotations()
 	require.Len(t, annotations, 1)
 
-	rAnnotation, ok := annotations[redirectAnnotation]
+	rAnnotation, ok := annotations[traefikMiddlewareAnnotation]
 	require.True(t, ok)
 	require.Equal(t, fmt.Sprintf("return 308 https://%s$request_uri;", testFqdn), rAnnotation)
 
