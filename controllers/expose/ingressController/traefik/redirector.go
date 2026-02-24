@@ -170,8 +170,8 @@ func createRedirectMiddleware(ctx context.Context, primaryFqdn string, fqdnList 
 	ownerReferences := []metav1.OwnerReference{{
 		APIVersion: "networking.k8s.io/v1",
 		Kind:       "Ingress",
-		Name:       owner.ObjectMeta.Name,
-		UID:        owner.ObjectMeta.UID,
+		Name:       owner.Name,
+		UID:        owner.UID,
 	}}
 
 	fqdns := make([]string, len(fqdnList))

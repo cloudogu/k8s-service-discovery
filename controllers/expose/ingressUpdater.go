@@ -242,10 +242,10 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	annotations := map[string]string{}
 
 	ownerReferences := []v1.OwnerReference{{
-		APIVersion: service.TypeMeta.APIVersion,
-		Kind:       service.TypeMeta.Kind,
-		Name:       service.ObjectMeta.Name,
-		UID:        service.ObjectMeta.UID,
+		APIVersion: service.APIVersion,
+		Kind:       service.Kind,
+		Name:       service.Name,
+		UID:        service.UID,
 	}}
 
 	if cesService.hasRewriteConfig() {
