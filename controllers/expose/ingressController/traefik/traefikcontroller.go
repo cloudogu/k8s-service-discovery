@@ -53,6 +53,7 @@ func NewTraefikController(deps IngressControllerDependencies) *IngressController
 	return &IngressController{
 		PortExposer: &PortExposer{
 			traefikInterface: deps.TraefikInterface,
+			ingressInterface: deps.IngressInterface,
 			namespace:        deps.Namespace,
 		},
 		IngressRedirector: &IngressRedirector{

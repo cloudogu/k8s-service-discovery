@@ -68,3 +68,15 @@ rules:
       - create
       - update
       - delete
+  # expose udp and tcp ports
+  - apiGroups:
+      - traefik.io
+    resources:
+      - ingressroutetcps
+      - ingressrouteudps
+    verbs:
+      - get
+      - list
+      - create
+      - update
+      - delete

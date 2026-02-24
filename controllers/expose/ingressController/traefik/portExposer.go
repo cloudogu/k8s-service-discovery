@@ -16,6 +16,7 @@ import (
 
 type PortExposer struct {
 	traefikInterface traefikInterface
+	ingressInterface ingressInterface
 	namespace        string
 }
 
@@ -25,20 +26,22 @@ type PortExposer struct {
 // This function is safe to call repeatedly (upsert semantics).
 //
 // Only TCP and UDP protocols are supported. Any other protocol values are logged and ignored.
-func (p PortExposer) ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error {
+func (p PortExposer) ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error {
 	logger := log.FromContext(ctx)
 
 	for _, port := range exposedPorts {
+		owner := getIngressRouteOwner(ctx, p.ingressInterface, port)
+
 		switch port.Protocol {
 		case corev1.ProtocolTCP:
 			route := createIngressRouteTCP(namespace, port, owner)
 			if err := p.upsertIngressRouteTCP(ctx, namespace, route); err != nil {
-				return fmt.Errorf("failed to upsert IngressRouteTCP for port %s: %w", port.PortString(), err)
+				return fmt.Errorf("failed to expose tcp port %s: %w", port.PortString(), err)
 			}
 		case corev1.ProtocolUDP:
 			route := createIngressRouteUDP(namespace, port, owner)
 			if err := p.upsertIngressRouteUDP(ctx, namespace, route); err != nil {
-				return fmt.Errorf("failed to upsert IngressRouteUDP for port %s: %w", port.PortString(), err)
+				return fmt.Errorf("failed to expose udp port %s: %w", port.PortString(), err)
 			}
 		default:
 			logger.Info("unsupported protocol for exposed port, port will be ignored", "name", port.Name, "protocol", port.Protocol)
@@ -100,7 +103,7 @@ func (p PortExposer) upsertIngressRouteUDP(ctx context.Context, namespace string
 	return nil
 }
 
-func createIngressRouteTCP(namespace string, port types.ExposedPort, owner *metav1.OwnerReference) *traefikv1alpha1.IngressRouteTCP {
+func createIngressRouteTCP(namespace string, port types.ExposedPort, ownerReferences []metav1.OwnerReference) *traefikv1alpha1.IngressRouteTCP {
 	route := &traefikv1alpha1.IngressRouteTCP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s-tcp", port.ServiceName, port.PortString()),
@@ -124,14 +127,14 @@ func createIngressRouteTCP(namespace string, port types.ExposedPort, owner *meta
 		},
 	}
 
-	if owner != nil {
-		route.SetOwnerReferences([]metav1.OwnerReference{*owner})
+	if ownerReferences != nil {
+		route.SetOwnerReferences(ownerReferences)
 	}
 
 	return route
 }
 
-func createIngressRouteUDP(namespace string, port types.ExposedPort, owner *metav1.OwnerReference) *traefikv1alpha1.IngressRouteUDP {
+func createIngressRouteUDP(namespace string, port types.ExposedPort, ownerReferences []metav1.OwnerReference) *traefikv1alpha1.IngressRouteUDP {
 	route := &traefikv1alpha1.IngressRouteUDP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s-udp", port.ServiceName, port.PortString()),
@@ -154,9 +157,19 @@ func createIngressRouteUDP(namespace string, port types.ExposedPort, owner *meta
 		},
 	}
 
-	if owner != nil {
-		route.SetOwnerReferences([]metav1.OwnerReference{*owner})
+	if ownerReferences != nil {
+		route.SetOwnerReferences(ownerReferences)
 	}
 
 	return route
+}
+
+// getIngressRouteOwner returns the same owner references as the associated ingress for the given port. Might return nil
+func getIngressRouteOwner(ctx context.Context, ingressInterface ingressInterface, port types.ExposedPort) []metav1.OwnerReference {
+	owner, err := ingressInterface.Get(ctx, port.ServiceName, metav1.GetOptions{})
+	if err != nil {
+		return nil
+	}
+
+	return owner.GetOwnerReferences()
 }
