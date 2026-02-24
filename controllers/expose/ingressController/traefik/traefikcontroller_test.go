@@ -41,7 +41,6 @@ func TestNewTraefikController(t *testing.T) {
 			})
 
 			require.NotNil(t, ctrl)
-			require.NotNil(t, ctrl.ingressInterface)
 			require.Equal(t, "test", ctrl.ingressClassName)
 			require.Equal(t, tt.expControllerType, ctrl.controllerType)
 		})

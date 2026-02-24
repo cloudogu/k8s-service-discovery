@@ -3,7 +3,6 @@ package traefik
 import (
 	"context"
 	"fmt"
-	"maps"
 	"testing"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
@@ -11,168 +10,237 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
 	testNamespace = "ecosystem"
 )
 
-func TestIngressNginxTcpUpdExposer_ExposePorts(t *testing.T) {
+func TestPortExposer_ExposePorts(t *testing.T) {
 	tests := []struct {
 		name           string
 		inExposedPorts types.ExposedPorts
-		inOwner        *metav1.OwnerReference
-		setupMocks     func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool)
-		expTCPMapData  map[string]string
-		expUDPMapData  map[string]string
+		setupMocks     func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface)
 		expErr         bool
 		expErrStr      string
 	}{
 		{
-			name: "set tcp and udp ports in both config maps",
+			name: "successfully create TCP and UDP IngressRoutes",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "b-60", ServiceName: "b", Protocol: corev1.ProtocolUDP, Port: 60, TargetPort: 60},
-				{Name: "c-70", ServiceName: "c", Protocol: corev1.ProtocolTCP, Port: 70, TargetPort: 60},
-				{Name: "d-80", ServiceName: "d", Protocol: corev1.ProtocolUDP, Port: 80, TargetPort: 60},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, Port: 5353, TargetPort: 5353},
 			},
-			inOwner:    &metav1.OwnerReference{},
-			setupMocks: expectCreateCMWithAssertion(t),
-			expTCPMapData: map[string]string{
-				"50": createMapEntryValue("a", "60"),
-				"70": createMapEntryValue("c", "60"),
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError).Times(2)
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, route *traefikv1alpha1.IngressRouteTCP, opts metav1.CreateOptions) {
+						assertIngressRouteTCP(t, route, "svc", 2222, 2222)
+					}).
+					Return(&traefikv1alpha1.IngressRouteTCP{}, nil)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
+
+				udpClientMock := newMockIngressrouteUdpInterface(t)
+				udpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, route *traefikv1alpha1.IngressRouteUDP, opts metav1.CreateOptions) {
+						assertIngressRouteUDP(t, route, "svc", 5353, 5353)
+					}).
+					Return(&traefikv1alpha1.IngressRouteUDP{}, nil)
+				traefikMock.EXPECT().IngressRouteUDPs(testNamespace).Return(udpClientMock)
 			},
-			expUDPMapData: map[string]string{
-				"60": createMapEntryValue("b", "60"),
-				"80": createMapEntryValue("d", "60"),
-			},
-			expErr:    false,
-			expErrStr: "",
+			expErr: false,
 		},
 		{
-			name: "create tcp config map with empty values",
+			name: "ignore unsupported protocol",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "b-60", ServiceName: "b", Protocol: corev1.ProtocolUDP, Port: 60, TargetPort: 60},
-				{Name: "d-80", ServiceName: "d", Protocol: corev1.ProtocolUDP, Port: 80, TargetPort: 60},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-9999", ServiceName: "svc", Protocol: "SCTP", Port: 9999, TargetPort: 9999},
 			},
-			inOwner:       &metav1.OwnerReference{},
-			setupMocks:    expectCreateCMWithAssertion(t),
-			expTCPMapData: map[string]string{},
-			expUDPMapData: map[string]string{
-				"60": createMapEntryValue("b", "60"),
-				"80": createMapEntryValue("d", "60"),
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError).Times(2)
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(&traefikv1alpha1.IngressRouteTCP{}, nil)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
 			},
-			expErr:    false,
-			expErrStr: "",
+			expErr: false,
 		},
 		{
-			name: "create udp config map with empty values",
+			name: "update IngressRouteTCP when it already exists",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "c-70", ServiceName: "c", Protocol: corev1.ProtocolTCP, Port: 70, TargetPort: 60},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
 			},
-			inOwner:    &metav1.OwnerReference{},
-			setupMocks: expectCreateCMWithAssertion(t),
-			expTCPMapData: map[string]string{
-				"50": createMapEntryValue("a", "60"),
-				"70": createMapEntryValue("c", "60"),
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
+
+				existing := &traefikv1alpha1.IngressRouteTCP{}
+				existing.ResourceVersion = "1"
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "svc-2222-tcp"))
+				tcpClientMock.EXPECT().Get(mock.Anything, "svc-2222-tcp", mock.Anything).
+					Return(existing, nil)
+				tcpClientMock.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, route *traefikv1alpha1.IngressRouteTCP, opts metav1.UpdateOptions) {
+						require.Equal(t, "1", route.ResourceVersion)
+					}).
+					Return(&traefikv1alpha1.IngressRouteTCP{}, nil)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
 			},
-			expUDPMapData: map[string]string{},
-			expErr:        false,
-			expErrStr:     "",
+			expErr: false,
 		},
 		{
-			name: "ignore ports with unknown ports",
+			name: "update IngressRouteUDP when it already exists",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "b-60", ServiceName: "b", Protocol: corev1.ProtocolUDP, Port: 60, TargetPort: 60},
-				{Name: "c-70", ServiceName: "c", Protocol: "invalid", Port: 70, TargetPort: 60},
+				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, Port: 5353, TargetPort: 5353},
 			},
-			inOwner:    &metav1.OwnerReference{},
-			setupMocks: expectCreateCMWithAssertion(t),
-			expTCPMapData: map[string]string{
-				"50": createMapEntryValue("a", "60"),
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
+
+				existing := &traefikv1alpha1.IngressRouteUDP{}
+				existing.ResourceVersion = "42"
+
+				udpClientMock := newMockIngressrouteUdpInterface(t)
+				udpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "svc-5353-udp"))
+				udpClientMock.EXPECT().Get(mock.Anything, "svc-5353-udp", mock.Anything).
+					Return(existing, nil)
+				udpClientMock.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, route *traefikv1alpha1.IngressRouteUDP, opts metav1.UpdateOptions) {
+						require.Equal(t, "42", route.ResourceVersion)
+					}).
+					Return(&traefikv1alpha1.IngressRouteUDP{}, nil)
+				traefikMock.EXPECT().IngressRouteUDPs(testNamespace).Return(udpClientMock)
 			},
-			expUDPMapData: map[string]string{
-				"60": createMapEntryValue("b", "60"),
-			},
-			expErr:    false,
-			expErrStr: "",
+			expErr: false,
 		},
 		{
-			name: "only set owner when defined",
+			name: "set owner references from ingress on IngressRouteTCP",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "b-60", ServiceName: "b", Protocol: corev1.ProtocolUDP, Port: 60, TargetPort: 60},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
 			},
-			inOwner:    nil,
-			setupMocks: expectCreateCMWithAssertion(t),
-			expTCPMapData: map[string]string{
-				"50": createMapEntryValue("a", "60"),
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ownerRef := metav1.OwnerReference{Name: "some-owner", UID: "abc123"}
+				ingressObj := &networkingv1.Ingress{}
+				ingressObj.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(ingressObj, nil)
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Run(func(ctx context.Context, route *traefikv1alpha1.IngressRouteTCP, opts metav1.CreateOptions) {
+						require.Len(t, route.GetOwnerReferences(), 1)
+						require.Equal(t, "some-owner", route.GetOwnerReferences()[0].Name)
+					}).
+					Return(&traefikv1alpha1.IngressRouteTCP{}, nil)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
 			},
-			expUDPMapData: map[string]string{
-				"60": createMapEntryValue("b", "60"),
-			},
-			expErr:    false,
-			expErrStr: "",
+			expErr: false,
 		},
 		{
-			name: "update tcp and udp config map when they already exist",
+			name: "return error when IngressRouteTCP cannot be created",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "d-80", ServiceName: "d", Protocol: corev1.ProtocolUDP, Port: 80, TargetPort: 60},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
 			},
-			inOwner:    &metav1.OwnerReference{},
-			setupMocks: expectUpdateCMWithAssertion(t),
-			expTCPMapData: map[string]string{
-				"50": createMapEntryValue("a", "60"),
-			},
-			expUDPMapData: map[string]string{
-				"80": createMapEntryValue("d", "60"),
-			},
-			expErr:    false,
-			expErrStr: "",
-		},
-		{
-			name: "return error when cm cannot be created",
-			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "b-60", ServiceName: "b", Protocol: corev1.ProtocolUDP, Port: 60, TargetPort: 60},
-			},
-			inOwner: &metav1.OwnerReference{},
-			setupMocks: func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool) {
-				m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, assert.AnError)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
 			},
 			expErr:    true,
-			expErrStr: "failed to create configMap",
+			expErrStr: "failed to expose tcp port",
 		},
 		{
-			name: "return error when cm cannot be created",
+			name: "return error when IngressRouteTCP already exists but cannot be fetched for update",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "a-50", ServiceName: "a", Protocol: corev1.ProtocolTCP, Port: 50, TargetPort: 60},
-				{Name: "b-60", ServiceName: "b", Protocol: corev1.ProtocolUDP, Port: 60, TargetPort: 60},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
 			},
-			inOwner: &metav1.OwnerReference{},
-			setupMocks: func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool) {
-				m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewAlreadyExists(corev1.Resource("configmap"), "configmap"))
-				m.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "svc-2222-tcp"))
+				tcpClientMock.EXPECT().Get(mock.Anything, "svc-2222-tcp", mock.Anything).
+					Return(nil, assert.AnError)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
 			},
 			expErr:    true,
-			expErrStr: "failed to update configMap",
+			expErrStr: "failed to expose tcp port",
+		},
+		{
+			name: "return error when IngressRouteTCP cannot be updated",
+			inExposedPorts: types.ExposedPorts{
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+			},
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
+
+				existing := &traefikv1alpha1.IngressRouteTCP{}
+				existing.ResourceVersion = "1"
+
+				tcpClientMock := newMockIngressrouteTcpInterface(t)
+				tcpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "svc-2222-tcp"))
+				tcpClientMock.EXPECT().Get(mock.Anything, "svc-2222-tcp", mock.Anything).
+					Return(existing, nil)
+				tcpClientMock.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, assert.AnError)
+				traefikMock.EXPECT().IngressRouteTCPs(testNamespace).Return(tcpClientMock)
+			},
+			expErr:    true,
+			expErrStr: "failed to expose tcp port",
+		},
+		{
+			name: "return error when IngressRouteUDP cannot be created",
+			inExposedPorts: types.ExposedPorts{
+				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, Port: 5353, TargetPort: 5353},
+			},
+			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
+				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
+
+				udpClientMock := newMockIngressrouteUdpInterface(t)
+				udpClientMock.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, assert.AnError)
+				traefikMock.EXPECT().IngressRouteUDPs(testNamespace).Return(udpClientMock)
+			},
+			expErr:    true,
+			expErrStr: "failed to expose udp port",
+		},
+		{
+			name:           "handle empty exposed ports list",
+			inExposedPorts: types.ExposedPorts{},
+			setupMocks:     func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {},
+			expErr:         false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmClientMock := newMockConfigMapInterface(t)
-			tt.setupMocks(cmClientMock, tt.expTCPMapData, tt.expUDPMapData, tt.inOwner != nil)
+			traefikMock := newMockTraefikInterface(t)
+			ingressMock := newMockIngressInterface(t)
+			tt.setupMocks(traefikMock, ingressMock)
 
-			exposer := PortExposer{}
+			sut := PortExposer{
+				traefikInterface: traefikMock,
+				ingressInterface: ingressMock,
+				namespace:        testNamespace,
+			}
 
-			err := exposer.ExposePorts(context.TODO(), testNamespace, tt.inExposedPorts, tt.inOwner)
+			err := sut.ExposePorts(context.TODO(), testNamespace, tt.inExposedPorts)
 
 			if tt.expErr {
 				require.Error(t, err)
@@ -185,57 +253,42 @@ func TestIngressNginxTcpUpdExposer_ExposePorts(t *testing.T) {
 	}
 }
 
-func createMapEntryValue(svcName, targetPort string) string {
-	return fmt.Sprintf("%s/%s:%s", testNamespace, svcName, targetPort)
+func assertIngressRouteTCP(t *testing.T, route *traefikv1alpha1.IngressRouteTCP, serviceName string, port, targetPort int32) {
+	t.Helper()
+
+	require.NotNil(t, route)
+	require.Equal(t, testNamespace, route.Namespace)
+	require.Equal(t, util.K8sCesServiceDiscoveryLabels, route.Labels)
+	require.Equal(t, fmt.Sprintf("%s-%d-tcp", serviceName, port), route.Name)
+
+	require.Len(t, route.Spec.EntryPoints, 1)
+	require.Equal(t, fmt.Sprintf("tcp-%d", port), route.Spec.EntryPoints[0])
+
+	require.Len(t, route.Spec.Routes, 1)
+	require.Equal(t, "HostSNI(`*`)", route.Spec.Routes[0].Match)
+
+	require.Len(t, route.Spec.Routes[0].Services, 1)
+	svc := route.Spec.Routes[0].Services[0]
+	require.Equal(t, serviceName, svc.Name)
+	require.Equal(t, testNamespace, svc.Namespace)
+	require.Equal(t, intstr.FromInt32(targetPort), svc.Port)
 }
 
-func asserCM(t *testing.T, cm *corev1.ConfigMap, expData map[string]string, expOwner bool) {
-	require.NotNil(t, cm)
+func assertIngressRouteUDP(t *testing.T, route *traefikv1alpha1.IngressRouteUDP, serviceName string, port, targetPort int32) {
+	t.Helper()
 
-	require.Equal(t, testNamespace, cm.Namespace)
-	require.Equal(t, util.K8sCesServiceDiscoveryLabels, cm.Labels)
-	require.Equal(t, expOwner, len(cm.OwnerReferences) > 0)
+	require.NotNil(t, route)
+	require.Equal(t, testNamespace, route.Namespace)
+	require.Equal(t, util.K8sCesServiceDiscoveryLabels, route.Labels)
+	require.Equal(t, fmt.Sprintf("%s-%d-udp", serviceName, port), route.Name)
 
-	require.True(t, maps.Equal(expData, cm.Data))
-}
+	require.Len(t, route.Spec.EntryPoints, 1)
+	require.Equal(t, fmt.Sprintf("udp-%d", port), route.Spec.EntryPoints[0])
 
-func expectCreateCMWithAssertion(t *testing.T) func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool) {
-	return func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool) {
-		m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
-			Run(func(ctx context.Context, cm *corev1.ConfigMap, opts metav1.CreateOptions) {
-				if cm.Name == "tcp-services" {
-					asserCM(t, cm, expTCPData, expOwner)
-					return
-				}
-
-				if cm.Name == "udp-services" {
-					asserCM(t, cm, expUDPData, expOwner)
-					return
-				}
-
-				assert.Fail(t, "unexpected config map name", "name", cm.Name)
-			}).
-			Return(&corev1.ConfigMap{}, nil)
-	}
-}
-
-func expectUpdateCMWithAssertion(t *testing.T) func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool) {
-	return func(m *mockConfigMapInterface, expTCPData, expUDPData map[string]string, expOwner bool) {
-		m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewAlreadyExists(corev1.Resource("configmap"), "configmap"))
-		m.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).
-			Run(func(ctx context.Context, cm *corev1.ConfigMap, opts metav1.UpdateOptions) {
-				if cm.Name == "tcp-services" {
-					asserCM(t, cm, expTCPData, expOwner)
-					return
-				}
-
-				if cm.Name == "udp-services" {
-					asserCM(t, cm, expUDPData, expOwner)
-					return
-				}
-
-				assert.Fail(t, "unexpected config map name", "name", cm.Name)
-			}).
-			Return(&corev1.ConfigMap{}, nil)
-	}
+	require.Len(t, route.Spec.Routes, 1)
+	require.Len(t, route.Spec.Routes[0].Services, 1)
+	svc := route.Spec.Routes[0].Services[0]
+	require.Equal(t, serviceName, svc.Name)
+	require.Equal(t, testNamespace, svc.Namespace)
+	require.Equal(t, intstr.FromInt32(targetPort), svc.Port)
 }

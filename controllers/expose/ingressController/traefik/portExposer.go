@@ -34,13 +34,15 @@ func (p PortExposer) ExposePorts(ctx context.Context, namespace string, exposedP
 
 		switch port.Protocol {
 		case corev1.ProtocolTCP:
+			client := p.traefikInterface.IngressRouteTCPs(namespace)
 			route := createIngressRouteTCP(namespace, port, owner)
-			if err := p.upsertIngressRouteTCP(ctx, namespace, route); err != nil {
+			if err := p.upsertIngressRouteTCP(ctx, route, client); err != nil {
 				return fmt.Errorf("failed to expose tcp port %s: %w", port.PortString(), err)
 			}
 		case corev1.ProtocolUDP:
+			client := p.traefikInterface.IngressRouteUDPs(namespace)
 			route := createIngressRouteUDP(namespace, port, owner)
-			if err := p.upsertIngressRouteUDP(ctx, namespace, route); err != nil {
+			if err := p.upsertIngressRouteUDP(ctx, route, client); err != nil {
 				return fmt.Errorf("failed to expose udp port %s: %w", port.PortString(), err)
 			}
 		default:
@@ -51,9 +53,7 @@ func (p PortExposer) ExposePorts(ctx context.Context, namespace string, exposedP
 	return nil
 }
 
-func (p PortExposer) upsertIngressRouteTCP(ctx context.Context, namespace string, route *traefikv1alpha1.IngressRouteTCP) error {
-	client := p.traefikInterface.IngressRouteTCPs(namespace)
-
+func (p PortExposer) upsertIngressRouteTCP(ctx context.Context, route *traefikv1alpha1.IngressRouteTCP, client ingressrouteTcpInterface) error {
 	_, err := client.Create(ctx, route, metav1.CreateOptions{})
 	if err == nil {
 		return nil
@@ -77,9 +77,7 @@ func (p PortExposer) upsertIngressRouteTCP(ctx context.Context, namespace string
 	return nil
 }
 
-func (p PortExposer) upsertIngressRouteUDP(ctx context.Context, namespace string, route *traefikv1alpha1.IngressRouteUDP) error {
-	client := p.traefikInterface.IngressRouteUDPs(namespace)
-
+func (p PortExposer) upsertIngressRouteUDP(ctx context.Context, route *traefikv1alpha1.IngressRouteUDP, client ingressrouteUdpInterface) error {
 	_, err := client.Create(ctx, route, metav1.CreateOptions{})
 	if err == nil {
 		return nil

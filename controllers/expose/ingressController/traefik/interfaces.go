@@ -12,3 +12,11 @@ type ingressInterface interface {
 type traefikInterface interface {
 	v1alpha1.TraefikV1alpha1Interface
 }
+
+type ingressrouteTcpInterface interface {
+	v1alpha1.IngressRouteTCPInterface
+}
+
+type ingressrouteUdpInterface interface {
+	v1alpha1.IngressRouteUDPInterface
+}
