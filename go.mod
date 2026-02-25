@@ -4,11 +4,11 @@ go 1.26.0
 
 require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
-	github.com/cloudogu/ces-commons-lib v0.2.0
+	github.com/cloudogu/ces-commons-lib v0.3.0
 	github.com/cloudogu/cesapp-lib v0.18.2
 	github.com/cloudogu/k8s-dogu-lib/v2 v2.11.0
 	github.com/cloudogu/k8s-dogu-operator/v3 v3.19.2
-	github.com/cloudogu/k8s-registry-lib v0.6.0
+	github.com/cloudogu/k8s-registry-lib v1.0.0
 	github.com/cloudogu/retry-lib v0.1.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-logr/logr v1.4.3
@@ -22,8 +22,6 @@ require (
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/controller-runtime v0.23.1
 )
-
-replace github.com/cloudogu/k8s-registry-lib v0.6.0 => github.com/cloudogu/k8s-registry-lib v0.2.2-0.20260219140143-05cf54f445aa
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
