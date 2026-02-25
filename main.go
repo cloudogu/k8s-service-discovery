@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
-	"github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	"github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	doguClient "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
@@ -37,7 +37,8 @@ import (
 )
 
 const (
-	IngressClassName = "k8s-ecosystem-ces-service"
+	IngressClassName                 = "k8s-ecosystem-ces-service"
+	ServiceDiscoveryMaintenanceOwner = "k8s-service-discovery"
 )
 
 var (
@@ -111,27 +112,25 @@ func startManager() error {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
-	ecoSystemClientSet, err := ecoSystem.NewForConfig(serviceDiscManager.GetConfig())
+	ecoSystemClientSet, err := doguClient.NewForConfig(serviceDiscManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create ecosystem client set: %w", err)
 	}
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 
+	maintenanceAdapter := repository.NewMaintenanceModeAdapter(ServiceDiscoveryMaintenanceOwner, serviceDiscManager.GetClient(), watchNamespace)
+
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
 		DeploymentReadyChecker: deploymentReadyChecker,
 		IngressInterface:       clientSet.ingressClient,
 		DoguInterface:          ecoSystemClientSet.Dogus(watchNamespace),
-		GlobalConfigRepo:       globalConfigRepo,
 		Namespace:              watchNamespace,
 		IngressClassName:       IngressClassName,
 		Recorder:               eventRecorder,
 		Controller:             controller,
+		MaintenanceAdapter:     maintenanceAdapter,
 	})
-
-	if err = handleMaintenanceMode(serviceDiscManager, watchNamespace, ingressUpdater, eventRecorder, globalConfigRepo); err != nil {
-		return err
-	}
 
 	cidr, err := config.ReadNetworkPolicyCIDR()
 	if err != nil {
@@ -149,11 +148,14 @@ func startManager() error {
 		serviceDiscManager,
 		clientSet,
 		globalConfigRepo,
+		watchNamespace,
 		controller,
 		ingressUpdater,
 		networkPolicyUpdater,
 		networkpoliciesEnabled,
 		certSync,
+		maintenanceAdapter,
+		eventRecorder,
 	); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
@@ -200,21 +202,27 @@ func configureManager(
 	k8sManager k8sManager,
 	k8sClients k8sClientSet,
 	globalConfigRepo controllers.GlobalConfigRepository,
+	namespace string,
 	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
+	maintenanceAdapter controllers.MaintenanceAdapter,
+	recorder record.EventRecorder,
 ) error {
 	if err := configureReconciler(
 		k8sManager,
 		k8sClients,
 		globalConfigRepo,
+		namespace,
 		ingressController,
 		ingressUpdater,
 		networkPolicyUpdater,
 		networkPoliciesEnabled,
 		certSync,
+		maintenanceAdapter,
+		recorder,
 	); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
@@ -278,28 +286,18 @@ func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string,
 	return nil
 }
 
-func handleMaintenanceMode(k8sManager k8sManager, namespace string, updater controllers.IngressUpdater, recorder record.EventRecorder, globalConfigRepo *repository.GlobalConfigRepository) error {
-	maintenanceModeUpdater, err := controllers.NewMaintenanceModeUpdater(k8sManager.GetClient(), namespace, updater, recorder, globalConfigRepo)
-	if err != nil {
-		return fmt.Errorf("failed to create new maintenance updater: %w", err)
-	}
-
-	if err = k8sManager.Add(maintenanceModeUpdater); err != nil {
-		return fmt.Errorf("failed to add maintenance updater as runnable to the manager: %w", err)
-	}
-
-	return nil
-}
-
 func configureReconciler(
 	k8sManager k8sManager,
 	k8sClients k8sClientSet,
 	globalConfigRepo controllers.GlobalConfigRepository,
+	namespace string,
 	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
+	maintenanceAdapter controllers.MaintenanceAdapter,
+	recorder record.EventRecorder,
 ) error {
 	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater, networkPoliciesEnabled)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
@@ -334,6 +332,11 @@ func configureReconciler(
 
 	if err := loadbalacnerReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup loadbalancer reconciler with the manager: %w", err)
+	}
+
+	if err := controllers.NewMaintenanceModeController(k8sManager.GetClient(), namespace, ingressUpdater, maintenanceAdapter, recorder).
+		SetupWithManager(k8sManager); err != nil {
+		return fmt.Errorf("failed to setup maintenance mode updater with the manager: %w", err)
 	}
 
 	return nil

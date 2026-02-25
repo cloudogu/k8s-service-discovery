@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
-	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,24 +21,11 @@ import (
 
 var testCtx = context.Background()
 
-func getGlobalConfigRepoMockWithMaintenance(t *testing.T, maintenanceMode bool) GlobalConfigRepository {
-	var entries registryconfig.Entries
+func getMaintenanceAdapterMock(t *testing.T, maintenanceMode bool) maintenanceAdapter {
+	mck := newMockMaintenanceAdapter(t)
+	mck.EXPECT().GetStatus(testCtx).Return(repository.MaintenanceModeDescription{}, maintenanceMode, nil)
 
-	if maintenanceMode {
-		entries = registryconfig.Entries{
-			"maintenance": "maintenance",
-		}
-	} else {
-		entries = registryconfig.Entries{}
-	}
-
-	globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-	globalConfig := registryconfig.GlobalConfig{
-		Config: registryconfig.CreateConfig(entries),
-	}
-	globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
-
-	return globalConfigRepoMock
+	return mck
 }
 
 const (
@@ -51,7 +38,7 @@ func TestNewIngressUpdater(t *testing.T) {
 		// given
 		ingressInterfaceMock := newMockIngressInterface(t)
 		doguInterfaceMock := newMockDoguInterface(t)
-		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
+		maintenanceAdapterMock := newMockMaintenanceAdapter(t)
 		ingressControllerMock := newMockIngressController(t)
 		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
 
@@ -60,11 +47,11 @@ func TestNewIngressUpdater(t *testing.T) {
 			deploymentReadyCheckerMock,
 			ingressInterfaceMock,
 			doguInterfaceMock,
-			globalConfigRepoMock,
 			testNamespace,
 			testIngressClassName,
 			newMockEventRecorder(t),
 			ingressControllerMock,
+			maintenanceAdapterMock,
 		})
 
 		// then
@@ -79,10 +66,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		}
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -100,10 +88,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -126,10 +115,11 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 			}},
 		}
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
 		}
 
 		// when
@@ -167,11 +157,12 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(nil, assert.AnError)
 
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 
 		sut := ingressUpdater{
-			globalConfigRepo: globalConfigRepoMock,
-			doguInterface:    doguInterfaceMock,
+			namespace:          testNamespace,
+			maintenanceAdapter: maintenanceAdapterMock,
+			doguInterface:      doguInterfaceMock,
 		}
 
 		// when
@@ -209,12 +200,13 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(false, assert.AnError)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			namespace:              testNamespace,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			doguInterface:          doguInterfaceMock,
 		}
@@ -263,7 +255,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
@@ -274,7 +266,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,
@@ -333,7 +325,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
@@ -346,7 +338,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		})
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,
@@ -394,14 +386,14 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		recorderMock := newMockEventRecorder(t)
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
-		globalConfigRepoMock := getGlobalConfigRepoMockWithMaintenance(t, false)
+		maintenanceAdapterMock := getMaintenanceAdapterMock(t, false)
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
 		ingressInterfaceMock := newMockIngressInterface(t)
 
 		sut := ingressUpdater{
-			globalConfigRepo:       globalConfigRepoMock,
+			maintenanceAdapter:     maintenanceAdapterMock,
 			deploymentReadyChecker: deploymentReadyChecker,
 			eventRecorder:          recorderMock,
 			doguInterface:          doguInterfaceMock,

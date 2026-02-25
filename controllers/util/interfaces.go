@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 )
