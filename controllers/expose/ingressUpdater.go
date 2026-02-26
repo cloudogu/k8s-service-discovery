@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
@@ -78,8 +78,6 @@ func (sr *serviceRewrite) generateConfig() string {
 }
 
 type ingressUpdater struct {
-	// globalConfig is used to read the global configuration.
-	globalConfigRepo GlobalConfigRepository
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string
 	// IngressClassName defines the ingress class for the ces services.
@@ -90,23 +88,23 @@ type ingressUpdater struct {
 	controller             ingressController
 	ingressInterface       ingressInterface
 	doguInterface          doguInterface
+	maintenanceAdapter     maintenanceAdapter
 }
 
 type IngressUpdaterDependencies struct {
 	DeploymentReadyChecker DeploymentReadyChecker
 	IngressInterface       ingressInterface
 	DoguInterface          doguInterface
-	GlobalConfigRepo       GlobalConfigRepository
 	Namespace              string
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
+	MaintenanceAdapter     maintenanceAdapter
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
 func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 	return &ingressUpdater{
-		globalConfigRepo:       deps.GlobalConfigRepo,
 		namespace:              deps.Namespace,
 		ingressClassName:       deps.IngressClassName,
 		deploymentReadyChecker: deps.DeploymentReadyChecker,
@@ -114,12 +112,13 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 		controller:             deps.Controller,
 		ingressInterface:       deps.IngressInterface,
 		doguInterface:          deps.DoguInterface,
+		maintenanceAdapter:     deps.MaintenanceAdapter,
 	}
 }
 
 // UpsertIngressForService creates or updates the ingress object of the given service.
 func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	isMaintenanceMode, err := util.IsMaintenanceModeActive(ctx, i.globalConfigRepo)
+	_, isMaintenanceMode, err := i.maintenanceAdapter.GetStatus(ctx)
 	if err != nil {
 		return err
 	}

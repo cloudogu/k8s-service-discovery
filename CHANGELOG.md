@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v5.0.0] - 2026-02-26
+> [!IMPORTANT]
+> Breaking change!
+> New compatible versions of k8s-ces-assets, k8s-backup-operator and k8s-ces-exporter are required.
+
+### Changed
+- [#96] Read maintenance mode from special `maintenance` ConfigMap
+  - Previously, the maintenance mode was read from the global config, 
+    which caused Dogus to restart unnecessarily.
+
 ## [v4.0.1] - 2026-02-17
 ### Security
 - [#99] Fix Go stdlib CVE-2025-68121

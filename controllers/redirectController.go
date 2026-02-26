@@ -93,6 +93,7 @@ func (r *RedirectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}, builder.WithPredicates(globalConfigPredicate())).
 		Owns(&networking.Ingress{}, builder.WithPredicates(redirectIngressPredicate())).
+		Named("redirect").
 		Complete(r)
 }
 

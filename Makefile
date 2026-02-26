@@ -1,11 +1,12 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=4.0.1
+VERSION=5.0.0
 
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.26.0
 MAKEFILES_VERSION=10.6.0
 LINT_VERSION?=v2.9.0
+MOCKERY_VERSION=v2.53.5
 
 ADDITIONAL_CLEAN=dist-clean
 
@@ -25,6 +26,7 @@ include build/make/static-analysis.mk
 include build/make/clean.mk
 include build/make/digital-signature.mk
 include build/make/mocks.mk
+include build/make/release.mk
 
 K8S_COMPONENT_SOURCE_VALUES = ${HELM_SOURCE_DIR}/values.yaml
 K8S_COMPONENT_TARGET_VALUES = ${HELM_TARGET_DIR}/values.yaml
