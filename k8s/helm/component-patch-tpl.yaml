@@ -1,7 +1,7 @@
 apiVersion: v1
 values:
   images:
-    serviceDiscovery: cloudogu/k8s-service-discovery:4.0.1
+    serviceDiscovery: cloudogu/k8s-service-discovery:5.0.0
 patches:
   values.yaml:
     manager:

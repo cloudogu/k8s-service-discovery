@@ -1,6 +1,6 @@
 # Set these to the desired values
 ARTIFACT_ID=k8s-service-discovery
-VERSION=4.0.1
+VERSION=5.0.0
 
 IMAGE=cloudogu/${ARTIFACT_ID}:${VERSION}
 GOTAG?=1.26.0
