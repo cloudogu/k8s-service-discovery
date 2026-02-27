@@ -33,6 +33,7 @@ type RedirectReconciler struct {
 	Client             client.Client
 	GlobalConfigGetter GlobalConfigRepository
 	Redirector         AlternativeFQDNRedirector
+	Namespace          string
 }
 
 // Reconcile reconciles the global configmap and triggers the AlternativeFQDNRedirector to redirect the alternative FQDNs.

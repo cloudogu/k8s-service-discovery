@@ -52,7 +52,7 @@ type AlternativeFQDNRedirector interface {
 }
 
 type PortExposer interface {
-	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *metav1.OwnerReference) error
+	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error
 }
 
 type IngressControllerSelector interface {

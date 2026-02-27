@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
@@ -21,8 +20,8 @@ import (
 const (
 	staticContentBackendName           = "k8s-ces-assets-service"
 	staticContentBackendPort           = 80
-	staticContentBackendRewrite        = "/errors/503.html"
-	staticContentDoguIsStartingRewrite = "/errors/starting.html"
+	staticContentBackendRewrite        = "maintenance-mode@kubernetescrd"
+	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
 )
 
 const (
@@ -88,6 +87,7 @@ type ingressUpdater struct {
 	controller             ingressController
 	ingressInterface       ingressInterface
 	doguInterface          doguInterface
+	middlewareManager      middlewareManager
 	maintenanceAdapter     maintenanceAdapter
 }
 
@@ -99,6 +99,7 @@ type IngressUpdaterDependencies struct {
 	IngressClassName       string
 	Recorder               eventRecorder
 	Controller             ingressController
+	MiddlewareManager      middlewareManager
 	MaintenanceAdapter     maintenanceAdapter
 }
 
@@ -112,6 +113,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
 		controller:             deps.Controller,
 		ingressInterface:       deps.IngressInterface,
 		doguInterface:          deps.DoguInterface,
+		middlewareManager:      deps.MiddlewareManager,
 		maintenanceAdapter:     deps.MaintenanceAdapter,
 	}
 }
@@ -207,7 +209,8 @@ func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv2.Ingres
 
 func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv2.Dogu) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
-	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): staticContentBackendRewrite}
+	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentBackendRewrite)
+	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): middlewareName}
 
 	err := i.upsertIngressObject(ctx, cesService.Name, service, cesService.Location, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
@@ -220,7 +223,8 @@ func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context,
 
 func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
 	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
-	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): staticContentDoguIsStartingRewrite}
+	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentDoguIsStartingRewrite)
+	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): middlewareName}
 
 	err := i.upsertIngressObject(ctx, cesService.Name, service, cesService.Location, staticContentBackendName, staticContentBackendPort, annotations)
 	if err != nil {
@@ -236,6 +240,13 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 	ingressPath := cesService.Location
 	annotations := map[string]string{}
 
+	ownerReferences := []v1.OwnerReference{{
+		APIVersion: service.APIVersion,
+		Kind:       service.Kind,
+		Name:       service.Name,
+		UID:        service.UID,
+	}}
+
 	if cesService.hasRewriteConfig() {
 		// the service has rewrite-config, we need to add it
 		rewriteCfg, err := cesService.getRewriteConfig()
@@ -243,14 +254,18 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 			return fmt.Errorf("error getting rewrite-config from ces-service: %w", err)
 		}
 
-		annotations[i.controller.GetRewriteAnnotationKey()] = rewriteCfg.Rewrite
-		annotations[i.controller.GetUseRegexKey()] = "true"
+		annotations["traefik.ingress.kubernetes.io/router.middlewares"] = fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, rewriteCfg.Rewrite)
 		ingressPath = rewriteCfg.Pattern
 	} else if cesService.Pass != cesService.Location {
-		// only add the rewrite-target if there is no explicit rewrite-config and the cesService.Pass is different the location
-		annotations[i.controller.GetRewriteAnnotationKey()] = path.Join(cesService.Pass, "$2")
-		annotations[i.controller.GetUseRegexKey()] = "true"
-		ingressPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(ingressPath, "/"))
+		// Create a dynamic middleware for the path rewrite
+		middlewareName, err := i.middlewareManager.createOrUpdateReplacePathMiddleware(ctx, service.Name, cesService, ownerReferences)
+		if err != nil {
+			return fmt.Errorf("failed to create/update middleware: %w", err)
+		}
+
+		// Reference the created middleware
+		annotations["traefik.ingress.kubernetes.io/router.middlewares"] = fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName)
+		ingressPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(cesService.Location, "/"))
 	}
 
 	// add other additional annotations (can possibly overwrite the rewrite annotations)

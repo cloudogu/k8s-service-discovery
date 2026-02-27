@@ -57,3 +57,26 @@ rules:
       - create
       - update
       - delete
+  # create and update traefik middlewares for dogus
+  - apiGroups:
+      - traefik.io
+    resources:
+      - middlewares
+    verbs:
+      - get
+      - list
+      - create
+      - update
+      - delete
+  # expose udp and tcp ports
+  - apiGroups:
+      - traefik.io
+    resources:
+      - ingressroutetcps
+      - ingressrouteudps
+    verbs:
+      - get
+      - list
+      - create
+      - update
+      - delete

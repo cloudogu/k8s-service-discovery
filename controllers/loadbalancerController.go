@@ -79,19 +79,14 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedDoguPorts)
 
-	lb, uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
+	_, uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
 	if uErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
 	logger.Info("Successfully applied new state to loadbalancer.")
 
-	owner, err := lb.GetOwnerReference(r.Client.Scheme())
-	if err != nil {
-		logger.Info("Could not get OwnerReference from loadbalancer", "error", err)
-	}
-
-	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts, owner); eErr != nil {
+	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts); eErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
 	}
 

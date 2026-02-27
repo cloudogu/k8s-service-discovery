@@ -41,7 +41,7 @@ func TestNewIngressUpdater(t *testing.T) {
 		maintenanceAdapterMock := newMockMaintenanceAdapter(t)
 		ingressControllerMock := newMockIngressController(t)
 		deploymentReadyCheckerMock := NewMockDeploymentReadyChecker(t)
-
+		middlewareManagerMock := newMockMiddlewareManager(t)
 		// when
 		sut := NewIngressUpdater(IngressUpdaterDependencies{
 			deploymentReadyCheckerMock,
@@ -51,6 +51,7 @@ func TestNewIngressUpdater(t *testing.T) {
 			testIngressClassName,
 			newMockEventRecorder(t),
 			ingressControllerMock,
+			middlewareManagerMock,
 			maintenanceAdapterMock,
 		})
 
@@ -246,8 +247,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		}
 
 		expectedIngress := getTestIngress("test", "myPattern", service, service.Name, 55, map[string]string{
-			"rewrite": "",
-			"regex":   "true",
+			"traefik.ingress.kubernetes.io/router.middlewares": "my-namespace-@kubernetescrd",
 		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
@@ -259,8 +259,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
-		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
 		ingressInterfaceMock := newMockIngressInterface(t)
 		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
 		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
@@ -301,7 +299,7 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 				Name: "test",
 				Annotations: map[string]string{
 					CesServiceAnnotation:                              string(cesServiceString),
-					annotation.AdditionalIngressAnnotationsAnnotation: "{\"nginx.org/client-max-body-size\":\"100m\",\"example-annotation\":\"example-value\"}",
+					annotation.AdditionalIngressAnnotationsAnnotation: "{\"example-annotation\":\"example-value\"}",
 				},
 				Namespace: testNamespace,
 				Labels:    map[string]string{"dogu.name": "test"},
@@ -314,10 +312,8 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		existingIngress := getTestIngress("test", "myPattern", service, service.Name, 44, map[string]string{})
 
 		expectedIngress := getTestIngress("test", "myPattern", service, service.Name, 55, map[string]string{
-			"rewrite":                        "",
-			"regex":                          "true",
-			"nginx.org/client-max-body-size": "100m",
-			"example-annotation":             "example-value",
+			"traefik.ingress.kubernetes.io/router.middlewares": "my-namespace-@kubernetescrd",
+			"example-annotation": "example-value",
 		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
@@ -329,8 +325,6 @@ func Test_ingressUpdater_UpdateIngressOfService(t *testing.T) {
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, dogu.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
-		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
 		ingressInterfaceMock := newMockIngressInterface(t)
 		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(existingIngress, nil)
 		ingressInterfaceMock.EXPECT().Update(testCtx, mock.Anything, metav1.UpdateOptions{}).Return(nil, nil).Run(func(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) {
@@ -428,9 +422,12 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 				Namespace: testNamespace,
 				Labels:    map[string]string{"dogu.name": "test"},
 				Annotations: map[string]string{
-					annotation.AdditionalIngressAnnotationsAnnotation: "{{{{\"nginx.org/client-max-body-size\":\"100m\",\"example-annotation\":\"example-value\"}",
+					annotation.AdditionalIngressAnnotationsAnnotation: "{{{{\"example-annotation\":\"example-value\"}",
 				},
 			},
+		}
+		ownerReferences := []metav1.OwnerReference{
+			{Name: service.GetName()},
 		}
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		doguInterfaceMock := newMockDoguInterface(t)
@@ -439,13 +436,14 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
 
+		middlewareManagerMock := newMockMiddlewareManager(t)
+		middlewareManagerMock.EXPECT().createOrUpdateReplacePathMiddleware(testCtx, service.Name, mock.Anything, ownerReferences).Return("/errors/starting.html", nil)
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
-		ingressControllerMock.EXPECT().GetUseRegexKey().Return("regex")
 
 		sut := ingressUpdater{
 			deploymentReadyChecker: deploymentReadyChecker,
 			doguInterface:          doguInterfaceMock,
+			middlewareManager:      middlewareManagerMock,
 			controller:             ingressControllerMock,
 		}
 
@@ -476,7 +474,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 			"k8s-ces-assets-service",
 			80,
 			map[string]string{
-				"rewrite": "/errors/503.html",
+				"traefik.ingress.kubernetes.io/router.middlewares": "my-namespace-maintenance-mode@kubernetescrd",
 			},
 		)
 
@@ -484,7 +482,7 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
+		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("traefik.ingress.kubernetes.io/router.middlewares")
 		recorderMock := newMockEventRecorder(t)
 		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Ingress for service [%s] has been updated to maintenance mode.", "test")
 		ingressInterfaceMock := newMockIngressInterface(t)
@@ -521,14 +519,14 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		}
 
 		expectedIngress := getTestIngress("test", "/myLocation", service, "k8s-ces-assets-service", 80, map[string]string{
-			"rewrite": "/errors/starting.html",
+			"traefik.ingress.kubernetes.io/router.middlewares": "my-namespace-dogu-starting@kubernetescrd",
 		})
 
 		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
 		doguInterfaceMock := newMockDoguInterface(t)
 		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(dogu, nil)
 		ingressControllerMock := newMockIngressController(t)
-		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("rewrite")
+		ingressControllerMock.EXPECT().GetRewriteAnnotationKey().Return("traefik.ingress.kubernetes.io/router.middlewares")
 		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
 		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(false, nil).Once()
 		ingressInterfaceMock := newMockIngressInterface(t)
