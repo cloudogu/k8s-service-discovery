@@ -5,7 +5,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-service-discovery
-    tag: 4.0.0
+    tag: 5.0.1
   env:
     logLevel: info
   resources:

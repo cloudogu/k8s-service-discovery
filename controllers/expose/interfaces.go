@@ -3,8 +3,7 @@ package expose
 import (
 	"context"
 
-	"github.com/cloudogu/k8s-dogu-operator/v3/api/ecoSystem"
-	libconfig "github.com/cloudogu/k8s-registry-lib/config"
+	doguClient "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +11,10 @@ import (
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/tools/record"
 )
+
+type maintenanceAdapter interface {
+	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
+}
 
 // DeploymentReadyChecker checks the readiness from deployments.
 type DeploymentReadyChecker interface {
@@ -21,12 +24,6 @@ type DeploymentReadyChecker interface {
 
 type eventRecorder interface {
 	record.EventRecorder
-}
-
-type GlobalConfigRepository interface {
-	Get(context.Context) (libconfig.GlobalConfig, error)
-	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
-	Update(ctx context.Context, globalConfig libconfig.GlobalConfig) (libconfig.GlobalConfig, error)
 }
 
 // used for mocks
@@ -44,7 +41,7 @@ type ingressInterface interface {
 }
 
 type doguInterface interface {
-	ecoSystem.DoguInterface
+	doguClient.DoguInterface
 }
 
 type ingressController interface {

@@ -1,12 +1,12 @@
 package util
 
 import (
-	"context"
 	"fmt"
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	"strings"
+
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 var K8sCesServiceDiscoveryLabels = map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"}
@@ -45,18 +45,4 @@ func HasDoguLabel(deployment client.Object) bool {
 
 func GetAppLabel() map[string]string {
 	return map[string]string{appLabelKey: appLabelValueCes}
-}
-
-func IsMaintenanceModeActive(ctx context.Context, globalConfigRepo GlobalConfigRepository) (bool, error) {
-	globalConfig, err := globalConfigRepo.Get(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get global config for maintenance mode: %w", err)
-	}
-
-	get, ok := globalConfig.Get("maintenance")
-	if !ok || !ContainsChars(get.String()) {
-		return false, nil
-	}
-
-	return true, nil
 }

@@ -8,6 +8,9 @@ import (
 	v2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
 	mock "github.com/stretchr/testify/mock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 )

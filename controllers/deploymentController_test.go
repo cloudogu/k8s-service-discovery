@@ -3,7 +3,7 @@ package controllers
 import (
 	"testing"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-operator/v3/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -122,7 +122,6 @@ func Test_deploymentReconciler_Reconcile(t *testing.T) {
 			Labels:    map[string]string{"dogu.name": "my-dogu"},
 		}}
 		service := &corev1.Service{
-			TypeMeta:   metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: "my-dogu", Namespace: testNamespace},
 		}
 		clientMock := testclient.NewClientBuilder().WithScheme(getScheme()).WithObjects(deployment, service).Build()
