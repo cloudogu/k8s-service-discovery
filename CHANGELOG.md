@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v5.0.1] - 2026-02-27
+### Changed
+- [#96] update k8s-dogu-lib to 2.12.0
+
 ## [v5.0.0] - 2026-02-26
 > [!IMPORTANT]
 > Breaking change!
