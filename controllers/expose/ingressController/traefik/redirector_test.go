@@ -435,6 +435,7 @@ func Test_createRedirectMiddleware(t *testing.T) {
 					Spec: traefikapi.MiddlewareSpec{},
 				}
 				mwi.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(middleware, nil)
+				mwi.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewNotFound(v1.Resource("middleware"), "test"))
 				m.EXPECT().Middlewares(namespace).Return(mwi)
 			},
 			expErr: false,
@@ -448,6 +449,7 @@ func Test_createRedirectMiddleware(t *testing.T) {
 			setupMock: func(m *mockTraefikInterface) {
 				mwi := newMockMiddlewareInterface(t)
 				mwi.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
+				mwi.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil, apierrors.NewNotFound(v1.Resource("middleware"), "test"))
 				m.EXPECT().Middlewares(namespace).Return(mwi)
 			},
 			expErr: true,

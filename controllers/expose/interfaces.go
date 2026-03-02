@@ -56,7 +56,6 @@ type networkPolicyInterface interface {
 type middlewareManager interface {
 	createOrUpdateReplacePathMiddleware(ctx context.Context, serviceName string, cesService CesService, ownerReferences []v1.OwnerReference) (string, error)
 	CreateOrUpdateAlternativeFQDNRedirectMiddleware(ctx context.Context, alternativeFQDNs []string, primaryFQDN string, ownerReferences []v1.OwnerReference) (string, error)
-	middlewareInterface
 }
 
 //nolint:unused
