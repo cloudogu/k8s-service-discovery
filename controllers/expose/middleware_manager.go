@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/traefik/traefik/v3/pkg/config/dynamic"
-	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,11 +15,11 @@ import (
 )
 
 type MiddlewareManager struct {
-	client    traefikv1alpha1.MiddlewareInterface
+	client    middlewareInterface
 	namespace string
 }
 
-func NewMiddlewareManager(traefikClient traefikv1alpha1.TraefikV1alpha1Interface, namespace string) *MiddlewareManager {
+func NewMiddlewareManager(traefikClient traefikInterface, namespace string) *MiddlewareManager {
 	return &MiddlewareManager{
 		client:    traefikClient.Middlewares(namespace),
 		namespace: namespace,
@@ -32,7 +31,6 @@ func (m *MiddlewareManager) createOrUpdateReplacePathMiddleware(ctx context.Cont
 	middlewareName := fmt.Sprintf("%s-%s-rewrite", serviceName, cesService.Name)
 	targetPath := path.Join(cesService.Pass, "$2")
 
-	// Create the middleware object using typed API
 	middleware := &traefikapi.Middleware{
 		ObjectMeta: v1.ObjectMeta{
 			Name:            middlewareName,
