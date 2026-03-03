@@ -102,11 +102,12 @@ node('docker') {
                 k3d.kubectl("--namespace default create configmap global-config --from-literal=config.yaml='key: value'")
             }
 
-            stage('install traefik CRDs') {
-                k3d.kubectl("apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml")
-            }
-
             stage('Deploy Manager') {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
+                    k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
+                    k3d.helm("install k8s-ces-gateway oci://${registry}/k8s/k8s-ces-gateway")
+                    k3d.helm("registry logout ${registry}")
+                }
                 k3d.helm("install ${repositoryName} ${helmChartDir}")
             }
 
