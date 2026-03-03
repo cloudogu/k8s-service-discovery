@@ -100,6 +100,8 @@ node('docker') {
 
             stage('create global configmap') {
                 k3d.kubectl("--namespace default create configmap global-config --from-literal=config.yaml='key: value'")
+                k3d.kubectl("get pods -A")
+                k3d.kubectl("get ns -A")
             }
 
             stage('Prepare Gateway') {
