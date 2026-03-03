@@ -106,27 +106,6 @@ node('docker') {
                 k3d.kubectl("apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml")
             }
 
-//             stage('Prepare Gateway') {
-//                 k3d.kubectl("--namespace default wait --for=condition=Ready pods --all")
-//                 // reinstall newest k8s-ces-gateway version with traefik crds
-//                 k3d.kubectl("delete component k8s-ces-gateway --namespace default")
-//                 def gateway = """
-// apiVersion: k8s.cloudogu.com/v1
-// kind: Component
-// metadata:
-//   name: k8s-ces-gateway
-//   labels:
-//     app: ces
-//     app.kubernetes.io/name: k8s-ces-gateway
-// spec:
-//   name: k8s-ces-gateway
-//   namespace: default
-//   version: 3.0.0
-// """
-//                 writeFile(file: "gateway.yaml", text: gateway)
-//                 k3d.kubectl("apply -f gateway.yaml --namespace default")
-//             }
-
             stage('Deploy Manager') {
                 k3d.helm("install ${repositoryName} ${helmChartDir}")
             }
