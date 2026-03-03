@@ -140,32 +140,6 @@ func TestIngressRedirector_RedirectAlternativeFQDN(t *testing.T) {
 			expErr:     true,
 			errMsg:     "failed to set owner for redirect ingress",
 		},
-		//{
-		//	name: "return error when middleware cannot be created",
-		//	inAltFQDNList: []types.AlternativeFQDN{
-		//		{FQDN: "test.testFqdn", CertificateSecretName: defaultCertificateName},
-		//	},
-		//	inSetOwner: func(targetObject metav1.Object) error { return nil },
-		//	setupMock: func(m *mockIngressInterface, t *mockTraefikInterface, l []types.AlternativeFQDN) {
-		//		ingress := &v1.Ingress{
-		//			ObjectMeta: metav1.ObjectMeta{
-		//				Name: ingressName,
-		//				UID:  "test-uid",
-		//			},
-		//		}
-		//		m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(ingress, nil)
-		//		t.EXPECT().Middlewares(namespace).Return(&mockMiddlewareInterface{
-		//			createOrUpdateFunc: func(ctx context.Context, middleware interface{}, opts metav1.UpdateOptions) (interface{}, error) {
-		//				return nil, assert.AnError
-		//			},
-		//			getFunc: func(ctx context.Context, name string, opts metav1.GetOptions) (interface{}, error) {
-		//				return nil, apierrors.NewNotFound(v1.Resource("middleware"), name)
-		//			},
-		//		})
-		//	},
-		//	expErr: true,
-		//	errMsg: "failed to create alternative fqdn redirect middleware",
-		//},
 	}
 
 	for _, tt := range tests {
