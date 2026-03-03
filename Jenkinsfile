@@ -81,23 +81,6 @@ node('docker') {
         try {
             stage('Set up k3d cluster') {
                 k3d.startK3d()
-                // reinstall newest k8s-ces-gateway version with traefik crds
-                k3d.kubectl("--namespace default delete component k8s-ces-gateway")
-                def gateway = """
-apiVersion: k8s.cloudogu.com/v1
-kind: Component
-metadata:
-  name: k8s-ces-gateway
-  labels:
-    app: ces
-    app.kubernetes.io/name: k8s-ces-gateway
-spec:
-  name: k8s-ces-gateway
-  namespace: default
-  version: 3.0.0
-"""
-                writeFile(file: "gateway.yaml", text: gateway)
-                k3d.kubectl("--namespace default apply -f gateway.yaml")
             }
 
             String controllerVersion = makefile.getVersion()
@@ -117,6 +100,27 @@ spec:
 
             stage('create global configmap') {
                 k3d.kubectl("--namespace default create configmap global-config --from-literal=config.yaml='key: value'")
+            }
+
+            stage('Prepare Gateway') {
+                k3d.kubectl("--namespace default wait --for=condition=Ready pods --all")
+                // reinstall newest k8s-ces-gateway version with traefik crds
+                k3d.kubectl("delete component k8s-ces-gateway --namespace default")
+                def gateway = """
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  name: k8s-ces-gateway
+  labels:
+    app: ces
+    app.kubernetes.io/name: k8s-ces-gateway
+spec:
+  name: k8s-ces-gateway
+  namespace: default
+  version: 3.0.0
+"""
+                writeFile(file: "gateway.yaml", text: gateway)
+                k3d.kubectl("apply -f gateway.yaml --namespace default")
             }
 
             stage('Deploy Manager') {
