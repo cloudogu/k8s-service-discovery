@@ -81,6 +81,23 @@ node('docker') {
         try {
             stage('Set up k3d cluster') {
                 k3d.startK3d()
+                // reinstall newest k8s-ces-gateway version with traefik crds
+                k3d.kubectl("--namespace default delete component k8s-ces-gateway")
+                def gateway = """
+apiVersion: k8s.cloudogu.com/v1
+kind: Component
+metadata:
+  name: k8s-ces-gateway
+  labels:
+    app: ces
+    app.kubernetes.io/name: k8s-ces-gateway
+spec:
+  name: k8s-ces-gateway
+  namespace: default
+  version: 3.0.0
+"""
+                writeFile(file: "gateway.yaml", text: gateway)
+                k3d.kubectl("--namespace default apply -f gateway.yaml")
             }
 
             String controllerVersion = makefile.getVersion()
