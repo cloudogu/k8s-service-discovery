@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v6.0.0] - 2026-03-04
 > [!IMPORTANT]
 > Breaking change!
 > New compatible version of k8s-ces-gateway is required (3.x.x)
