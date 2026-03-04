@@ -7,7 +7,6 @@ import (
 
 	types "github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	mock "github.com/stretchr/testify/mock"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,17 +23,17 @@ func (_m *MockIngressController) EXPECT() *MockIngressController_Expecter {
 	return &MockIngressController_Expecter{mock: &_m.Mock}
 }
 
-// ExposePorts provides a mock function with given fields: ctx, namespace, exposedPorts, owner
-func (_m *MockIngressController) ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *v1.OwnerReference) error {
-	ret := _m.Called(ctx, namespace, exposedPorts, owner)
+// ExposePorts provides a mock function with given fields: ctx, namespace, exposedPorts
+func (_m *MockIngressController) ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error {
+	ret := _m.Called(ctx, namespace, exposedPorts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExposePorts")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ExposedPorts, *v1.OwnerReference) error); ok {
-		r0 = rf(ctx, namespace, exposedPorts, owner)
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.ExposedPorts) error); ok {
+		r0 = rf(ctx, namespace, exposedPorts)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -51,14 +50,13 @@ type MockIngressController_ExposePorts_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - exposedPorts types.ExposedPorts
-//   - owner *v1.OwnerReference
-func (_e *MockIngressController_Expecter) ExposePorts(ctx interface{}, namespace interface{}, exposedPorts interface{}, owner interface{}) *MockIngressController_ExposePorts_Call {
-	return &MockIngressController_ExposePorts_Call{Call: _e.mock.On("ExposePorts", ctx, namespace, exposedPorts, owner)}
+func (_e *MockIngressController_Expecter) ExposePorts(ctx interface{}, namespace interface{}, exposedPorts interface{}) *MockIngressController_ExposePorts_Call {
+	return &MockIngressController_ExposePorts_Call{Call: _e.mock.On("ExposePorts", ctx, namespace, exposedPorts)}
 }
 
-func (_c *MockIngressController_ExposePorts_Call) Run(run func(ctx context.Context, namespace string, exposedPorts types.ExposedPorts, owner *v1.OwnerReference)) *MockIngressController_ExposePorts_Call {
+func (_c *MockIngressController_ExposePorts_Call) Run(run func(ctx context.Context, namespace string, exposedPorts types.ExposedPorts)) *MockIngressController_ExposePorts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(types.ExposedPorts), args[3].(*v1.OwnerReference))
+		run(args[0].(context.Context), args[1].(string), args[2].(types.ExposedPorts))
 	})
 	return _c
 }
@@ -68,7 +66,7 @@ func (_c *MockIngressController_ExposePorts_Call) Return(_a0 error) *MockIngress
 	return _c
 }
 
-func (_c *MockIngressController_ExposePorts_Call) RunAndReturn(run func(context.Context, string, types.ExposedPorts, *v1.OwnerReference) error) *MockIngressController_ExposePorts_Call {
+func (_c *MockIngressController_ExposePorts_Call) RunAndReturn(run func(context.Context, string, types.ExposedPorts) error) *MockIngressController_ExposePorts_Call {
 	_c.Call.Return(run)
 	return _c
 }

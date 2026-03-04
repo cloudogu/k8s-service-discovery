@@ -79,19 +79,14 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedDoguPorts)
 
-	lb, uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
+	uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
 	if uErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
 	logger.Info("Successfully applied new state to loadbalancer.")
 
-	owner, err := lb.GetOwnerReference(r.Client.Scheme())
-	if err != nil {
-		logger.Info("Could not get OwnerReference from loadbalancer", "error", err)
-	}
-
-	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts, owner); eErr != nil {
+	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts); eErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
 	}
 
@@ -114,10 +109,10 @@ func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]type
 	return serviceList, nil
 }
 
-func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts, setOwner func(object metav1.Object)) (types.LoadBalancer, error) {
+func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts, setOwner func(object metav1.Object)) error {
 	lbObj, err := r.SvcClient.Get(ctx, types.LoadbalancerName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		return types.LoadBalancer{}, fmt.Errorf("failed to get service for loadbalancer: %w", err)
+		return fmt.Errorf("failed to get service for loadbalancer: %w", err)
 	}
 
 	if apierrors.IsNotFound(err) {
@@ -125,17 +120,17 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 		newLBService := newLB.ToK8sService()
 		setOwner(newLBService)
 
-		lbService, cErr := r.SvcClient.Create(ctx, newLBService, metav1.CreateOptions{})
+		_, cErr := r.SvcClient.Create(ctx, newLBService, metav1.CreateOptions{})
 		if cErr != nil {
-			return types.LoadBalancer{}, fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
+			return fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
 		}
 
-		return types.LoadBalancer(*lbService), nil
+		return nil
 	}
 
 	lb, ok := types.ParseLoadBalancer(lbObj)
 	if !ok {
-		return types.LoadBalancer{}, fmt.Errorf("could not parse existing service to LoadBalancer because of unkown type %T", lbObj)
+		return fmt.Errorf("could not parse existing service to LoadBalancer because of unkown type %T", lbObj)
 	}
 
 	lb.ApplyConfig(cfg)
@@ -146,10 +141,10 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 
 	updatedLBService, uErr := r.SvcClient.Update(ctx, updatedLBService, metav1.UpdateOptions{})
 	if uErr != nil {
-		return types.LoadBalancer{}, fmt.Errorf("failed to update existing loadbalancer: %w", uErr)
+		return fmt.Errorf("failed to update existing loadbalancer: %w", uErr)
 	}
 
-	return types.LoadBalancer(*updatedLBService), nil
+	return nil
 }
 
 // SetupWithManager sets up the ces-loadbalancer configmap with the Manager.

@@ -103,6 +103,11 @@ node('docker') {
             }
 
             stage('Deploy Manager') {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
+                    k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
+                    k3d.helm("install k8s-ces-gateway oci://${registry}/k8s/k8s-ces-gateway")
+                    k3d.helm("registry logout ${registry}")
+                }
                 k3d.helm("install ${repositoryName} ${helmChartDir}")
             }
 

@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.0.0] - 2026-03-04
+> [!IMPORTANT]
+> Breaking change!
+> New compatible version of k8s-ces-gateway is required (3.x.x)
+
+### Changed
+- [#98] use traefik resources instead of nginx-ingress
+
 ## [v5.0.1] - 2026-02-27
 ### Changed
 - [#96] update k8s-dogu-lib to 2.12.0

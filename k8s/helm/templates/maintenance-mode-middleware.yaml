@@ -1,0 +1,8 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: maintenance-mode
+  namespace: {{ .Release.Namespace }}
+spec:
+  replacePath:
+    path: "/errors/503.html"

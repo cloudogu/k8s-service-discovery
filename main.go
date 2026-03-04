@@ -16,6 +16,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
+	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -94,11 +95,17 @@ func startManager() error {
 		return fmt.Errorf("failed to create k8s client set: %w", err)
 	}
 
+	traefikClient, err := traefikv1alpha1.NewForConfig(serviceDiscManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create traefik client: %w", err)
+	}
+
 	controller := ingressController.ParseIngressController(ingressController.Dependencies{
-		Controller:         ingressControllerStr,
-		ConfigMapInterface: clientSet.configMapClient,
-		IngressInterface:   clientSet.ingressClient,
-		IngressClassName:   IngressClassName,
+		Controller:       ingressControllerStr,
+		IngressInterface: clientSet.ingressClient,
+		IngressClassName: IngressClassName,
+		TraefikInterface: traefikClient,
+		Namespace:        watchNamespace,
 	})
 
 	globalConfigRepo := repository.NewGlobalConfigRepository(clientSet.configMapClient)
@@ -119,6 +126,8 @@ func startManager() error {
 
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 
+	middlewareManager := expose.NewMiddlewareManager(traefikClient, watchNamespace)
+
 	maintenanceAdapter := repository.NewMaintenanceModeAdapter(ServiceDiscoveryMaintenanceOwner, serviceDiscManager.GetClient(), watchNamespace)
 
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
@@ -129,6 +138,7 @@ func startManager() error {
 		IngressClassName:       IngressClassName,
 		Recorder:               eventRecorder,
 		Controller:             controller,
+		MiddlewareManager:      middlewareManager,
 		MaintenanceAdapter:     maintenanceAdapter,
 	})
 
@@ -318,6 +328,7 @@ func configureReconciler(
 		Client:             k8sManager.GetClient(),
 		GlobalConfigGetter: globalConfigRepo,
 		Redirector:         ingressController,
+		Namespace:          namespace,
 	}
 
 	if err := redirectReconciler.SetupWithManager(k8sManager); err != nil {
