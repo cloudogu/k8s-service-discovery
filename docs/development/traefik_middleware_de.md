@@ -25,9 +25,9 @@ Im ``k8s-ces-gateway`` werden diese Ports statisch in der values.yaml freigegebe
 
 ## Dogu Rewrites
 Einzelne Dogus benötigen statische Rewrites, z.B. das Nexus Docker Repository. Dafür wird dynamisch bei der Installation
-des Dogus eine Middleware erstellt, die für den Service eines Dogus einen ``Replace Path Rewrite`` durchführt. Diese Middleware
+des Dogus eine Middleware erstellt, die für den Service eines Dogus einen ``Replace Path Rewrite`` durchführt. Diese [Middleware](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/replacepathregex/)
 wird erstellt, wenn der Service eines Dogus zusätzliche ``ces-services `` definiert hat. 
 
 ## Alternative FQDNs
 In der global-config können alternative FQDNs für das Ecosystem definiert werden. Wenn diese Konfiguration vorhanden ist, 
-wird dynamisch eine ``Redirect`` Middleware erstellt, die anhand von einer Regex von den alternativen FQDNs auf die primäre FQDN umleitet.
+wird dynamisch eine ``Redirect`` [Middleware](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/redirectregex/) erstellt, die anhand von einer Regex von den alternativen FQDNs auf die primäre FQDN umleitet.
