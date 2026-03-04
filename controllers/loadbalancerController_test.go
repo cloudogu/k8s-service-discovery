@@ -526,7 +526,7 @@ externalTrafficPolicy: Local
 				m.EXPECT().GetSelector().Return(map[string]string{
 					"service.name": "service",
 				})
-				m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything, mock.Anything).Return(assert.AnError)
+				m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything).Return(assert.AnError)
 			},
 			setupServiceClientMock: createSvcNewLoadbalancer(false),
 			expErr:                 true,
@@ -590,7 +590,7 @@ func createNoErrorExposePorts() func(m *MockIngressController) {
 		m.EXPECT().GetSelector().Return(map[string]string{
 			"service.name": "service",
 		}).Maybe()
-		m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything, mock.Anything).Return(nil).Maybe()
+		m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything).Return(nil).Maybe()
 	}
 }
 

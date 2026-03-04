@@ -26,4 +26,4 @@ appVersion: "0.0.0-replaceme"
 annotations:
   # Dependency for the CES-Gateway.
   # Allow all versions up to next major version to avoid breaking changes
-  "k8s.cloudogu.com/ces-dependency/k8s-ces-gateway": "2.x.x-0"
+  "k8s.cloudogu.com/ces-dependency/k8s-ces-gateway": "3.x.x-0"

@@ -1,4 +1,4 @@
-package nginx
+package traefik
 
 import (
 	"testing"
@@ -7,8 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewNginxController(t *testing.T) {
-	cfgMock := newMockConfigMapInterface(t)
+func TestNewTraefikController(t *testing.T) {
 	ingressMock := newMockIngressInterface(t)
 
 	tests := []struct {
@@ -35,16 +34,13 @@ func TestNewNginxController(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := NewNginxController(IngressControllerDependencies{
-				ConfigMapInterface: cfgMock,
-				IngressInterface:   ingressMock,
-				IngressClassName:   "test",
-				ControllerType:     tt.inControllerType,
+			ctrl := NewTraefikController(IngressControllerDependencies{
+				IngressInterface: ingressMock,
+				IngressClassName: "test",
+				ControllerType:   tt.inControllerType,
 			})
 
 			require.NotNil(t, ctrl)
-			require.NotNil(t, ctrl.configMapInterface)
-			require.NotNil(t, ctrl.ingressInterface)
 			require.Equal(t, "test", ctrl.ingressClassName)
 			require.Equal(t, tt.expControllerType, ctrl.controllerType)
 		})
@@ -82,19 +78,6 @@ func Test_controller_GetName(t *testing.T) {
 	}
 }
 
-func Test_controller_GetControllerSpec(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// given
-		sut := &IngressController{}
-
-		// when
-		spec := sut.GetControllerSpec()
-
-		// then
-		require.Equal(t, "k8s.io/nginx-ingress", spec)
-	})
-}
-
 func Test_controller_GetRewriteAnnotationKey(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// given
@@ -104,20 +87,7 @@ func Test_controller_GetRewriteAnnotationKey(t *testing.T) {
 		key := sut.GetRewriteAnnotationKey()
 
 		// then
-		require.Equal(t, "nginx.ingress.kubernetes.io/rewrite-target", key)
-	})
-}
-
-func Test_controller_GetUseRegexKey(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// given
-		sut := &IngressController{}
-
-		// when
-		key := sut.GetUseRegexKey()
-
-		// then
-		require.Equal(t, "nginx.ingress.kubernetes.io/use-regex", key)
+		require.Equal(t, "traefik.ingress.kubernetes.io/router.middlewares", key)
 	})
 }
 

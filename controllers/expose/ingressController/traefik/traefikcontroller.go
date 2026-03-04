@@ -1,16 +1,13 @@
-package nginx
+package traefik
 
 import (
 	k8sv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 )
 
 const (
-	ingressRewriteTargetAnnotation = "nginx.ingress.kubernetes.io/rewrite-target"
-	ingressUseRegexAnnotation      = "nginx.ingress.kubernetes.io/use-regex"
-	nginxIngressControllerSpec     = "k8s.io/nginx-ingress"
-
-	IngressControllerName = "nginx-ingress"
-	GatewayControllerName = "k8s-ces-gateway"
+	ingressRewriteTargetAnnotation = "traefik.ingress.kubernetes.io/router.middlewares"
+	IngressControllerName          = "traefik"
+	GatewayControllerName          = "k8s-ces-gateway"
 
 	componentLabelKey = "k8s.cloudogu.com/component.name"
 )
@@ -45,20 +42,25 @@ type IngressController struct {
 }
 
 type IngressControllerDependencies struct {
-	ConfigMapInterface configMapInterface
-	IngressInterface   ingressInterface
-	IngressClassName   string
-	ControllerType     string
+	IngressInterface ingressInterface
+	IngressClassName string
+	ControllerType   string
+	TraefikInterface traefikInterface
+	Namespace        string
 }
 
-func NewNginxController(deps IngressControllerDependencies) *IngressController {
+func NewTraefikController(deps IngressControllerDependencies) *IngressController {
 	return &IngressController{
 		PortExposer: &PortExposer{
-			configMapInterface: deps.ConfigMapInterface,
+			traefikInterface: deps.TraefikInterface,
+			ingressInterface: deps.IngressInterface,
+			namespace:        deps.Namespace,
 		},
 		IngressRedirector: &IngressRedirector{
 			ingressClassName: deps.IngressClassName,
 			ingressInterface: deps.IngressInterface,
+			traefikInterface: deps.TraefikInterface,
+			namespace:        deps.Namespace,
 		},
 		controllerType: mapStringToControllerType(deps.ControllerType),
 	}
@@ -68,16 +70,8 @@ func (c *IngressController) GetName() string {
 	return c.String()
 }
 
-func (c *IngressController) GetControllerSpec() string {
-	return nginxIngressControllerSpec
-}
-
 func (c *IngressController) GetRewriteAnnotationKey() string {
 	return ingressRewriteTargetAnnotation
-}
-
-func (c *IngressController) GetUseRegexKey() string {
-	return ingressUseRegexAnnotation
 }
 
 func (c *IngressController) GetSelector() map[string]string {
