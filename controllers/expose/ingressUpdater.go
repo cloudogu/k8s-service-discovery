@@ -72,10 +72,6 @@ type serviceRewrite struct {
 	Rewrite string `json:"rewrite"`
 }
 
-func (sr *serviceRewrite) generateConfig() string {
-	return fmt.Sprintf("rewrite ^/%s(/|$)(.*) %s/$2 break;", sr.Pattern, sr.Rewrite)
-}
-
 type ingressUpdater struct {
 	// Namespace defines the target namespace for the ingress objects.
 	namespace string

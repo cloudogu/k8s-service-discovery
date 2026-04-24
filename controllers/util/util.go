@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var K8sCesServiceDiscoveryLabels = map[string]string{"app": "ces", "app.kubernetes.io/name": "k8s-service-discovery"}
+var K8sCesServiceDiscoveryLabels = map[string]string{"app": "ces", "app.kubernetes.io/managed-by": "k8s-service-discovery"}
 
 const (
 	appLabelKey      = "app"
