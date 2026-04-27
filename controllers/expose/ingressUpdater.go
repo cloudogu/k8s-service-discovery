@@ -18,18 +18,6 @@ import (
 )
 
 const (
-	staticContentBackendName           = "k8s-ces-assets-service"
-	staticContentBackendPort           = 80
-	staticContentBackendRewrite        = "maintenance-mode@kubernetescrd"
-	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
-)
-
-const (
-	// CesServiceAnnotation can be appended to service with information of ces services.
-	CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
-)
-
-const (
 	ingressCreationEventReason = "IngressCreation"
 )
 const failedIngressUpdateErrMsg = "failed to update ingress object: %w"

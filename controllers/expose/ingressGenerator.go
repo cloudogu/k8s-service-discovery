@@ -11,6 +11,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	staticContentBackendName           = "k8s-ces-assets-service"
+	staticContentBackendPort           = 80
+	staticContentBackendRewrite        = "maintenance-mode@kubernetescrd"
+	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
+)
+
+const (
+	// CesServiceAnnotation can be appended to service with information of ces services.
+	CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
+)
+
 const traefikMiddlewareAnnotationKey = "traefik.ingress.kubernetes.io/router.middlewares"
 
 type ingressGenerator struct {
@@ -36,13 +48,27 @@ func (i *ingressGenerator) GenerateWithMiddlewares(definition *IngressesDefiniti
 }
 
 func (i *ingressGenerator) generateStarting(definition *IngressesDefinition) []networkingv1.Ingress {
-	// TODO
-	return []networkingv1.Ingress{}
+	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentDoguIsStartingRewrite)
+	return i.generateWithStaticContent(definition, middlewareName)
 }
 
 func (i *ingressGenerator) generateMaintenanceMode(definition *IngressesDefinition) []networkingv1.Ingress {
-	// TODO
-	return []networkingv1.Ingress{}
+	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentBackendRewrite)
+	return i.generateWithStaticContent(definition, middlewareName)
+}
+
+func (i *ingressGenerator) generateWithStaticContent(definition *IngressesDefinition, middlewareName string) []networkingv1.Ingress {
+	var ingresses []networkingv1.Ingress
+	for _, route := range definition.HttpRoutes {
+		route.Service = staticContentBackendName
+		route.Port = staticContentBackendPort
+		route.AdditionalAnnotations = nil
+		route.Rewrite = nil
+		ingress := i.generateIngress(definition.BaseName, middlewareName, definition.OwnerReference, route)
+		ingresses = append(ingresses, ingress)
+	}
+
+	return ingresses
 }
 
 func (i *ingressGenerator) generateNormalWithMiddlewares(definition *IngressesDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
