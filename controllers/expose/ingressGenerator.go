@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/definition"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/traefik/traefik/v3/pkg/config/dynamic"
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
@@ -18,11 +19,6 @@ const (
 	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
 )
 
-const (
-	// CesServiceAnnotation can be appended to service with information of ces services.
-	CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
-)
-
 const traefikMiddlewareAnnotationKey = "traefik.ingress.kubernetes.io/router.middlewares"
 
 type ingressGenerator struct {
@@ -35,7 +31,7 @@ type ingressGenerator struct {
 	middlewareManager middlewareManager
 }
 
-func (i *ingressGenerator) GenerateWithMiddlewares(definition *IngressesDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
+func (i *ingressGenerator) GenerateWithMiddlewares(definition *definition.ExpositionDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
 	if definition.Dogu != nil && definition.Dogu.IsStarting {
 		ingresses := i.generateStarting(definition)
 		return ingresses, nil
@@ -47,17 +43,17 @@ func (i *ingressGenerator) GenerateWithMiddlewares(definition *IngressesDefiniti
 	return i.generateNormalWithMiddlewares(definition)
 }
 
-func (i *ingressGenerator) generateStarting(definition *IngressesDefinition) []networkingv1.Ingress {
+func (i *ingressGenerator) generateStarting(definition *definition.ExpositionDefinition) []networkingv1.Ingress {
 	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentDoguIsStartingRewrite)
 	return i.generateWithStaticContent(definition, middlewareName)
 }
 
-func (i *ingressGenerator) generateMaintenanceMode(definition *IngressesDefinition) []networkingv1.Ingress {
+func (i *ingressGenerator) generateMaintenanceMode(definition *definition.ExpositionDefinition) []networkingv1.Ingress {
 	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentBackendRewrite)
 	return i.generateWithStaticContent(definition, middlewareName)
 }
 
-func (i *ingressGenerator) generateWithStaticContent(definition *IngressesDefinition, middlewareName string) []networkingv1.Ingress {
+func (i *ingressGenerator) generateWithStaticContent(definition *definition.ExpositionDefinition, middlewareName string) []networkingv1.Ingress {
 	var ingresses []networkingv1.Ingress
 	for _, route := range definition.HttpRoutes {
 		route.Service = staticContentBackendName
@@ -71,7 +67,7 @@ func (i *ingressGenerator) generateWithStaticContent(definition *IngressesDefini
 	return ingresses
 }
 
-func (i *ingressGenerator) generateNormalWithMiddlewares(definition *IngressesDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
+func (i *ingressGenerator) generateNormalWithMiddlewares(definition *definition.ExpositionDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
 	var ingresses []networkingv1.Ingress
 	var middlewares []traefikapi.Middleware
 	for _, route := range definition.HttpRoutes {
@@ -89,7 +85,7 @@ func (i *ingressGenerator) generateNormalWithMiddlewares(definition *IngressesDe
 	return ingresses, middlewares
 }
 
-func (i *ingressGenerator) generateIngress(baseName, middlewareName string, ownerReference metav1.OwnerReference, httpRoute HttpRoute) networkingv1.Ingress {
+func (i *ingressGenerator) generateIngress(baseName, middlewareName string, ownerReference metav1.OwnerReference, httpRoute definition.HttpRoute) networkingv1.Ingress {
 	annotations := map[string]string{
 		traefikMiddlewareAnnotationKey: fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName),
 	}
@@ -128,7 +124,7 @@ func (i *ingressGenerator) generateIngress(baseName, middlewareName string, owne
 	}
 }
 
-func (i *ingressGenerator) generateMiddleware(baseName string, ownerReference metav1.OwnerReference, httpRoute HttpRoute) traefikapi.Middleware {
+func (i *ingressGenerator) generateMiddleware(baseName string, ownerReference metav1.OwnerReference, httpRoute definition.HttpRoute) traefikapi.Middleware {
 	var replacePathRegex *dynamic.ReplacePathRegex
 	var stripPrefix *dynamic.StripPrefix
 	if httpRoute.Rewrite.Regex != nil {

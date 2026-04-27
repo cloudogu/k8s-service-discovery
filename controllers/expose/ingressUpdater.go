@@ -8,6 +8,7 @@ import (
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/definition"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/retry-lib/retry"
 	corev1 "k8s.io/api/core/v1"
@@ -134,7 +135,7 @@ func (i *ingressUpdater) getCesServices(service *corev1.Service) ([]CesService, 
 		return []CesService{}, false, nil
 	}
 
-	cesServicesAnnotation, ok := service.Annotations[CesServiceAnnotation]
+	cesServicesAnnotation, ok := service.Annotations[definition.CesServiceAnnotation]
 	if !ok {
 		return []CesService{}, false, nil
 	}
