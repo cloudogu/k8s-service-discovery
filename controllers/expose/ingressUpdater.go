@@ -2,344 +2,117 @@ package expose
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"strings"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
-	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/definition"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
-	"github.com/cloudogu/retry-lib/retry"
+	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 )
 
-const (
-	ingressCreationEventReason = "IngressCreation"
-)
-const failedIngressUpdateErrMsg = "failed to update ingress object: %w"
-
-// CesService contains information about one exposed ces service.
-type CesService struct {
-	// Name of the ces service serving as identifier.
-	Name string `json:"name"`
-	// Port of the ces service.
-	Port int `json:"port"`
-	// Location of the ces service defining the external path to the service.
-	Location string `json:"location"`
-	// Pass of the ces service defining the target path inside the service's pod.
-	Pass string `json:"pass"`
-	// Rewrite that should be applied to the ingress configuration.
-	// Is a json-marshalled `serviceRewrite`. Useful if Dogus do not support sub-paths.
-	Rewrite string `json:"rewrite,omitempty"`
-}
-
-func (cs CesService) hasRewriteConfig() bool {
-	return cs.Rewrite != ""
-}
-
-func (cs CesService) getRewriteConfig() (*serviceRewrite, error) {
-	if !cs.hasRewriteConfig() {
-		return nil, fmt.Errorf("cesService has no rewrite config")
-	}
-
-	serviceRewrite := &serviceRewrite{}
-	err := json.Unmarshal([]byte(cs.Rewrite), serviceRewrite)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read service rewrite from ces service: %w", err)
-	}
-
-	return serviceRewrite, nil
-}
-
-type serviceRewrite struct {
-	Pattern string `json:"pattern"`
-	Rewrite string `json:"rewrite"`
-}
-
-type ingressUpdater struct {
-	// Namespace defines the target namespace for the ingress objects.
-	namespace string
-	// IngressClassName defines the ingress class for the ces services.
-	ingressClassName string
-	// deploymentReadyChecker checks whether dogu are ready (healthy).
-	deploymentReadyChecker DeploymentReadyChecker
-	eventRecorder          eventRecorder
-	controller             ingressController
-	ingressInterface       ingressInterface
-	doguInterface          doguInterface
-	middlewareManager      middlewareManager
-	maintenanceAdapter     maintenanceAdapter
+type IngressUpdater struct {
+	serviceConverter    serviceConverter
+	expositionConverter expositionConverter
+	generator           ingressGenerator
+	ingressUpserter     upserter
+	middlewareUpserter  upserter
 }
 
 type IngressUpdaterDependencies struct {
-	DeploymentReadyChecker DeploymentReadyChecker
-	IngressInterface       ingressInterface
-	DoguInterface          doguInterface
-	Namespace              string
-	IngressClassName       string
-	Recorder               eventRecorder
-	Controller             ingressController
-	MiddlewareManager      middlewareManager
-	MaintenanceAdapter     maintenanceAdapter
+	Namespace          string
+	IngressClassName   string
+	MaintenanceAdapter maintenanceAdapter
+	ReadyChecker       DeploymentReadyChecker
+	DynamicClient      dynamic.Interface
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
-func NewIngressUpdater(deps IngressUpdaterDependencies) *ingressUpdater {
-	return &ingressUpdater{
-		namespace:              deps.Namespace,
-		ingressClassName:       deps.IngressClassName,
-		deploymentReadyChecker: deps.DeploymentReadyChecker,
-		eventRecorder:          deps.Recorder,
-		controller:             deps.Controller,
-		ingressInterface:       deps.IngressInterface,
-		doguInterface:          deps.DoguInterface,
-		middlewareManager:      deps.MiddlewareManager,
-		maintenanceAdapter:     deps.MaintenanceAdapter,
+func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
+	return &IngressUpdater{
+		serviceConverter:    definition.NewServiceConverter(deps.MaintenanceAdapter, deps.ReadyChecker),
+		expositionConverter: definition.NewExpositionConverter(deps.MaintenanceAdapter, deps.ReadyChecker),
+		generator:           newIngressGenerator(deps.Namespace, deps.IngressClassName),
+		ingressUpserter: util.NewDeclarativeUpserter(
+			deps.DynamicClient,
+			networkingv1.SchemeGroupVersion.WithResource("ingresses"),
+			deps.Namespace,
+		),
+		middlewareUpserter: util.NewDeclarativeUpserter(
+			deps.DynamicClient,
+			traefikv1alpha1.SchemeGroupVersion.WithResource("middlewares"),
+			deps.Namespace,
+		),
 	}
 }
 
-// UpsertIngressForService creates or updates the ingress object of the given service.
-func (i *ingressUpdater) UpsertIngressForService(ctx context.Context, service *corev1.Service) error {
-	_, isMaintenanceMode, err := i.maintenanceAdapter.GetStatus(ctx)
+// UpsertForService creates or updates the ingress object of the given service.
+func (i *IngressUpdater) UpsertForService(ctx context.Context, service *corev1.Service) error {
+	expositionDefinition, err := i.serviceConverter.Convert(ctx, service)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to convert service to exposition exposition definition: %w", err)
 	}
 
-	cesServices, ok, err := i.getCesServices(service)
+	return i.upsertForDefinition(ctx, expositionDefinition)
+}
+
+func (i *IngressUpdater) UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error {
+	expositionDefinition, err := i.expositionConverter.Convert(ctx, exposition)
 	if err != nil {
-		return fmt.Errorf("failed to get ces services: %w", err)
+		return fmt.Errorf("failed to convert exposition to exposition exposition definition: %w", err)
 	}
 
-	if !ok {
-		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("service [%s] has no ports or ces services -> skipping ingress creation", service.Name))
-		return nil
+	return i.upsertForDefinition(ctx, expositionDefinition)
+}
+
+func (i *IngressUpdater) upsertForDefinition(ctx context.Context, definition definition.ExpositionDefinition) error {
+	// generate ingress objects
+	ingresses, middlewares := i.generator.GenerateWithMiddlewares(definition)
+
+	// upsert ingresses
+	unstructuredIngresses, err := convertListToUnstructuredMap(ingresses)
+	if err != nil {
+		return fmt.Errorf("failed to convert ingresses to unstructured: %w", err)
 	}
 
-	for _, cesService := range cesServices {
-		upsertErr := i.upsertIngressForCesService(ctx, cesService, service, isMaintenanceMode)
-		if upsertErr != nil {
-			return fmt.Errorf("failed to create ingress object for ces service [%+v]: %w", cesService, upsertErr)
-		}
+	selector := labels.Set{ownedByLabelKey: definition.BaseName}.AsSelector()
+	err = i.ingressUpserter.Upsert(ctx, selector, unstructuredIngresses)
+	if err != nil {
+		return fmt.Errorf("failed to upsert ingresses: %w", err)
+	}
+
+	// upsert middlewares
+	unstructuredMiddlewares, err := convertListToUnstructuredMap(middlewares)
+	if err != nil {
+		return fmt.Errorf("failed to convert middlewares to unstructured: %w", err)
+	}
+
+	err = i.middlewareUpserter.Upsert(ctx, selector, unstructuredMiddlewares)
+	if err != nil {
+		return fmt.Errorf("failed to upsert middlewares: %w", err)
 	}
 
 	return nil
 }
 
-func (i *ingressUpdater) getCesServices(service *corev1.Service) ([]CesService, bool, error) {
-	if len(service.Spec.Ports) <= 0 {
-		return []CesService{}, false, nil
-	}
-
-	cesServicesAnnotation, ok := service.Annotations[definition.CesServiceAnnotation]
-	if !ok {
-		return []CesService{}, false, nil
-	}
-
-	var cesServices []CesService
-	err := json.Unmarshal([]byte(cesServicesAnnotation), &cesServices)
-	if err != nil {
-		return []CesService{}, false, fmt.Errorf("failed to unmarshal ces services: %w", err)
-	}
-
-	return cesServices, true, nil
-}
-
-func (i *ingressUpdater) upsertIngressForCesService(ctx context.Context, cesService CesService, service *corev1.Service, isMaintenanceMode bool) error {
-	dogu, err := i.doguInterface.Get(ctx, service.Name, v1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get dogu for service [%s]: %w", service.Name, err)
-	}
-
-	if isMaintenanceMode {
-		return i.upsertMaintenanceModeIngressObject(ctx, cesService, service, dogu)
-	}
-
-	if util.HasDoguLabel(service) {
-		isReady, err := i.deploymentReadyChecker.IsReady(ctx, service.Name)
+func convertListToUnstructuredMap[T metav1.Object](objects []T) (map[string]unstructured.Unstructured, error) {
+	var converterErrs []error
+	unstructuredObjects := make(map[string]unstructured.Unstructured, len(objects))
+	for _, object := range objects {
+		unstructuredIngress, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
 		if err != nil {
-			return err
+			converterErrs = append(converterErrs, err)
 		}
 
-		if !isReady {
-			return i.upsertDoguIsStartingIngressObject(ctx, cesService, service)
-		}
+		unstructuredObjects[object.GetName()] = unstructured.Unstructured{Object: unstructuredIngress}
 	}
 
-	err = i.upsertDoguIngressObject(ctx, cesService, service)
-	if err != nil {
-		return err
-	}
-
-	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Created regular ingress for service [%s].", cesService.Name)
-	return err
-}
-
-func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv2.IngressAnnotations, error) {
-	annotations := doguv2.IngressAnnotations(nil)
-	annotationsJson, exists := doguService.Annotations[annotation.AdditionalIngressAnnotationsAnnotation]
-	if exists {
-		err := json.Unmarshal([]byte(annotationsJson), &annotations)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get addtional ingress annotations from dogu service '%s': %w", doguService.Name, err)
-		}
-	}
-
-	return annotations, nil
-}
-
-func (i *ingressUpdater) upsertMaintenanceModeIngressObject(ctx context.Context, cesService CesService, service *corev1.Service, dogu *doguv2.Dogu) error {
-	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("system is in maintenance mode -> create maintenance ingress object for service [%s]", service.GetName()))
-	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentBackendRewrite)
-	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): middlewareName}
-
-	err := i.upsertIngressObject(ctx, cesService.Name, service, cesService.Location, staticContentBackendName, staticContentBackendPort, annotations)
-	if err != nil {
-		return fmt.Errorf(failedIngressUpdateErrMsg, err)
-	}
-
-	i.eventRecorder.Eventf(dogu, corev1.EventTypeNormal, ingressCreationEventReason, "Ingress for service [%s] has been updated to maintenance mode.", cesService.Name)
-	return nil
-}
-
-func (i *ingressUpdater) upsertDoguIsStartingIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
-	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is still starting -> create dogu is starting ingress object for service [%s]", service.GetName()))
-	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentDoguIsStartingRewrite)
-	annotations := map[string]string{i.controller.GetRewriteAnnotationKey(): middlewareName}
-
-	err := i.upsertIngressObject(ctx, cesService.Name, service, cesService.Location, staticContentBackendName, staticContentBackendPort, annotations)
-	if err != nil {
-		return fmt.Errorf(failedIngressUpdateErrMsg, err)
-	}
-
-	return nil
-}
-
-func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService CesService, service *corev1.Service) error {
-	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("dogu is ready -> update ces service ingress object for service [%s]", service.GetName()))
-
-	ingressPath := cesService.Location
-	annotations := map[string]string{}
-
-	ownerReferences := []v1.OwnerReference{{
-		APIVersion: service.APIVersion,
-		Kind:       service.Kind,
-		Name:       service.Name,
-		UID:        service.UID,
-	}}
-
-	if cesService.hasRewriteConfig() {
-		// the service has rewrite-config, we need to add it
-		rewriteCfg, err := cesService.getRewriteConfig()
-		if err != nil {
-			return fmt.Errorf("error getting rewrite-config from ces-service: %w", err)
-		}
-
-		annotations["traefik.ingress.kubernetes.io/router.middlewares"] = fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, rewriteCfg.Rewrite)
-		ingressPath = rewriteCfg.Pattern
-	} else if cesService.Pass != cesService.Location {
-		// Create a dynamic middleware for the path rewrite
-		middlewareName, err := i.middlewareManager.createOrUpdateReplacePathMiddleware(ctx, service.Name, cesService, ownerReferences)
-		if err != nil {
-			return fmt.Errorf("failed to create/update middleware: %w", err)
-		}
-
-		// Reference the created middleware
-		annotations["traefik.ingress.kubernetes.io/router.middlewares"] = fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName)
-		ingressPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(cesService.Location, "/"))
-	}
-
-	// add other additional annotations (can possibly overwrite the rewrite annotations)
-	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
-	if err != nil {
-		return err
-	}
-	for key, value := range additionalAnnotations {
-		annotations[key] = value
-	}
-
-	err = i.upsertIngressObject(ctx, cesService.Name, service, ingressPath, service.GetName(), int32(cesService.Port), annotations)
-	if err != nil {
-		return fmt.Errorf(failedIngressUpdateErrMsg, err)
-	}
-
-	return nil
-}
-
-func (i *ingressUpdater) upsertIngressObject(ctx context.Context, ingressName string, service *corev1.Service, path string, endpointName string, endpointPort int32, annotations map[string]string) error {
-	ingress := i.getIngress(ingressName, service.ObjectMeta, service.TypeMeta, path, endpointName, endpointPort, annotations)
-
-	err := retry.OnConflict(func() error {
-		_, err := i.ingressInterface.Get(ctx, ingress.Name, v1.GetOptions{})
-
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-
-		if errors.IsNotFound(err) {
-			_, createErr := i.ingressInterface.Create(ctx, ingress, v1.CreateOptions{})
-			return createErr
-		}
-
-		_, err = i.ingressInterface.Update(ctx, ingress, v1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to upsert ingress %s: %w", ingress.Name, err)
-	}
-
-	return nil
-}
-
-func (i *ingressUpdater) getIngress(ingressName string, ownerObject v1.ObjectMeta, ownerType v1.TypeMeta, path string, endpointName string, endpointPort int32, annotations map[string]string) *networking.Ingress {
-	pathType := networking.PathTypePrefix
-
-	return &networking.Ingress{
-		ObjectMeta: v1.ObjectMeta{
-			Name:        ingressName,
-			Namespace:   i.namespace,
-			Annotations: annotations,
-			Labels:      util.K8sCesServiceDiscoveryLabels,
-			OwnerReferences: []v1.OwnerReference{{
-				APIVersion: ownerType.APIVersion,
-				Kind:       ownerType.Kind,
-				Name:       ownerObject.Name,
-				UID:        ownerObject.UID,
-			}},
-		},
-		Spec: networking.IngressSpec{
-			IngressClassName: &i.ingressClassName,
-			Rules: []networking.IngressRule{
-				{
-					IngressRuleValue: networking.IngressRuleValue{
-						HTTP: &networking.HTTPIngressRuleValue{
-							Paths: []networking.HTTPIngressPath{
-								{
-									Path:     path,
-									PathType: &pathType,
-									Backend: networking.IngressBackend{
-										Service: &networking.IngressServiceBackend{
-											Name: endpointName,
-											Port: networking.ServiceBackendPort{
-												Number: endpointPort,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	return unstructuredObjects, errors.Join(converterErrs...)
 }

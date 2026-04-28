@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
-	doguClient "github.com/cloudogu/k8s-dogu-lib/v2/client"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
@@ -17,6 +16,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
+	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -119,27 +119,20 @@ func startManager() error {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
-	ecoSystemClientSet, err := doguClient.NewForConfig(serviceDiscManager.GetConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create ecosystem client set: %w", err)
-	}
-
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
-
-	middlewareManager := expose.NewMiddlewareManager(traefikClient, watchNamespace)
-
 	maintenanceAdapter := repository.NewMaintenanceModeAdapter(ServiceDiscoveryMaintenanceOwner, serviceDiscManager.GetClient(), watchNamespace)
 
+	dynamicClient, err := dynamic.NewForConfig(serviceDiscManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
-		DeploymentReadyChecker: deploymentReadyChecker,
-		IngressInterface:       clientSet.ingressClient,
-		DoguInterface:          ecoSystemClientSet.Dogus(watchNamespace),
-		Namespace:              watchNamespace,
-		IngressClassName:       IngressClassName,
-		Recorder:               eventRecorder,
-		Controller:             controller,
-		MiddlewareManager:      middlewareManager,
-		MaintenanceAdapter:     maintenanceAdapter,
+		Namespace:          watchNamespace,
+		IngressClassName:   IngressClassName,
+		MaintenanceAdapter: maintenanceAdapter,
+		ReadyChecker:       deploymentReadyChecker,
+		DynamicClient:      dynamicClient,
 	})
 
 	cidr, err := config.ReadNetworkPolicyCIDR()

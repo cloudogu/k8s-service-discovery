@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
@@ -33,8 +34,10 @@ type GlobalConfigRepository interface {
 
 // IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
 type IngressUpdater interface {
-	// UpsertIngressForService creates or updates the ingress object of the given service.
-	UpsertIngressForService(ctx context.Context, service *corev1.Service) error
+	// UpsertIngressForService creates or updates the ingress objects of the given service.
+	UpsertForService(ctx context.Context, service *corev1.Service) error
+	// UpsertIngressForExposition creates or updates the ingress objects of the given exposition.
+	UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error
 }
 
 type NetworkPolicyUpdater interface {

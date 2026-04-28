@@ -3,13 +3,17 @@ package expose
 import (
 	"context"
 
-	doguClient "github.com/cloudogu/k8s-dogu-lib/v2/client"
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-registry-lib/repository"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/definition"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
-	"k8s.io/client-go/tools/record"
 )
 
 type maintenanceAdapter interface {
@@ -22,8 +26,20 @@ type DeploymentReadyChecker interface {
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
 }
 
-type eventRecorder interface {
-	record.EventRecorder
+type serviceConverter interface {
+	Convert(ctx context.Context, service *corev1.Service) (definition.ExpositionDefinition, error)
+}
+
+type expositionConverter interface {
+	Convert(ctx context.Context, exposition *expositionv1.Exposition) (definition.ExpositionDefinition, error)
+}
+
+type ingressGenerator interface {
+	GenerateWithMiddlewares(definition definition.ExpositionDefinition) ([]*networkingv1.Ingress, []*traefikapi.Middleware)
+}
+
+type upserter interface {
+	Upsert(ctx context.Context, labelSelector labels.Selector, objects map[string]unstructured.Unstructured) error
 }
 
 // used for mocks
@@ -40,10 +56,6 @@ type ingressInterface interface {
 	netv1.IngressInterface
 }
 
-type doguInterface interface {
-	doguClient.DoguInterface
-}
-
 type ingressController interface {
 	GetName() string
 	GetRewriteAnnotationKey() string
@@ -51,11 +63,6 @@ type ingressController interface {
 
 type networkPolicyInterface interface {
 	netv1.NetworkPolicyInterface
-}
-
-type middlewareManager interface {
-	createOrUpdateReplacePathMiddleware(ctx context.Context, serviceName string, cesService CesService, ownerReferences []v1.OwnerReference) (string, error)
-	CreateOrUpdateAlternativeFQDNRedirectMiddleware(ctx context.Context, alternativeFQDNs []string, primaryFQDN string, ownerReferences []v1.OwnerReference) (string, error)
 }
 
 //nolint:unused

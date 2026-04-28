@@ -54,13 +54,13 @@ func getDoguInformation(ctx context.Context, meta metav1.ObjectMeta, maintenance
 	return nil, nil
 }
 
-func (c *ExpositionConverter) Convert(ctx context.Context, exposition *expositionv1.Exposition) (*ExpositionDefinition, error) {
+func (c *ExpositionConverter) Convert(ctx context.Context, exposition *expositionv1.Exposition) (ExpositionDefinition, error) {
 	doguInformation, err := getDoguInformation(ctx, exposition.ObjectMeta, c.maintenance, c.readyChecker)
 	if err != nil {
-		return nil, err
+		return ExpositionDefinition{}, err
 	}
 
-	return &ExpositionDefinition{
+	return ExpositionDefinition{
 		BaseName: exposition.Name,
 		Dogu:     doguInformation,
 		OwnerReference: metav1.OwnerReference{

@@ -21,17 +21,20 @@ const (
 
 const traefikMiddlewareAnnotationKey = "traefik.ingress.kubernetes.io/router.middlewares"
 
-type ingressGenerator struct {
+const ownedByLabelKey = "k8s-service-discovery.cloudogu.com/owned-by"
+
+type defaultIngressGenerator struct {
 	// namespace defines the target namespace for the ingress objects.
 	namespace string
 	// ingressClassName defines the ingress class for the ces services.
-	ingressClassName  string
-	eventRecorder     eventRecorder
-	controller        ingressController
-	middlewareManager middlewareManager
+	ingressClassName string
 }
 
-func (i *ingressGenerator) GenerateWithMiddlewares(definition *definition.ExpositionDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
+func newIngressGenerator(namespace string, ingressClassName string) *defaultIngressGenerator {
+	return &defaultIngressGenerator{namespace: namespace, ingressClassName: ingressClassName}
+}
+
+func (i *defaultIngressGenerator) GenerateWithMiddlewares(definition definition.ExpositionDefinition) ([]*networkingv1.Ingress, []*traefikapi.Middleware) {
 	if definition.Dogu != nil && definition.Dogu.IsStarting {
 		ingresses := i.generateStarting(definition)
 		return ingresses, nil
@@ -43,18 +46,18 @@ func (i *ingressGenerator) GenerateWithMiddlewares(definition *definition.Exposi
 	return i.generateNormalWithMiddlewares(definition)
 }
 
-func (i *ingressGenerator) generateStarting(definition *definition.ExpositionDefinition) []networkingv1.Ingress {
+func (i *defaultIngressGenerator) generateStarting(definition definition.ExpositionDefinition) []*networkingv1.Ingress {
 	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentDoguIsStartingRewrite)
 	return i.generateWithStaticContent(definition, middlewareName)
 }
 
-func (i *ingressGenerator) generateMaintenanceMode(definition *definition.ExpositionDefinition) []networkingv1.Ingress {
+func (i *defaultIngressGenerator) generateMaintenanceMode(definition definition.ExpositionDefinition) []*networkingv1.Ingress {
 	middlewareName := fmt.Sprintf("%s-%s", i.namespace, staticContentBackendRewrite)
 	return i.generateWithStaticContent(definition, middlewareName)
 }
 
-func (i *ingressGenerator) generateWithStaticContent(definition *definition.ExpositionDefinition, middlewareName string) []networkingv1.Ingress {
-	var ingresses []networkingv1.Ingress
+func (i *defaultIngressGenerator) generateWithStaticContent(definition definition.ExpositionDefinition, middlewareName string) []*networkingv1.Ingress {
+	var ingresses []*networkingv1.Ingress
 	for _, route := range definition.HttpRoutes {
 		route.Service = staticContentBackendName
 		route.Port = staticContentBackendPort
@@ -67,9 +70,9 @@ func (i *ingressGenerator) generateWithStaticContent(definition *definition.Expo
 	return ingresses
 }
 
-func (i *ingressGenerator) generateNormalWithMiddlewares(definition *definition.ExpositionDefinition) ([]networkingv1.Ingress, []traefikapi.Middleware) {
-	var ingresses []networkingv1.Ingress
-	var middlewares []traefikapi.Middleware
+func (i *defaultIngressGenerator) generateNormalWithMiddlewares(definition definition.ExpositionDefinition) ([]*networkingv1.Ingress, []*traefikapi.Middleware) {
+	var ingresses []*networkingv1.Ingress
+	var middlewares []*traefikapi.Middleware
 	for _, route := range definition.HttpRoutes {
 		var middlewareName string
 		if route.Rewrite != nil {
@@ -85,20 +88,23 @@ func (i *ingressGenerator) generateNormalWithMiddlewares(definition *definition.
 	return ingresses, middlewares
 }
 
-func (i *ingressGenerator) generateIngress(baseName, middlewareName string, ownerReference metav1.OwnerReference, httpRoute definition.HttpRoute) networkingv1.Ingress {
+func (i *defaultIngressGenerator) generateIngress(baseName, middlewareName string, ownerReference metav1.OwnerReference, httpRoute definition.HttpRoute) *networkingv1.Ingress {
 	annotations := map[string]string{
 		traefikMiddlewareAnnotationKey: fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName),
 	}
 	maps.Insert(annotations, maps.All(httpRoute.AdditionalAnnotations))
 
+	labels := map[string]string{ownedByLabelKey: baseName}
+	maps.Insert(labels, maps.All(util.K8sCesServiceDiscoveryLabels))
+
 	pathType := networkingv1.PathTypePrefix
-	return networkingv1.Ingress{
+	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", baseName, httpRoute.Name),
 			Namespace:       i.namespace,
 			Annotations:     annotations,
 			OwnerReferences: []metav1.OwnerReference{ownerReference},
-			Labels:          util.K8sCesServiceDiscoveryLabels,
+			Labels:          labels,
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &i.ingressClassName,
@@ -124,7 +130,7 @@ func (i *ingressGenerator) generateIngress(baseName, middlewareName string, owne
 	}
 }
 
-func (i *ingressGenerator) generateMiddleware(baseName string, ownerReference metav1.OwnerReference, httpRoute definition.HttpRoute) traefikapi.Middleware {
+func (i *defaultIngressGenerator) generateMiddleware(baseName string, ownerReference metav1.OwnerReference, httpRoute definition.HttpRoute) *traefikapi.Middleware {
 	var replacePathRegex *dynamic.ReplacePathRegex
 	var stripPrefix *dynamic.StripPrefix
 	if httpRoute.Rewrite.Regex != nil {
@@ -139,11 +145,15 @@ func (i *ingressGenerator) generateMiddleware(baseName string, ownerReference me
 		}
 	}
 
-	return traefikapi.Middleware{
+	labels := map[string]string{ownedByLabelKey: baseName}
+	maps.Insert(labels, maps.All(util.K8sCesServiceDiscoveryLabels))
+
+	return &traefikapi.Middleware{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s-rewrite", baseName, httpRoute.Name),
 			Namespace:       i.namespace,
 			OwnerReferences: []metav1.OwnerReference{ownerReference},
+			Labels:          labels,
 		},
 		Spec: traefikapi.MiddlewareSpec{
 			ReplacePathRegex: replacePathRegex,

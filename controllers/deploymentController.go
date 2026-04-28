@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -50,7 +51,7 @@ func (r *deploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to find service for deployment [%s]: %w", deployment.Name, err)
 	}
 
-	err = r.updater.UpsertIngressForService(ctx, doguService)
+	err = r.updater.UpsertForService(ctx, doguService)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", doguService.Name, err)
 	}

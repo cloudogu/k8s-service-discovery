@@ -65,7 +65,7 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *serviceReconciler) handleUpsert(ctx context.Context, service *corev1.Service) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	err := r.ingressUpdater.UpsertIngressForService(ctx, service)
+	err := r.ingressUpdater.UpsertForService(ctx, service)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", service.Name, err)
 	}

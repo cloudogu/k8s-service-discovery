@@ -31,28 +31,28 @@ func NewServiceConverter(maintenanceAdapter maintenanceAdapter, readyChecker dep
 	}
 }
 
-func (c *ServiceConverter) Convert(ctx context.Context, service *corev1.Service) (*ExpositionDefinition, error) {
+func (c *ServiceConverter) Convert(ctx context.Context, service *corev1.Service) (ExpositionDefinition, error) {
 	doguInformation, err := getDoguInformation(ctx, service.ObjectMeta, c.maintenance, c.readyChecker)
 	if err != nil {
-		return nil, err
+		return ExpositionDefinition{}, err
 	}
 
 	cesServices, err := getCesServices(service)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ces services: %w", err)
+		return ExpositionDefinition{}, fmt.Errorf("failed to get ces services: %w", err)
 	}
 
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get additional ingress additionalAnnotations: %w", err)
+		return ExpositionDefinition{}, fmt.Errorf("failed to get additional ingress additionalAnnotations: %w", err)
 	}
 
 	httpRoutes, err := c.getHttpRoutesForService(service, cesServices, additionalAnnotations)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get http routes: %w", err)
+		return ExpositionDefinition{}, fmt.Errorf("failed to get http routes: %w", err)
 	}
 
-	return &ExpositionDefinition{
+	return ExpositionDefinition{
 		BaseName: service.Name,
 		Dogu:     doguInformation,
 		OwnerReference: metav1.OwnerReference{

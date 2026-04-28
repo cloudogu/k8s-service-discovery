@@ -117,7 +117,7 @@ func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, ac
 
 	for _, service := range serviceList {
 		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
-		err := mmu.ingressUpdater.UpsertIngressForService(ctx, service)
+		err := mmu.ingressUpdater.UpsertForService(ctx, service)
 		if err != nil {
 			return fmt.Errorf("failed to %s maintenance mode: %w", verb, err)
 		}
