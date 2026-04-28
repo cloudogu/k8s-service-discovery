@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -103,6 +104,22 @@ func (mmu *maintenanceModeController) getAllServices(ctx context.Context) (v1Ser
 	return modifiableServiceList, nil
 }
 
+func (mmu *maintenanceModeController) getAllExpositions(ctx context.Context) ([]*expositionv1.Exposition, error) {
+	expositionList := &expositionv1.ExpositionList{}
+	err := mmu.client.List(ctx, expositionList, &client.ListOptions{Namespace: mmu.namespace})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get list of all services in namespace [%s]: %w", mmu.namespace, err)
+	}
+
+	var modifiableExpositionList []*expositionv1.Exposition
+	for _, exp := range expositionList.Items {
+		copyExp := exp
+		modifiableExpositionList = append(modifiableExpositionList, &copyExp)
+	}
+
+	return modifiableExpositionList, nil
+}
+
 func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, activate bool) error {
 	verb := "deactivate"
 	if activate {
@@ -112,15 +129,33 @@ func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, ac
 
 	serviceList, err := mmu.getAllServices(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to %s maintenance mode: %w", verb, err)
+		return fmt.Errorf("failed get services to %s maintenance mode: %w", verb, err)
 	}
 
+	var errs []error
 	for _, service := range serviceList {
-		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress object [%s]", service.Name))
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress objects for service [%s]", service.Name))
 		err := mmu.ingressUpdater.UpsertForService(ctx, service)
 		if err != nil {
-			return fmt.Errorf("failed to %s maintenance mode: %w", verb, err)
+			errs = append(errs, err)
 		}
+	}
+
+	expositionList, err := mmu.getAllExpositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get expositions to %s maintenance mode: %w", verb, err)
+	}
+
+	for _, exposition := range expositionList {
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress objects exposition [%s]", exposition.Name))
+		err := mmu.ingressUpdater.UpsertForExposition(ctx, exposition)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to %s maintenance mode: %w", verb, errors.Join(errs...))
 	}
 
 	err = mmu.serviceRewriter.rewrite(ctx, serviceList, activate)
