@@ -149,7 +149,7 @@ func Test_networkPolicyHandler_updateNetworkPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nph := &networkPolicyHandler{
+			nph := &NetworkPolicyHandler{
 				ingressController:      tt.fields.mockIngressController(),
 				networkPolicyInterface: tt.fields.mockNetworkPolicyInterface(),
 				allowedCIDR:            tt.fields.allowedCIDR,
@@ -293,7 +293,7 @@ func Test_networkPolicyHandler_RemoveExposedPorts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nph := &networkPolicyHandler{
+			nph := &NetworkPolicyHandler{
 				ingressController:      tt.fields.mockIngressController(),
 				networkPolicyInterface: tt.fields.mockNetworkPolicyInterface(),
 				allowedCIDR:            tt.fields.allowedCIDR,
@@ -442,7 +442,7 @@ func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nph := &networkPolicyHandler{
+			nph := &NetworkPolicyHandler{
 				ingressController:      tt.fields.mockIngressController(),
 				networkPolicyInterface: tt.fields.mockNetworkPolicyInterface(),
 				allowedCIDR:            tt.fields.allowedCIDR,
@@ -675,7 +675,7 @@ func Test_networkPolicyHandler_RemoveNetworkPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nph := &networkPolicyHandler{
+			nph := &NetworkPolicyHandler{
 				ingressController:      tt.fields.ingressControllerMock(),
 				networkPolicyInterface: tt.fields.networkPolicyInterfaceMock(),
 			}

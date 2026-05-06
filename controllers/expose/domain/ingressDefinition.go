@@ -1,8 +1,8 @@
-package definition
+package domain
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-type ExpositionDefinition struct {
+type IngressDefinition struct {
 	// BaseName is the name that generated resource names should be based on.
 	BaseName string
 	// Dogu contains information only relevant to dogus.

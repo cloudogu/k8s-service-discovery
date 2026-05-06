@@ -2,32 +2,28 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // serviceReconciler watches every Service object in the cluster and creates ingress objects accordingly.
 type serviceReconciler struct {
-	ingressUpdater         IngressUpdater
-	networkPolicyUpdater   NetworkPolicyUpdater
-	client                 client.Client
-	networkPoliciesEnabled bool
+	ingressUpdater       IngressUpdater
+	networkPolicyUpdater NetworkPolicyUpdater
+	client               client.Client
 }
 
 // NewServiceReconciler creates a new service reconciler.
-func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, networkPolicyUpdater NetworkPolicyUpdater, networkPoliciesEnabled bool) *serviceReconciler {
+func NewServiceReconciler(client client.Client, ingressUpdater IngressUpdater, networkPolicyUpdater NetworkPolicyUpdater) *serviceReconciler {
 	return &serviceReconciler{
-		client:                 client,
-		ingressUpdater:         ingressUpdater,
-		networkPolicyUpdater:   networkPolicyUpdater,
-		networkPoliciesEnabled: networkPoliciesEnabled,
+		client:               client,
+		ingressUpdater:       ingressUpdater,
+		networkPolicyUpdater: networkPolicyUpdater,
 	}
 }
 
@@ -45,59 +41,24 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	if !r.networkPoliciesEnabled {
-		// Try to delete the networkpolicy
-		logger.Info("networkpolicy support is disabled")
-		err = r.networkPolicyUpdater.RemoveNetworkPolicy(ctx)
-		if err != nil {
-			logger.Error(fmt.Errorf("failed to delete network policy: %w", err), "networkpolicy error")
-		}
-	}
-
-	if apierrors.IsNotFound(err) {
-		logger.Info(fmt.Sprintf("service %s not found", req.NamespacedName))
-		return r.handleDelete(ctx, req)
-	}
-
-	logger.Info(fmt.Sprintf("Found service [%s]", service.Name))
+	logger.Info(fmt.Sprintf("Reconciling service [%s]", service.Name))
 	return r.handleUpsert(ctx, service)
 }
 
 func (r *serviceReconciler) handleUpsert(ctx context.Context, service *corev1.Service) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
 	err := r.ingressUpdater.UpsertForService(ctx, service)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", service.Name, err)
 	}
 
-	if r.networkPoliciesEnabled {
-		logger.Info("networkpolicy support is enabled")
-		err = r.networkPolicyUpdater.UpsertNetworkPoliciesForService(ctx, service)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create/update network policies for service [%s]: %w", service.Name, err)
-		}
+	err = r.networkPolicyUpdater.UpsertNetworkPoliciesForService(ctx, service)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create/update network policies for service [%s]: %w", service.Name, err)
 	}
+
+	// TODO finalizer?
 
 	return ctrl.Result{}, nil
-}
-
-func (r *serviceReconciler) handleDelete(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-	logger.Info("remove exposed ports")
-
-	var multiErr []error
-
-	// Do not remove ports if networkpolicies are not enabled because the policy should be deleted anyway.
-	if r.networkPoliciesEnabled {
-		logger.Info("remove network policy ports")
-		netPolErr := r.networkPolicyUpdater.RemoveExposedPorts(ctx, req.Name)
-		if netPolErr != nil {
-			multiErr = append(multiErr, netPolErr)
-			logger.Error(netPolErr, fmt.Sprintf("failed to remove exposed ports in network policy for service %s", req.NamespacedName))
-		}
-	}
-
-	return ctrl.Result{}, errors.Join(multiErr...)
 }
 
 // SetupWithManager sets up the controller with the Manager.

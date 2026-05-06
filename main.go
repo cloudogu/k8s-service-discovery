@@ -222,7 +222,6 @@ func configureManager(
 		ingressController,
 		ingressUpdater,
 		networkPolicyUpdater,
-		networkPoliciesEnabled,
 		certSync,
 		maintenanceAdapter,
 		recorder,
@@ -297,12 +296,11 @@ func configureReconciler(
 	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
-	networkPoliciesEnabled bool,
 	certSync certificateSynchronizer,
 	maintenanceAdapter controllers.MaintenanceAdapter,
 	recorder record.EventRecorder,
 ) error {
-	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater, networkPoliciesEnabled)
+	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
 	}

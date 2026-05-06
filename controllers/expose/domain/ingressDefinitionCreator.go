@@ -1,4 +1,4 @@
-package definition
+package domain
 
 import (
 	"context"
@@ -10,8 +10,11 @@ import (
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
+	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -19,53 +22,138 @@ const (
 	CesServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-services"
 )
 
-type ServiceConverter struct {
+type maintenanceAdapter interface {
+	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
+}
+
+// deploymentReadyChecker checks the readiness from deployments.
+type deploymentReadyChecker interface {
+	// IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
+	IsReady(ctx context.Context, deploymentName string) (bool, error)
+}
+
+type IngressDefinitionCreator struct {
 	maintenance  maintenanceAdapter
 	readyChecker deploymentReadyChecker
 }
 
-func NewServiceConverter(maintenanceAdapter maintenanceAdapter, readyChecker deploymentReadyChecker) *ServiceConverter {
-	return &ServiceConverter{
+func NewIngressDefinitionCreator(maintenanceAdapter maintenanceAdapter, readyChecker deploymentReadyChecker) *IngressDefinitionCreator {
+	return &IngressDefinitionCreator{
 		maintenance:  maintenanceAdapter,
 		readyChecker: readyChecker,
 	}
 }
 
-func (c *ServiceConverter) Convert(ctx context.Context, service *corev1.Service) (ExpositionDefinition, error) {
+func getDoguInformation(ctx context.Context, meta metav1.ObjectMeta, maintenanceAdapter maintenanceAdapter, readyChecker deploymentReadyChecker) (*DoguInformation, error) {
+	doguName, isDogu := meta.Labels[doguv2.DoguLabelName]
+	if isDogu {
+		_, maintenanceActive, err := maintenanceAdapter.GetStatus(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get maintenance status: %w", err)
+		}
+
+		isReady, err := readyChecker.IsReady(ctx, doguName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check deployment readiness for %q: %w", doguName, err)
+		}
+
+		return &DoguInformation{
+			IsMaintenanceMode: maintenanceActive,
+			IsStarting:        !isReady,
+		}, nil
+	}
+
+	return nil, nil
+}
+
+func (c *IngressDefinitionCreator) CreateFromExposition(ctx context.Context, exposition *expositionv1.Exposition) (IngressDefinition, error) {
+	doguInformation, err := getDoguInformation(ctx, exposition.ObjectMeta, c.maintenance, c.readyChecker)
+	if err != nil {
+		return IngressDefinition{}, err
+	}
+
+	return IngressDefinition{
+		BaseName: exposition.Name,
+		Dogu:     doguInformation,
+		OwnerReference: metav1.OwnerReference{
+			APIVersion:         exposition.APIVersion,
+			Kind:               exposition.Kind,
+			Name:               exposition.Name,
+			UID:                exposition.UID,
+			Controller:         ptr.To(true),
+			BlockOwnerDeletion: ptr.To(true),
+		},
+		HttpRoutes: c.getHttpRoutesForExposition(exposition),
+	}, nil
+}
+
+func (c *IngressDefinitionCreator) getHttpRoutesForExposition(exposition *expositionv1.Exposition) []HttpRoute {
+	var httpRoutes []HttpRoute
+	for _, httpEntry := range exposition.Spec.HTTP {
+		var rewrite *HttpRewrite
+		if httpEntry.Rewrite != nil {
+			var regex *RegexReplacement
+			if httpEntry.Rewrite.Regex != nil {
+				regex = &RegexReplacement{
+					Pattern:     httpEntry.Rewrite.Regex.Pattern,
+					Replacement: httpEntry.Rewrite.Regex.Replacement,
+				}
+			}
+
+			rewrite = &HttpRewrite{
+				StripPrefix: httpEntry.Rewrite.StripPrefix,
+				Regex:       regex,
+			}
+		}
+
+		httpRoutes = append(httpRoutes, HttpRoute{
+			Name:    httpEntry.Name,
+			Service: httpEntry.Service,
+			Port:    httpEntry.Port,
+			Path:    httpEntry.Path,
+			Rewrite: rewrite,
+		})
+	}
+	return httpRoutes
+}
+
+func (c *IngressDefinitionCreator) CreateFromService(ctx context.Context, service *corev1.Service) (IngressDefinition, error) {
 	doguInformation, err := getDoguInformation(ctx, service.ObjectMeta, c.maintenance, c.readyChecker)
 	if err != nil {
-		return ExpositionDefinition{}, err
+		return IngressDefinition{}, err
 	}
 
 	cesServices, err := getCesServices(service)
 	if err != nil {
-		return ExpositionDefinition{}, fmt.Errorf("failed to get ces services: %w", err)
+		return IngressDefinition{}, fmt.Errorf("failed to get ces services: %w", err)
 	}
 
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
 	if err != nil {
-		return ExpositionDefinition{}, fmt.Errorf("failed to get additional ingress additionalAnnotations: %w", err)
+		return IngressDefinition{}, fmt.Errorf("failed to get additional ingress additionalAnnotations: %w", err)
 	}
 
 	httpRoutes, err := c.getHttpRoutesForService(service, cesServices, additionalAnnotations)
 	if err != nil {
-		return ExpositionDefinition{}, fmt.Errorf("failed to get http routes: %w", err)
+		return IngressDefinition{}, fmt.Errorf("failed to get http routes: %w", err)
 	}
 
-	return ExpositionDefinition{
+	return IngressDefinition{
 		BaseName: service.Name,
 		Dogu:     doguInformation,
 		OwnerReference: metav1.OwnerReference{
-			APIVersion: service.APIVersion,
-			Kind:       service.Kind,
-			Name:       service.Name,
-			UID:        service.UID,
+			APIVersion:         service.APIVersion,
+			Kind:               service.Kind,
+			Name:               service.Name,
+			UID:                service.UID,
+			Controller:         ptr.To(true),
+			BlockOwnerDeletion: ptr.To(true),
 		},
 		HttpRoutes: httpRoutes,
 	}, nil
 }
 
-func (c *ServiceConverter) getHttpRoutesForService(service *corev1.Service, cesServices []cesService, additionalAnnotations doguv2.IngressAnnotations) ([]HttpRoute, error) {
+func (c *IngressDefinitionCreator) getHttpRoutesForService(service *corev1.Service, cesServices []cesService, additionalAnnotations doguv2.IngressAnnotations) ([]HttpRoute, error) {
 	var httpRoutes []HttpRoute
 	var errs []error
 	for _, cesService := range cesServices {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/definition"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/domain"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,11 +19,10 @@ import (
 )
 
 type IngressUpdater struct {
-	serviceConverter    serviceConverter
-	expositionConverter expositionConverter
-	generator           ingressGenerator
-	ingressUpserter     upserter
-	middlewareUpserter  upserter
+	ingressDefinitionCreator ingressDefinitionCreator
+	generator                ingressGenerator
+	ingressUpserter          upserter
+	middlewareUpserter       upserter
 }
 
 type IngressUpdaterDependencies struct {
@@ -37,9 +36,8 @@ type IngressUpdaterDependencies struct {
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
 func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
 	return &IngressUpdater{
-		serviceConverter:    definition.NewServiceConverter(deps.MaintenanceAdapter, deps.ReadyChecker),
-		expositionConverter: definition.NewExpositionConverter(deps.MaintenanceAdapter, deps.ReadyChecker),
-		generator:           newIngressGenerator(deps.Namespace, deps.IngressClassName),
+		ingressDefinitionCreator: domain.NewIngressDefinitionCreator(deps.MaintenanceAdapter, deps.ReadyChecker),
+		generator:                newIngressGenerator(deps.Namespace, deps.IngressClassName),
 		ingressUpserter: util.NewDeclarativeUpserter(
 			deps.DynamicClient,
 			networkingv1.SchemeGroupVersion.WithResource("ingresses"),
@@ -55,7 +53,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
 
 // UpsertForService creates or updates the ingress object of the given service.
 func (i *IngressUpdater) UpsertForService(ctx context.Context, service *corev1.Service) error {
-	expositionDefinition, err := i.serviceConverter.Convert(ctx, service)
+	expositionDefinition, err := i.ingressDefinitionCreator.CreateFromService(ctx, service)
 	if err != nil {
 		return fmt.Errorf("failed to convert service to exposition exposition definition: %w", err)
 	}
@@ -64,7 +62,7 @@ func (i *IngressUpdater) UpsertForService(ctx context.Context, service *corev1.S
 }
 
 func (i *IngressUpdater) UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error {
-	expositionDefinition, err := i.expositionConverter.Convert(ctx, exposition)
+	expositionDefinition, err := i.ingressDefinitionCreator.CreateFromExposition(ctx, exposition)
 	if err != nil {
 		return fmt.Errorf("failed to convert exposition to exposition exposition definition: %w", err)
 	}
@@ -72,7 +70,7 @@ func (i *IngressUpdater) UpsertForExposition(ctx context.Context, exposition *ex
 	return i.upsertForDefinition(ctx, expositionDefinition)
 }
 
-func (i *IngressUpdater) upsertForDefinition(ctx context.Context, definition definition.ExpositionDefinition) error {
+func (i *IngressUpdater) upsertForDefinition(ctx context.Context, definition domain.IngressDefinition) error {
 	// generate ingress objects
 	ingresses, middlewares := i.generator.GenerateWithMiddlewares(definition)
 

@@ -5,7 +5,7 @@ import (
 
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/definition"
+	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/domain"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,16 +26,17 @@ type DeploymentReadyChecker interface {
 	IsReady(ctx context.Context, deploymentName string) (bool, error)
 }
 
-type serviceConverter interface {
-	Convert(ctx context.Context, service *corev1.Service) (definition.ExpositionDefinition, error)
-}
-
-type expositionConverter interface {
-	Convert(ctx context.Context, exposition *expositionv1.Exposition) (definition.ExpositionDefinition, error)
+type ingressDefinitionCreator interface {
+	CreateFromService(ctx context.Context, service *corev1.Service) (domain.IngressDefinition, error)
+	CreateFromExposition(ctx context.Context, exposition *expositionv1.Exposition) (domain.IngressDefinition, error)
 }
 
 type ingressGenerator interface {
-	GenerateWithMiddlewares(definition definition.ExpositionDefinition) ([]*networkingv1.Ingress, []*traefikapi.Middleware)
+	GenerateWithMiddlewares(definition domain.IngressDefinition) ([]*networkingv1.Ingress, []*traefikapi.Middleware)
+}
+
+type networkPolicyGenerator interface {
+	Generate(definition domain.ExposedPortsDefinition) []*networkingv1.NetworkPolicy
 }
 
 type upserter interface {
@@ -58,6 +59,7 @@ type ingressInterface interface {
 
 type ingressController interface {
 	GetName() string
+	GetSelector() map[string]string
 	GetRewriteAnnotationKey() string
 }
 

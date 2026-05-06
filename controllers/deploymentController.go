@@ -26,6 +26,8 @@ func NewDeploymentReconciler(client client.Client, updater IngressUpdater) *depl
 	}
 }
 
+// TODO maybe do this in the service and exposition controllers?
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -55,6 +57,8 @@ func (r *deploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update ingress object of service [%s]: %w", doguService.Name, err)
 	}
+
+	// TODO do this for expositions as well
 
 	return ctrl.Result{}, nil
 }

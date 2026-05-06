@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"golang.org/x/text/cases"
@@ -17,21 +16,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 )
 
-const (
-	maintenanceChangeEventReason = "Maintenance"
-)
-
-const exposedServiceMaintenanceSelectorKey = "deactivatedDuringMaintenance"
-
 type v1ServiceList []*v1.Service
-
-type serviceRewriter interface {
-	rewrite(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error
-}
 
 type k8sClient interface {
 	client.Client
@@ -39,14 +27,11 @@ type k8sClient interface {
 
 // NewMaintenanceModeController creates a new maintenance mode updater.
 func NewMaintenanceModeController(client k8sClient, namespace string, ingressUpdater IngressUpdater, maintenanceAdapter MaintenanceAdapter, recorder eventRecorder) *maintenanceModeController {
-	rewriter := &defaultServiceRewriter{client: client, eventRecorder: recorder, namespace: namespace}
-
 	return &maintenanceModeController{
 		client:             client,
 		namespace:          namespace,
 		ingressUpdater:     ingressUpdater,
 		eventRecorder:      recorder,
-		serviceRewriter:    rewriter,
 		maintenanceAdapter: maintenanceAdapter,
 	}
 }
@@ -57,9 +42,10 @@ type maintenanceModeController struct {
 	namespace          string
 	ingressUpdater     IngressUpdater
 	eventRecorder      eventRecorder
-	serviceRewriter    serviceRewriter
 	maintenanceAdapter MaintenanceAdapter
 }
+
+// TODO maybe do this in the service and exposition controllers?
 
 func (mmu *maintenanceModeController) Reconcile(ctx context.Context, _ reconcile.Request) (reconcile.Result, error) {
 	err := mmu.handleMaintenanceModeUpdate(ctx)
@@ -147,7 +133,7 @@ func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, ac
 	}
 
 	for _, exposition := range expositionList {
-		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress objects exposition [%s]", exposition.Name))
+		ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating ingress objects for exposition [%s]", exposition.Name))
 		err := mmu.ingressUpdater.UpsertForExposition(ctx, exposition)
 		if err != nil {
 			errs = append(errs, err)
@@ -156,11 +142,6 @@ func (mmu *maintenanceModeController) setMaintenanceMode(ctx context.Context, ac
 
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to %s maintenance mode: %w", verb, errors.Join(errs...))
-	}
-
-	err = mmu.serviceRewriter.rewrite(ctx, serviceList, activate)
-	if err != nil {
-		return fmt.Errorf("failed to rewrite services on %s maintenance mode: %w", verb, err)
 	}
 
 	return nil
@@ -179,59 +160,4 @@ func maintenancePredicate() predicate.Funcs {
 	return predicate.NewPredicateFuncs(func(object client.Object) bool {
 		return object.GetName() == repository.MaintenanceConfigMapName
 	})
-}
-
-type defaultServiceRewriter struct {
-	client        k8sClient
-	eventRecorder eventRecorder
-	namespace     string
-}
-
-func (sw *defaultServiceRewriter) rewrite(ctx context.Context, serviceList v1ServiceList, activateMaintenanceMode bool) error {
-	var errs []error
-	for _, service := range serviceList {
-		rewriteErr := rewriteNonSimpleServiceRoute(ctx, sw.client, sw.eventRecorder, service, activateMaintenanceMode)
-		if rewriteErr != nil {
-			errs = append(errs, rewriteErr)
-		}
-	}
-
-	return errors.Join(errs...)
-}
-
-func rewriteNonSimpleServiceRoute(ctx context.Context, cli k8sClient, recorder eventRecorder, service *v1.Service, rewriteToMaintenance bool) error {
-	if service.Spec.Type == v1.ServiceTypeClusterIP {
-		return nil
-	}
-
-	if service.Spec.Selector[doguv2.DoguLabelName] == "" {
-		return nil
-	}
-
-	if isServiceNginxRelated(service) {
-		return nil
-	}
-
-	ctrl.LoggerFrom(ctx).Info(fmt.Sprintf("Updating service object [%s]", service.Name))
-
-	var serviceEventMsg string
-	if rewriteToMaintenance {
-		serviceEventMsg = "Maintenance mode was activated, rewriting exposed service %s"
-		service.Spec.Selector = map[string]string{doguv2.DoguLabelName: exposedServiceMaintenanceSelectorKey}
-	} else {
-		serviceEventMsg = "Maintenance mode was deactivated, restoring exposed service %s"
-		service.Spec.Selector = map[string]string{doguv2.DoguLabelName: service.Labels[doguv2.DoguLabelName]}
-	}
-	recorder.Eventf(service, v1.EventTypeNormal, maintenanceChangeEventReason, serviceEventMsg, service.Name)
-
-	err := cli.Update(ctx, service)
-	if err != nil {
-		return fmt.Errorf("could not rewrite service %s: %w", service.Name, err)
-	}
-
-	return nil
-}
-
-func isServiceNginxRelated(service *v1.Service) bool {
-	return strings.HasPrefix(service.Spec.Selector[doguv2.DoguLabelName], "nginx-")
 }
