@@ -17,6 +17,7 @@ const (
 	// networkPolicyCIDREnvVar define the ip range which is allowed to access the ingress controller if networkpolicies are enabled.
 	networkPolicyCIDREnvVar    = "NETWORK_POLICIES_CIDR"
 	networkPolicyEnabledEnvVar = "NETWORK_POLICIES_ENABLED"
+	expositionEnabledEnvVar    = "EXPOSITION_ENABLED"
 )
 
 var (
@@ -60,5 +61,20 @@ func ReadNetworkPolicyEnabled() (bool, error) {
 
 	logger.Info(fmt.Sprintf("network policies enabled: [%s]", enabled))
 
+	return parseBool, nil
+}
+
+func ReadExpositionEnabled() (bool, error) {
+	enabled, found := os.LookupEnv(expositionEnabledEnvVar)
+	if !found {
+		return false, fmt.Errorf("failed to read flag exposition enabled from environment variable [%s], please set the variable and try again", "EXPOSE_EXPOSITION")
+	}
+
+	parseBool, err := strconv.ParseBool(enabled)
+	if err != nil {
+		return false, err
+	}
+
+	logger.Info(fmt.Sprintf("exposition enabled: [%s]", enabled))
 	return parseBool, nil
 }

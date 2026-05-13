@@ -18,6 +18,8 @@ manager:
   imagePullPolicy: IfNotPresent
 ingress:
   controller: k8s-ces-gateway
+exposition:
+  enabled: false
 networkPolicies:
   enabled: true
   denyAll: true

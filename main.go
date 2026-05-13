@@ -145,7 +145,12 @@ func startManager() error {
 		return err
 	}
 
-	networkPolicyUpdater := expose.NewNetworkPolicyHandler(clientSet.networkPolicyClient, controller, cidr)
+	networkPolicyUpdater := expose.NewNetworkPolicyHandler(!networkpoliciesEnabled, watchNamespace, controller, cidr, dynamicClient)
+
+	expositionEnabled, err := config.ReadExpositionEnabled()
+	if err != nil {
+		return err
+	}
 
 	if err = configureManager(
 		serviceDiscManager,
@@ -155,7 +160,7 @@ func startManager() error {
 		controller,
 		ingressUpdater,
 		networkPolicyUpdater,
-		networkpoliciesEnabled,
+		expositionEnabled,
 		certSync,
 		maintenanceAdapter,
 		eventRecorder,
@@ -209,7 +214,7 @@ func configureManager(
 	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
-	networkPoliciesEnabled bool,
+	expositionEnabled bool,
 	certSync certificateSynchronizer,
 	maintenanceAdapter controllers.MaintenanceAdapter,
 	recorder record.EventRecorder,
@@ -222,6 +227,7 @@ func configureManager(
 		ingressController,
 		ingressUpdater,
 		networkPolicyUpdater,
+		expositionEnabled,
 		certSync,
 		maintenanceAdapter,
 		recorder,
@@ -296,13 +302,21 @@ func configureReconciler(
 	ingressController controllers.IngressController,
 	ingressUpdater controllers.IngressUpdater,
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
+	expositionEnabled bool,
 	certSync certificateSynchronizer,
 	maintenanceAdapter controllers.MaintenanceAdapter,
 	recorder record.EventRecorder,
 ) error {
 	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater)
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
-		return fmt.Errorf("failed to setup service discovery with the manager: %w", err)
+		return fmt.Errorf("failed to setup service reconciler with the manager: %w", err)
+	}
+
+	if expositionEnabled {
+		expositionReconciler := controllers.NewExpositionReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater)
+		if err := expositionReconciler.SetupWithManager(k8sManager); err != nil {
+			return fmt.Errorf("failed to setup exposition reconciler with the manager: %w", err)
+		}
 	}
 
 	deploymentReconciler := controllers.NewDeploymentReconciler(k8sManager.GetClient(), ingressUpdater)

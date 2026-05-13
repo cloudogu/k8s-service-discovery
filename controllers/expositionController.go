@@ -15,19 +15,17 @@ import (
 
 // expositionReconciler watches every Exposition object in the cluster and creates ingress objects accordingly.
 type expositionReconciler struct {
-	ingressUpdater         IngressUpdater
-	networkPolicyUpdater   NetworkPolicyUpdater
-	client                 client.Client
-	networkPoliciesEnabled bool
+	ingressUpdater       IngressUpdater
+	networkPolicyUpdater NetworkPolicyUpdater
+	client               client.Client
 }
 
 // NewExpositionReconciler creates a new exposition reconciler.
-func NewExpositionReconciler(client client.Client, ingressUpdater IngressUpdater, networkPolicyUpdater NetworkPolicyUpdater, networkPoliciesEnabled bool) *expositionReconciler {
+func NewExpositionReconciler(client client.Client, ingressUpdater IngressUpdater, networkPolicyUpdater NetworkPolicyUpdater) *expositionReconciler {
 	return &expositionReconciler{
-		client:                 client,
-		ingressUpdater:         ingressUpdater,
-		networkPolicyUpdater:   networkPolicyUpdater,
-		networkPoliciesEnabled: networkPoliciesEnabled,
+		client:               client,
+		ingressUpdater:       ingressUpdater,
+		networkPolicyUpdater: networkPolicyUpdater,
 	}
 }
 
