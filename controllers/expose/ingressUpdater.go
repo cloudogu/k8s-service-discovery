@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
@@ -265,7 +264,6 @@ func (i *ingressUpdater) upsertDoguIngressObject(ctx context.Context, cesService
 
 		// Reference the created middleware
 		annotations["traefik.ingress.kubernetes.io/router.middlewares"] = fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName)
-		ingressPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(cesService.Location, "/"))
 	}
 
 	// add other additional annotations (can possibly overwrite the rewrite annotations)
