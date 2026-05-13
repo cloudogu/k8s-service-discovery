@@ -36,7 +36,9 @@ func (r *serviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := ctrl.LoggerFrom(ctx)
 
 	service, err := r.getService(ctx, req)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	} else if err != nil {
 		logger.Info(fmt.Sprintf("failed to get service %s: %s", req.NamespacedName, err))
 		return ctrl.Result{}, err
 	}
@@ -55,8 +57,6 @@ func (r *serviceReconciler) handleUpsert(ctx context.Context, service *corev1.Se
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update network policies for service [%s]: %w", service.Name, err)
 	}
-
-	// TODO finalizer?
 
 	return ctrl.Result{}, nil
 }

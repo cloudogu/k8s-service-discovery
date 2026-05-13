@@ -16,7 +16,6 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
-	"k8s.io/client-go/dynamic"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -122,17 +121,12 @@ func startManager() error {
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 	maintenanceAdapter := repository.NewMaintenanceModeAdapter(ServiceDiscoveryMaintenanceOwner, serviceDiscManager.GetClient(), watchNamespace)
 
-	dynamicClient, err := dynamic.NewForConfig(serviceDiscManager.GetConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %w", err)
-	}
-
 	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
 		Namespace:          watchNamespace,
 		IngressClassName:   IngressClassName,
 		MaintenanceAdapter: maintenanceAdapter,
 		ReadyChecker:       deploymentReadyChecker,
-		DynamicClient:      dynamicClient,
+		Client:             serviceDiscManager.GetClient(),
 	})
 
 	cidr, err := config.ReadNetworkPolicyCIDR()
@@ -140,12 +134,12 @@ func startManager() error {
 		return err
 	}
 
-	networkpoliciesEnabled, err := config.ReadNetworkPolicyEnabled()
+	networkPoliciesEnabled, err := config.ReadNetworkPolicyEnabled()
 	if err != nil {
 		return err
 	}
 
-	networkPolicyUpdater := expose.NewNetworkPolicyHandler(!networkpoliciesEnabled, watchNamespace, controller, cidr, dynamicClient)
+	networkPolicyUpdater := expose.NewNetworkPolicyHandler(!networkPoliciesEnabled, watchNamespace, controller, cidr, serviceDiscManager.GetClient())
 
 	expositionEnabled, err := config.ReadExpositionEnabled()
 	if err != nil {

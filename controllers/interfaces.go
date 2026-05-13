@@ -34,9 +34,9 @@ type GlobalConfigRepository interface {
 
 // IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
 type IngressUpdater interface {
-	// UpsertIngressForService creates or updates the ingress objects of the given service.
+	// UpsertForService creates or updates the ingress objects of the given service.
 	UpsertForService(ctx context.Context, service *corev1.Service) error
-	// UpsertIngressForExposition creates or updates the ingress objects of the given exposition.
+	// UpsertForExposition creates or updates the ingress objects of the given exposition.
 	UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error
 }
 

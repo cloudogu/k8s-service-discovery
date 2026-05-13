@@ -74,6 +74,7 @@ func (c *IngressDefinitionCreator) CreateFromExposition(ctx context.Context, exp
 
 	return IngressDefinition{
 		BaseName: exposition.Name,
+		Type:     TypeExposition,
 		Dogu:     doguInformation,
 		OwnerReference: metav1.OwnerReference{
 			APIVersion:         exposition.APIVersion,
@@ -140,6 +141,7 @@ func (c *IngressDefinitionCreator) CreateFromService(ctx context.Context, servic
 
 	return IngressDefinition{
 		BaseName: service.Name,
+		Type:     TypeService,
 		Dogu:     doguInformation,
 		OwnerReference: metav1.OwnerReference{
 			APIVersion:         service.APIVersion,

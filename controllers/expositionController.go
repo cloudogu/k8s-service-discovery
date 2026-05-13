@@ -37,7 +37,9 @@ func (r *expositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger := ctrl.LoggerFrom(ctx)
 
 	exposition, err := r.getExposition(ctx, req)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
+		return ctrl.Result{}, nil
+	} else if err != nil {
 		logger.Info(fmt.Sprintf("failed to get exposition %s: %s", req.NamespacedName, err))
 		return ctrl.Result{}, err
 	}
@@ -56,8 +58,6 @@ func (r *expositionReconciler) handleUpsert(ctx context.Context, exposition *exp
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create/update network policies for exposition [%s]: %w", exposition.Name, err)
 	}
-
-	// TODO finalizer?
 
 	return ctrl.Result{}, nil
 }

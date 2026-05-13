@@ -10,8 +10,6 @@ import (
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 )
@@ -37,10 +35,6 @@ type ingressGenerator interface {
 
 type networkPolicyGenerator interface {
 	Generate(definition domain.ExposedPortsDefinition) []*networkingv1.NetworkPolicy
-}
-
-type upserter interface {
-	Upsert(ctx context.Context, labelSelector labels.Selector, objects map[string]unstructured.Unstructured) error
 }
 
 // used for mocks

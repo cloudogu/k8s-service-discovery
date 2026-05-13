@@ -21,6 +21,8 @@ const (
 type ExposedPortsDefinition struct {
 	// BaseName is the name that generated resource names should be based on.
 	BaseName string
+	// Type of the definition, currently either TypeService or TypeExposition.
+	Type DefinitionType
 	// OwnerReference to be set on the generated resources.
 	OwnerReference metav1.OwnerReference
 	// TcpRoutes to be exposed.

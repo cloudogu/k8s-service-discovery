@@ -97,7 +97,6 @@ func (i *defaultIngressGenerator) generateIngress(baseName, middlewareName strin
 	labels := map[string]string{ownedByLabelKey: baseName}
 	maps.Insert(labels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
-	pathType := networkingv1.PathTypePrefix
 	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", baseName, httpRoute.Name),
@@ -113,7 +112,7 @@ func (i *defaultIngressGenerator) generateIngress(baseName, middlewareName strin
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{{
 							Path:     httpRoute.Path,
-							PathType: &pathType,
+							PathType: new(networkingv1.PathTypePrefix),
 							Backend: networkingv1.IngressBackend{
 								Service: &networkingv1.IngressServiceBackend{
 									Name: httpRoute.Service,

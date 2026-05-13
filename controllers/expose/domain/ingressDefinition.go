@@ -5,6 +5,8 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 type IngressDefinition struct {
 	// BaseName is the name that generated resource names should be based on.
 	BaseName string
+	// Type of the definition, currently either TypeService or TypeExposition.
+	Type DefinitionType
 	// Dogu contains information only relevant to dogus.
 	Dogu *DoguInformation
 	// OwnerReference to be set on the generated resources.
@@ -12,6 +14,13 @@ type IngressDefinition struct {
 	// HttpRoutes to be exposed.
 	HttpRoutes []HttpRoute
 }
+
+type DefinitionType string
+
+const (
+	TypeService    DefinitionType = "service"
+	TypeExposition DefinitionType = "exposition"
+)
 
 type DoguInformation struct {
 	IsMaintenanceMode bool

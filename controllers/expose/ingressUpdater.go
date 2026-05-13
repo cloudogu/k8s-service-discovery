@@ -7,22 +7,20 @@ import (
 
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/domain"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type IngressUpdater struct {
 	ingressDefinitionCreator ingressDefinitionCreator
 	generator                ingressGenerator
-	ingressUpserter          upserter
-	middlewareUpserter       upserter
+	client                   client.Client
+	namespace                string
 }
 
 type IngressUpdaterDependencies struct {
@@ -30,7 +28,7 @@ type IngressUpdaterDependencies struct {
 	IngressClassName   string
 	MaintenanceAdapter maintenanceAdapter
 	ReadyChecker       DeploymentReadyChecker
-	DynamicClient      dynamic.Interface
+	Client             client.Client
 }
 
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
@@ -38,16 +36,8 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
 	return &IngressUpdater{
 		ingressDefinitionCreator: domain.NewIngressDefinitionCreator(deps.MaintenanceAdapter, deps.ReadyChecker),
 		generator:                newIngressGenerator(deps.Namespace, deps.IngressClassName),
-		ingressUpserter: util.NewDeclarativeUpserter(
-			deps.DynamicClient,
-			networkingv1.SchemeGroupVersion.WithResource("ingresses"),
-			deps.Namespace,
-		),
-		middlewareUpserter: util.NewDeclarativeUpserter(
-			deps.DynamicClient,
-			traefikv1alpha1.SchemeGroupVersion.WithResource("middlewares"),
-			deps.Namespace,
-		),
+		client:                   deps.Client,
+		namespace:                deps.Namespace,
 	}
 }
 
@@ -55,7 +45,7 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
 func (i *IngressUpdater) UpsertForService(ctx context.Context, service *corev1.Service) error {
 	expositionDefinition, err := i.ingressDefinitionCreator.CreateFromService(ctx, service)
 	if err != nil {
-		return fmt.Errorf("failed to convert service to exposition exposition definition: %w", err)
+		return fmt.Errorf("failed to convert service to exposition definition: %w", err)
 	}
 
 	return i.upsertForDefinition(ctx, expositionDefinition)
@@ -64,7 +54,7 @@ func (i *IngressUpdater) UpsertForService(ctx context.Context, service *corev1.S
 func (i *IngressUpdater) UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error {
 	expositionDefinition, err := i.ingressDefinitionCreator.CreateFromExposition(ctx, exposition)
 	if err != nil {
-		return fmt.Errorf("failed to convert exposition to exposition exposition definition: %w", err)
+		return fmt.Errorf("failed to convert exposition to exposition definition: %w", err)
 	}
 
 	return i.upsertForDefinition(ctx, expositionDefinition)
@@ -74,43 +64,106 @@ func (i *IngressUpdater) upsertForDefinition(ctx context.Context, definition dom
 	// generate ingress objects
 	ingresses, middlewares := i.generator.GenerateWithMiddlewares(definition)
 
-	// upsert ingresses
-	unstructuredIngresses, err := convertListToUnstructuredMap(ingresses)
+	var errs []error
+	err := i.upsertIngresses(ctx, definition, ingresses)
 	if err != nil {
-		return fmt.Errorf("failed to convert ingresses to unstructured: %w", err)
+		errs = append(errs, err)
 	}
 
-	selector := labels.Set{ownedByLabelKey: definition.BaseName}.AsSelector()
-	err = i.ingressUpserter.Upsert(ctx, selector, unstructuredIngresses)
+	err = i.upsertMiddlewares(ctx, definition, middlewares)
 	if err != nil {
-		return fmt.Errorf("failed to upsert ingresses: %w", err)
+		errs = append(errs, err)
 	}
 
-	// upsert middlewares
-	unstructuredMiddlewares, err := convertListToUnstructuredMap(middlewares)
-	if err != nil {
-		return fmt.Errorf("failed to convert middlewares to unstructured: %w", err)
-	}
-
-	err = i.middlewareUpserter.Upsert(ctx, selector, unstructuredMiddlewares)
-	if err != nil {
-		return fmt.Errorf("failed to upsert middlewares: %w", err)
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to upsert ingresses or middleswares for %s %q: %w", definition.Type, definition.BaseName, errors.Join(errs...))
 	}
 
 	return nil
 }
 
-func convertListToUnstructuredMap[T metav1.Object](objects []T) (map[string]unstructured.Unstructured, error) {
-	var converterErrs []error
-	unstructuredObjects := make(map[string]unstructured.Unstructured, len(objects))
-	for _, object := range objects {
-		unstructuredIngress, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
-		if err != nil {
-			converterErrs = append(converterErrs, err)
-		}
-
-		unstructuredObjects[object.GetName()] = unstructured.Unstructured{Object: unstructuredIngress}
+func (i *IngressUpdater) upsertIngresses(ctx context.Context, definition domain.IngressDefinition, desiredState []*networkingv1.Ingress) error {
+	var errs []error
+	existing := &networkingv1.IngressList{}
+	err := i.client.List(ctx, existing, &client.ListOptions{Namespace: i.namespace, LabelSelector: selectorFromBaseName(definition.BaseName)})
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
 	}
 
-	return unstructuredObjects, errors.Join(converterErrs...)
+	var existingMap map[string]networkingv1.Ingress
+	for _, existingObject := range existing.Items {
+		existingMap[existingObject.Name] = existingObject
+	}
+
+	for _, desiredObject := range desiredState {
+		updateRef := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: desiredObject.Name, Namespace: desiredObject.Namespace}}
+		// only keep track of those that are not in the desired state to delete later
+		delete(existingMap, desiredObject.Name)
+
+		_, err := controllerutil.CreateOrUpdate(ctx, i.client, updateRef, func() error {
+			updateRef.Annotations = desiredObject.Annotations
+			updateRef.OwnerReferences = desiredObject.OwnerReferences
+			updateRef.Labels = desiredObject.Labels
+			updateRef.Spec = desiredObject.Spec
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// delete objects not in desired state
+	for _, existingObject := range existingMap {
+		err := i.client.Delete(ctx, &existingObject)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func (i *IngressUpdater) upsertMiddlewares(ctx context.Context, definition domain.IngressDefinition, desiredState []*traefikv1alpha1.Middleware) error {
+	var errs []error
+	existing := &traefikv1alpha1.MiddlewareList{}
+	err := i.client.List(ctx, existing, &client.ListOptions{Namespace: i.namespace, LabelSelector: selectorFromBaseName(definition.BaseName)})
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
+	}
+
+	var existingMap map[string]traefikv1alpha1.Middleware
+	for _, existingObject := range existing.Items {
+		existingMap[existingObject.Name] = existingObject
+	}
+
+	for _, desiredObject := range desiredState {
+		updateRef := &traefikv1alpha1.Middleware{ObjectMeta: metav1.ObjectMeta{Name: desiredObject.Name, Namespace: desiredObject.Namespace}}
+		// only keep track of those that are not in the desired state to delete later
+		delete(existingMap, desiredObject.Name)
+
+		_, err := controllerutil.CreateOrUpdate(ctx, i.client, updateRef, func() error {
+			updateRef.Annotations = desiredObject.Annotations
+			updateRef.OwnerReferences = desiredObject.OwnerReferences
+			updateRef.Labels = desiredObject.Labels
+			updateRef.Spec = desiredObject.Spec
+			return nil
+		})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// delete objects not in desired state
+	for _, existingObject := range existingMap {
+		err := i.client.Delete(ctx, &existingObject)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func selectorFromBaseName(baseName string) labels.Selector {
+	return labels.Set{ownedByLabelKey: baseName}.AsSelector()
 }
