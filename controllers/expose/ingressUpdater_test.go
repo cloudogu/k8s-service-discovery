@@ -455,6 +455,72 @@ func Test_ingressUpdater_upsertIngressForCesService(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to get addtional ingress annotations from dogu service 'test': invalid character '{' looking for beginning of object key string")
 	})
 
+	t.Run("Create ingress resource with rewrite middleware and prefix path", func(t *testing.T) {
+		// given
+		cesServiceWithRewrite := CesService{
+			Name:     "test",
+			Port:     12345,
+			Location: "/myLocation",
+			Pass:     "/myPass",
+		}
+		service := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: testNamespace,
+				Labels:    map[string]string{"dogu.name": "test"},
+			},
+		}
+		ownerReferences := []metav1.OwnerReference{
+			{
+				APIVersion: service.APIVersion,
+				Kind:       service.Kind,
+				Name:       service.Name,
+				UID:        service.UID,
+			},
+		}
+		expectedIngress := getTestIngress(
+			"test",
+			"/myLocation",
+			service,
+			service.Name,
+			12345,
+			map[string]string{
+				"traefik.ingress.kubernetes.io/router.middlewares": "my-namespace-test-rewrite@kubernetescrd",
+			},
+		)
+
+		dogu := &doguv2.Dogu{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}}
+		doguInterfaceMock := newMockDoguInterface(t)
+		doguInterfaceMock.EXPECT().Get(testCtx, service.Name, metav1.GetOptions{}).Return(dogu, nil)
+
+		deploymentReadyChecker := NewMockDeploymentReadyChecker(t)
+		deploymentReadyChecker.EXPECT().IsReady(testCtx, "test").Return(true, nil)
+
+		middlewareManagerMock := newMockMiddlewareManager(t)
+		middlewareManagerMock.EXPECT().createOrUpdateReplacePathMiddleware(testCtx, service.Name, cesServiceWithRewrite, ownerReferences).Return("test-rewrite", nil)
+		ingressInterfaceMock := newMockIngressInterface(t)
+		ingressInterfaceMock.EXPECT().Get(testCtx, expectedIngress.Name, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
+		ingressInterfaceMock.EXPECT().Create(testCtx, expectedIngress, metav1.CreateOptions{}).Return(nil, nil)
+		recorderMock := newMockEventRecorder(t)
+		recorderMock.EXPECT().Eventf(mock.IsType(&doguv2.Dogu{}), "Normal", "IngressCreation", "Created regular ingress for service [%s].", "test")
+
+		sut := ingressUpdater{
+			deploymentReadyChecker: deploymentReadyChecker,
+			doguInterface:          doguInterfaceMock,
+			middlewareManager:      middlewareManagerMock,
+			ingressInterface:       ingressInterfaceMock,
+			namespace:              testNamespace,
+			ingressClassName:       testIngressClassName,
+			eventRecorder:          recorderMock,
+		}
+
+		// when
+		err := sut.upsertIngressForCesService(testCtx, cesServiceWithRewrite, &service, false)
+
+		// then
+		require.NoError(t, err)
+	})
+
 	t.Run("Create ingress resource for a single ces service while maintenance mode is active", func(t *testing.T) {
 		// given
 		cesServiceWithOneWebapp := CesService{
