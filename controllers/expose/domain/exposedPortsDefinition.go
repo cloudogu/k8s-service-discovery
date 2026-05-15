@@ -10,7 +10,6 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -73,8 +72,8 @@ func CreateExposedPortsDefinitionFromService(service *corev1.Service) (ExposedPo
 			Kind:               service.Kind,
 			Name:               service.Name,
 			UID:                service.UID,
-			Controller:         ptr.To(true),
-			BlockOwnerDeletion: ptr.To(true),
+			Controller:         new(true),
+			BlockOwnerDeletion: new(true),
 		},
 		TcpRoutes: tcpRoutes,
 		UdpRoutes: udpRoutes,
@@ -161,8 +160,8 @@ func CreateExposedPortsDefinitionFromExposition(exposition *expositionv1.Exposit
 			Kind:               exposition.Kind,
 			Name:               exposition.Name,
 			UID:                exposition.UID,
-			Controller:         ptr.To(true),
-			BlockOwnerDeletion: ptr.To(true),
+			Controller:         new(true),
+			BlockOwnerDeletion: new(true),
 		},
 		TcpRoutes: nil,
 		UdpRoutes: nil,

@@ -14,7 +14,6 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -81,8 +80,8 @@ func (c *IngressDefinitionCreator) CreateFromExposition(ctx context.Context, exp
 			Kind:               exposition.Kind,
 			Name:               exposition.Name,
 			UID:                exposition.UID,
-			Controller:         ptr.To(true),
-			BlockOwnerDeletion: ptr.To(true),
+			Controller:         new(true),
+			BlockOwnerDeletion: new(true),
 		},
 		HttpRoutes: c.getHttpRoutesForExposition(exposition),
 	}, nil
@@ -148,8 +147,8 @@ func (c *IngressDefinitionCreator) CreateFromService(ctx context.Context, servic
 			Kind:               service.Kind,
 			Name:               service.Name,
 			UID:                service.UID,
-			Controller:         ptr.To(true),
-			BlockOwnerDeletion: ptr.To(true),
+			Controller:         new(true),
+			BlockOwnerDeletion: new(true),
 		},
 		HttpRoutes: httpRoutes,
 	}, nil
