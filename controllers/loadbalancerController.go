@@ -3,8 +3,11 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
 
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +30,7 @@ const (
 // LoadBalancerReconciler is responsible for reconciling the ces-loadbalancer configmap and to create / update the corresponding
 // loadbalancer service. For this, it also watches Services to detect changes for exposed ports.
 type LoadBalancerReconciler struct {
+	ExpositionEnabled bool
 	Client            client.Client
 	IngressController IngressController
 	SvcClient         serviceClient
@@ -72,12 +76,17 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to get exposed dogu services: %w", err)
 	}
 
-	exposedDoguPorts, err := getExposedDoguPorts(exposedDoguServices)
+	expositions, err := r.getExpositions(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get expositions: %w", err)
+	}
+
+	exposedPorts, err := getExposedPorts(exposedDoguServices, expositions)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get exposed ports from services: %w", err)
 	}
 
-	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedDoguPorts)
+	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedPorts)
 
 	uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
 	if uErr != nil {
@@ -86,7 +95,7 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	logger.Info("Successfully applied new state to loadbalancer.")
 
-	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts); eErr != nil {
+	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedPorts); eErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
 	}
 
@@ -107,6 +116,24 @@ func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]type
 	}
 
 	return serviceList, nil
+}
+
+func (r *LoadBalancerReconciler) getExpositions(ctx context.Context) ([]types.Exposition, error) {
+	if !r.ExpositionEnabled {
+		return nil, nil
+	}
+
+	var k8sExpositionList expositionv1.ExpositionList
+	if lErr := r.Client.List(ctx, &k8sExpositionList); lErr != nil {
+		return nil, fmt.Errorf("failed to list expositions: %w", lErr)
+	}
+
+	expositionList := make([]types.Exposition, 0, len(k8sExpositionList.Items))
+	for _, k8sExposition := range k8sExpositionList.Items {
+		expositionList = append(expositionList, types.Exposition(k8sExposition))
+	}
+
+	return expositionList, nil
 }
 
 func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts, setOwner func(object metav1.Object)) error {
@@ -155,7 +182,7 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return fmt.Errorf("failed to create index for service with exposed ports: %w", iErr)
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&corev1.ConfigMap{},
 			builder.WithPredicates(loadbalancerConfigPredicate()),
@@ -169,8 +196,15 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Service{},
 			builder.WithPredicates(loadbalancerServicePredicate()),
 		).
-		Named("loadbalancer-configmap").
-		Complete(r)
+		Named("loadbalancer-configmap")
+	if r.ExpositionEnabled {
+		ctrlBuilder.Watches(
+			&expositionv1.Exposition{},
+			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
+			builder.WithPredicates(exposedPortExpositionPredicate()),
+		)
+	}
+	return ctrlBuilder.Complete(r)
 }
 
 func enqueueLoadBalancerConfig(_ context.Context, object client.Object) []reconcile.Request {
@@ -194,6 +228,60 @@ func loadbalancerConfigPredicate() predicate.Funcs {
 	return predicate.NewPredicateFuncs(func(object client.Object) bool {
 		return object.GetName() == types.LoadBalancerConfigName
 	})
+}
+
+func exposedPortExpositionPredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
+			return isExposedPortExposition(e.Object)
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
+			return isExposedPortExposition(e.Object)
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[client.Object]) bool {
+			expositionOld, ok := e.ObjectOld.(*expositionv1.Exposition)
+			if !ok {
+				return false
+			}
+
+			expositionNew, ok := e.ObjectNew.(*expositionv1.Exposition)
+			if !ok {
+				return false
+			}
+
+			if len(expositionOld.Spec.TCP) != len(expositionNew.Spec.TCP) ||
+				len(expositionOld.Spec.UDP) != len(expositionNew.Spec.UDP) {
+				return true
+			}
+
+			tcpSortFunc := func(a, b expositionv1.TCPEntry) int {
+				return strings.Compare(a.Name, b.Name)
+			}
+			slices.SortFunc(expositionOld.Spec.TCP, tcpSortFunc)
+			slices.SortFunc(expositionNew.Spec.TCP, tcpSortFunc)
+
+			udpSortFunc := func(a, b expositionv1.UDPEntry) int {
+				return strings.Compare(a.Name, b.Name)
+			}
+			slices.SortFunc(expositionOld.Spec.UDP, udpSortFunc)
+			slices.SortFunc(expositionNew.Spec.UDP, udpSortFunc)
+
+			return !(reflect.DeepEqual(expositionOld.Spec.TCP, expositionNew.Spec.TCP) &&
+				reflect.DeepEqual(expositionOld.Spec.UDP, expositionNew.Spec.UDP))
+		},
+		GenericFunc: func(e event.TypedGenericEvent[client.Object]) bool {
+			return isExposedPortExposition(e.Object)
+		},
+	}
+}
+
+func isExposedPortExposition(object metav1.Object) bool {
+	exposition, ok := object.(*expositionv1.Exposition)
+	if !ok {
+		return false
+	}
+
+	return len(exposition.Spec.TCP)+len(exposition.Spec.UDP) > 0
 }
 
 func exposedPortServicePredicate() predicate.Funcs {
@@ -289,8 +377,8 @@ func createLoadBalancerExposedPorts(doguPorts types.ExposedPorts) types.ExposedP
 	return exposedPorts
 }
 
-func getExposedDoguPorts(services []types.Service) (types.ExposedPorts, error) {
-	exposedDoguPorts := make(types.ExposedPorts, 0, len(services))
+func getExposedPorts(services []types.Service, expositions []types.Exposition) (types.ExposedPorts, error) {
+	exposedPorts := make(types.ExposedPorts, 0, len(services))
 
 	for _, service := range services {
 		serviceExposedPorts, err := service.GetExposedPorts()
@@ -298,10 +386,15 @@ func getExposedDoguPorts(services []types.Service) (types.ExposedPorts, error) {
 			return nil, fmt.Errorf("failed to get exposed ports from service %s: %w", service.Name, err)
 		}
 
-		exposedDoguPorts = append(exposedDoguPorts, serviceExposedPorts...)
+		exposedPorts = append(exposedPorts, serviceExposedPorts...)
 	}
 
-	exposedDoguPorts.SortByName()
+	for _, exposition := range expositions {
+		expositionExposedPorts := exposition.GetExposedPorts()
+		exposedPorts = append(exposedPorts, expositionExposedPorts...)
+	}
 
-	return exposedDoguPorts, nil
+	exposedPorts.SortByName()
+
+	return exposedPorts, nil
 }
