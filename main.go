@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -86,8 +85,6 @@ func startManager() error {
 	if err != nil {
 		return fmt.Errorf("failed to create new manager: %w", err)
 	}
-
-	eventRecorder := serviceDiscManager.GetEventRecorderFor("k8s-service-discovery-controller-manager")
 
 	clientSet, err := getK8sClientSet(serviceDiscManager.GetConfig(), watchNamespace)
 	if err != nil {
@@ -156,8 +153,6 @@ func startManager() error {
 		networkPolicyUpdater,
 		expositionEnabled,
 		certSync,
-		maintenanceAdapter,
-		eventRecorder,
 	); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
 	}
@@ -210,8 +205,6 @@ func configureManager(
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	expositionEnabled bool,
 	certSync certificateSynchronizer,
-	maintenanceAdapter controllers.MaintenanceAdapter,
-	recorder record.EventRecorder,
 ) error {
 	if err := configureReconciler(
 		k8sManager,
@@ -223,8 +216,6 @@ func configureManager(
 		networkPolicyUpdater,
 		expositionEnabled,
 		certSync,
-		maintenanceAdapter,
-		recorder,
 	); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
 	}
@@ -298,24 +289,25 @@ func configureReconciler(
 	networkPolicyUpdater controllers.NetworkPolicyUpdater,
 	expositionEnabled bool,
 	certSync certificateSynchronizer,
-	maintenanceAdapter controllers.MaintenanceAdapter,
-	recorder record.EventRecorder,
 ) error {
-	reconciler := controllers.NewServiceReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater)
+	reconciler := &controllers.ServiceReconciler{
+		Client:               k8sManager.GetClient(),
+		IngressUpdater:       ingressUpdater,
+		NetworkPolicyUpdater: networkPolicyUpdater,
+	}
 	if err := reconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup service reconciler with the manager: %w", err)
 	}
 
 	if expositionEnabled {
-		expositionReconciler := controllers.NewExpositionReconciler(k8sManager.GetClient(), ingressUpdater, networkPolicyUpdater)
+		expositionReconciler := controllers.ExpositionReconciler{
+			Client:               k8sManager.GetClient(),
+			IngressUpdater:       ingressUpdater,
+			NetworkPolicyUpdater: networkPolicyUpdater,
+		}
 		if err := expositionReconciler.SetupWithManager(k8sManager); err != nil {
 			return fmt.Errorf("failed to setup exposition reconciler with the manager: %w", err)
 		}
-	}
-
-	deploymentReconciler := controllers.NewDeploymentReconciler(k8sManager.GetClient(), ingressUpdater)
-	if err := deploymentReconciler.SetupWithManager(k8sManager); err != nil {
-		return fmt.Errorf("failed to setup deployment reconciler with the manager: %w", err)
 	}
 
 	ecosystemCertificateReconciler := controllers.NewEcosystemCertificateReconciler(certSync)
@@ -342,11 +334,6 @@ func configureReconciler(
 
 	if err := loadbalacnerReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup loadbalancer reconciler with the manager: %w", err)
-	}
-
-	if err := controllers.NewMaintenanceModeController(k8sManager.GetClient(), namespace, ingressUpdater, maintenanceAdapter, recorder).
-		SetupWithManager(k8sManager); err != nil {
-		return fmt.Errorf("failed to setup maintenance mode updater with the manager: %w", err)
 	}
 
 	return nil

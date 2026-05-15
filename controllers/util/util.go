@@ -37,8 +37,8 @@ func ContainsChars(s string) bool {
 	return len(strings.TrimSpace(s)) != 0
 }
 
-func HasDoguLabel(deployment client.Object) bool {
-	for label := range deployment.GetLabels() {
+func HasDoguLabel(object client.Object) bool {
+	for label := range object.GetLabels() {
 		if label == legacyDoguLabel || label == doguv2.DoguLabelName {
 			return true
 		}
