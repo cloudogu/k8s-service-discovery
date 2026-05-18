@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.0.2] - 2026-05-13
+### Fixed
+- [#106] Generate valid prefix ingress paths for services using Traefik rewrite middleware.
+
 ## [v6.0.1] - 2026-03-25
 ### Security
 - [#103] Fix `google.golang.org/grpc` CVE-2026-33186
