@@ -12,6 +12,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type maintenanceAdapter interface {
@@ -35,6 +36,10 @@ type ingressGenerator interface {
 
 type networkPolicyGenerator interface {
 	Generate(definition domain.ExposedPortsDefinition) []*networkingv1.NetworkPolicy
+}
+
+type k8sClient interface {
+	client.Client
 }
 
 // used for mocks

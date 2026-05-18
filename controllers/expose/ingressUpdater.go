@@ -19,7 +19,7 @@ import (
 type IngressUpdater struct {
 	ingressDefinitionCreator ingressDefinitionCreator
 	generator                ingressGenerator
-	client                   client.Client
+	client                   k8sClient
 	namespace                string
 }
 
@@ -76,7 +76,7 @@ func (i *IngressUpdater) upsertForDefinition(ctx context.Context, definition dom
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to upsert ingresses or middleswares for %s %q: %w", definition.Type, definition.BaseName, errors.Join(errs...))
+		return fmt.Errorf("failed to upsert ingresses or middlewares for %s %q: %w", definition.Type, definition.BaseName, errors.Join(errs...))
 	}
 
 	return nil
@@ -90,7 +90,7 @@ func (i *IngressUpdater) upsertIngresses(ctx context.Context, definition domain.
 		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
 	}
 
-	var existingMap map[string]networkingv1.Ingress
+	existingMap := make(map[string]networkingv1.Ingress, len(existing.Items))
 	for _, existingObject := range existing.Items {
 		existingMap[existingObject.Name] = existingObject
 	}
@@ -108,7 +108,7 @@ func (i *IngressUpdater) upsertIngresses(ctx context.Context, definition domain.
 			return nil
 		})
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to create or update ingress %q: %w", desiredObject.Name, err))
 		}
 	}
 
@@ -116,7 +116,7 @@ func (i *IngressUpdater) upsertIngresses(ctx context.Context, definition domain.
 	for _, existingObject := range existingMap {
 		err := i.client.Delete(ctx, &existingObject)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to delete outdated ingress %q: %w", existingObject.Name, err))
 		}
 	}
 
@@ -128,10 +128,10 @@ func (i *IngressUpdater) upsertMiddlewares(ctx context.Context, definition domai
 	existing := &traefikv1alpha1.MiddlewareList{}
 	err := i.client.List(ctx, existing, &client.ListOptions{Namespace: i.namespace, LabelSelector: selectorFromBaseName(definition.BaseName)})
 	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
+		errs = append(errs, fmt.Errorf("failed to list existing middlewares: %w", err))
 	}
 
-	var existingMap map[string]traefikv1alpha1.Middleware
+	existingMap := make(map[string]traefikv1alpha1.Middleware, len(existing.Items))
 	for _, existingObject := range existing.Items {
 		existingMap[existingObject.Name] = existingObject
 	}
@@ -149,7 +149,7 @@ func (i *IngressUpdater) upsertMiddlewares(ctx context.Context, definition domai
 			return nil
 		})
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to create or update middleware %q: %w", desiredObject.Name, err))
 		}
 	}
 
@@ -157,7 +157,7 @@ func (i *IngressUpdater) upsertMiddlewares(ctx context.Context, definition domai
 	for _, existingObject := range existingMap {
 		err := i.client.Delete(ctx, &existingObject)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to delete outdated middleware %q: %w", existingObject.Name, err))
 		}
 	}
 

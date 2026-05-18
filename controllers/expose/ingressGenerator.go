@@ -89,8 +89,9 @@ func (i *defaultIngressGenerator) generateNormalWithMiddlewares(definition domai
 }
 
 func (i *defaultIngressGenerator) generateIngress(baseName, middlewareName string, ownerReference metav1.OwnerReference, httpRoute domain.HttpRoute) *networkingv1.Ingress {
-	annotations := map[string]string{
-		traefikMiddlewareAnnotationKey: fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName),
+	annotations := make(map[string]string, len(httpRoute.AdditionalAnnotations)+1)
+	if middlewareName != "" {
+		annotations[traefikMiddlewareAnnotationKey] = fmt.Sprintf("%s-%s@kubernetescrd", i.namespace, middlewareName)
 	}
 	maps.Insert(annotations, maps.All(httpRoute.AdditionalAnnotations))
 

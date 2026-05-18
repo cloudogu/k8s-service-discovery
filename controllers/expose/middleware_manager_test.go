@@ -21,11 +21,11 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		clientMock := newMockMiddlewareInterface(t)
 		manager := &MiddlewareManager{client: clientMock, namespace: "test-Namespace"}
 
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
-		clientMock.EXPECT().Create(testCtx, mock.AnythingOfType("*v1alpha1.Middleware"), v1.CreateOptions{}).Return(&traefikapi.Middleware{}, nil)
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
+		clientMock.EXPECT().Create(t.Context(), mock.AnythingOfType("*v1alpha1.Middleware"), v1.CreateOptions{}).Return(&traefikapi.Middleware{}, nil)
 
 		// when
-		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt1.example.com", "alt2.example.com"}, "primary.example.com", nil)
+		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt1.example.com", "alt2.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.NoError(t, err)
@@ -40,11 +40,11 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		existingMiddleware := &traefikapi.Middleware{
 			ObjectMeta: v1.ObjectMeta{Name: expectedMiddlewareName, ResourceVersion: "7"},
 		}
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(existingMiddleware, nil)
-		clientMock.EXPECT().Update(testCtx, mock.AnythingOfType("*v1alpha1.Middleware"), v1.UpdateOptions{}).Return(&traefikapi.Middleware{}, nil)
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(existingMiddleware, nil)
+		clientMock.EXPECT().Update(t.Context(), mock.AnythingOfType("*v1alpha1.Middleware"), v1.UpdateOptions{}).Return(&traefikapi.Middleware{}, nil)
 
 		// when
-		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt1.example.com"}, "primary.example.com", nil)
+		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt1.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.NoError(t, err)
@@ -60,14 +60,14 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		existingMiddleware := &traefikapi.Middleware{
 			ObjectMeta: v1.ObjectMeta{Name: expectedMiddlewareName, ResourceVersion: expectedResourceVersion},
 		}
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(existingMiddleware, nil)
-		clientMock.EXPECT().Update(testCtx, mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(existingMiddleware, nil)
+		clientMock.EXPECT().Update(t.Context(), mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
 			// since the middleware ist never returned, it is validated here
 			return mw.ResourceVersion == expectedResourceVersion
 		}), v1.UpdateOptions{}).Return(&traefikapi.Middleware{}, nil)
 
 		// when
-		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt.example.com"}, "primary.example.com", nil)
+		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.NoError(t, err)
@@ -78,8 +78,8 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		clientMock := newMockMiddlewareInterface(t)
 		manager := &MiddlewareManager{client: clientMock, namespace: "test-Namespace"}
 
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
-		clientMock.EXPECT().Create(testCtx, mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
+		clientMock.EXPECT().Create(t.Context(), mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
 			// since the middleware ist never returned, it is validated here
 			spec := mw.Spec.RedirectRegex
 			return spec != nil &&
@@ -88,7 +88,7 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		}), v1.CreateOptions{}).Return(&traefikapi.Middleware{}, nil)
 
 		// when
-		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt1.example.com", "alt2.example.com"}, "primary.example.com", nil)
+		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt1.example.com", "alt2.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.NoError(t, err)
@@ -99,14 +99,14 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		clientMock := newMockMiddlewareInterface(t)
 		manager := &MiddlewareManager{client: clientMock, namespace: "my-Namespace"}
 
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
-		clientMock.EXPECT().Create(testCtx, mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
+		clientMock.EXPECT().Create(t.Context(), mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
 			// since the middleware ist never returned, it is validated here
 			return mw.Namespace == "my-Namespace"
 		}), v1.CreateOptions{}).Return(&traefikapi.Middleware{}, nil)
 
 		// when
-		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt.example.com"}, "primary.example.com", nil)
+		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.NoError(t, err)
@@ -118,14 +118,14 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		manager := &MiddlewareManager{client: clientMock, namespace: "test-Namespace"}
 		ownerRefs := []v1.OwnerReference{{Name: "my-owner"}}
 
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
-		clientMock.EXPECT().Create(testCtx, mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
+		clientMock.EXPECT().Create(t.Context(), mock.MatchedBy(func(mw *traefikapi.Middleware) bool {
 			// since the middleware ist never returned, it is validated here
 			return len(mw.OwnerReferences) == 1 && mw.OwnerReferences[0].Name == "my-owner"
 		}), v1.CreateOptions{}).Return(&traefikapi.Middleware{}, nil)
 
 		// when
-		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt.example.com"}, "primary.example.com", ownerRefs)
+		_, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt.example.com"}, "primary.example.com", ownerRefs)
 
 		// then
 		require.NoError(t, err)
@@ -136,10 +136,10 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		clientMock := newMockMiddlewareInterface(t)
 		manager := &MiddlewareManager{client: clientMock, namespace: "test-Namespace"}
 
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(nil, fmt.Errorf("server unavailable"))
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(nil, fmt.Errorf("server unavailable"))
 
 		// when
-		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt.example.com"}, "primary.example.com", nil)
+		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.Error(t, err)
@@ -152,11 +152,11 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		clientMock := newMockMiddlewareInterface(t)
 		manager := &MiddlewareManager{client: clientMock, namespace: "test-Namespace"}
 
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
-		clientMock.EXPECT().Create(testCtx, mock.AnythingOfType("*v1alpha1.Middleware"), v1.CreateOptions{}).Return(nil, fmt.Errorf("create failed"))
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, expectedMiddlewareName))
+		clientMock.EXPECT().Create(t.Context(), mock.AnythingOfType("*v1alpha1.Middleware"), v1.CreateOptions{}).Return(nil, fmt.Errorf("create failed"))
 
 		// when
-		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt.example.com"}, "primary.example.com", nil)
+		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.Error(t, err)
@@ -172,11 +172,11 @@ func TestMiddlewareManager_CreateOrUpdateAlternativeFQDNRedirectMiddleware(t *te
 		existingMiddleware := &traefikapi.Middleware{
 			ObjectMeta: v1.ObjectMeta{Name: expectedMiddlewareName, ResourceVersion: "3"},
 		}
-		clientMock.EXPECT().Get(testCtx, expectedMiddlewareName, v1.GetOptions{}).Return(existingMiddleware, nil)
-		clientMock.EXPECT().Update(testCtx, mock.AnythingOfType("*v1alpha1.Middleware"), v1.UpdateOptions{}).Return(nil, fmt.Errorf("update failed"))
+		clientMock.EXPECT().Get(t.Context(), expectedMiddlewareName, v1.GetOptions{}).Return(existingMiddleware, nil)
+		clientMock.EXPECT().Update(t.Context(), mock.AnythingOfType("*v1alpha1.Middleware"), v1.UpdateOptions{}).Return(nil, fmt.Errorf("update failed"))
 
 		// when
-		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(testCtx, []string{"alt.example.com"}, "primary.example.com", nil)
+		result, err := manager.CreateOrUpdateAlternativeFQDNRedirectMiddleware(t.Context(), []string{"alt.example.com"}, "primary.example.com", nil)
 
 		// then
 		require.Error(t, err)
