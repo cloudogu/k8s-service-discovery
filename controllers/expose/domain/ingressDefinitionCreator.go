@@ -170,8 +170,8 @@ func (c *IngressDefinitionCreator) getHttpRoutesForService(service *corev1.Servi
 			targetPath = serviceRewrite.Pattern
 			rewrite = &HttpRewrite{Regex: &RegexReplacement{Replacement: serviceRewrite.Rewrite, Pattern: targetPath}}
 		} else if cesService.Pass != cesService.Location {
-			targetPath = fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(cesService.Location, "/"))
-			rewrite = &HttpRewrite{Regex: &RegexReplacement{Replacement: path.Join(cesService.Pass, "$2"), Pattern: targetPath}}
+			pattern := fmt.Sprintf("%s(/|$)(.*)", strings.TrimRight(cesService.Location, "/"))
+			rewrite = &HttpRewrite{Regex: &RegexReplacement{Replacement: path.Join(cesService.Pass, "$2"), Pattern: pattern}}
 		}
 
 		httpRoutes = append(httpRoutes, HttpRoute{
