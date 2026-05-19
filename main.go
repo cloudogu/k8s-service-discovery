@@ -115,6 +115,13 @@ func startManager() error {
 		return fmt.Errorf("failed to create selfsigned certificate updater: %w", err)
 	}
 
+	if err = serviceDiscManager.Add(&controllers.MigrationCleanupManager{
+		Client:    serviceDiscManager.GetClient(),
+		Namespace: watchNamespace,
+	}); err != nil {
+		return fmt.Errorf("failed to register migration cleanup handler: %w", err)
+	}
+
 	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 	maintenanceAdapter := repository.NewMaintenanceModeAdapter(ServiceDiscoveryMaintenanceOwner, serviceDiscManager.GetClient(), watchNamespace)
 
@@ -140,7 +147,8 @@ func startManager() error {
 
 	expositionEnabled, err := config.ReadExpositionEnabled()
 	if err != nil {
-		return err
+		logger.Error(err, "assuming default of exposition disabled")
+		expositionEnabled = false
 	}
 
 	if err = configureManager(
