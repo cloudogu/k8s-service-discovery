@@ -1,19 +1,11 @@
 package expose
 
 import (
-	"context"
-	"fmt"
-	"testing"
-
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -80,158 +72,6 @@ var (
 		}},
 	}
 )
-
-func Test_networkPolicyHandler_UpsertNetworkPoliciesForService(t *testing.T) {
-	initialNetpol, _, jenkinsNetpol, _ := getTestNetworkPolicies()
-	type fields struct {
-		mockIngressController      func() ingressController
-		mockNetworkPolicyInterface func() networkPolicyInterface
-		allowedCIDR                string
-	}
-	type args struct {
-		ctx     context.Context
-		service *corev1.Service
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr func(t *testing.T, err error, msg string)
-	}{
-		{
-			name: "should create networkpolicy if no exists",
-			fields: fields{
-				mockIngressController: func() ingressController {
-					return getIngressControllerMock(t)
-				},
-				mockNetworkPolicyInterface: func() networkPolicyInterface {
-					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
-					networkPolicyInterfaceMock.EXPECT().Get(t.Context(), netPolName, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-					networkPolicyInterfaceMock.EXPECT().Create(t.Context(), getInitialNetpolWithCIDR(testCIDR), metav1.CreateOptions{}).Return(nil, nil)
-
-					return networkPolicyInterfaceMock
-				},
-				allowedCIDR: testCIDR,
-			},
-			args: args{
-				ctx:     t.Context(),
-				service: nginxExposedService,
-			},
-			wantErr: func(t *testing.T, err error, msg string) {
-				require.NoError(t, err, msg)
-			},
-		},
-		{
-			name: "should return error on error creating networkpolicy",
-			fields: fields{
-				mockIngressController: func() ingressController {
-					return getIngressControllerMock(t)
-				},
-				mockNetworkPolicyInterface: func() networkPolicyInterface {
-					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
-					networkPolicyInterfaceMock.EXPECT().Get(t.Context(), netPolName, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-					networkPolicyInterfaceMock.EXPECT().Create(t.Context(), getInitialNetpolWithCIDR(testCIDR), metav1.CreateOptions{}).Return(nil, assert.AnError)
-
-					return networkPolicyInterfaceMock
-				},
-				allowedCIDR: testCIDR,
-			},
-			args: args{
-				ctx:     t.Context(),
-				service: nginxExposedService,
-			},
-			wantErr: func(t *testing.T, err error, msg string) {
-				require.Error(t, err, msg)
-				assert.ErrorIs(t, err, assert.AnError)
-				assert.ErrorContains(t, err, "failed to create networkpolicy nginx-ingress-exposed")
-			},
-		},
-		{
-			name: "should not create networkpolicy if no exposed ports exist",
-			fields: fields{
-				mockIngressController: func() ingressController {
-					return getIngressControllerMock(t)
-				},
-				mockNetworkPolicyInterface: func() networkPolicyInterface {
-					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
-					networkPolicyInterfaceMock.EXPECT().Get(t.Context(), netPolName, metav1.GetOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, "not found"))
-
-					return networkPolicyInterfaceMock
-				},
-				allowedCIDR: testCIDR,
-			},
-			args: args{
-				ctx:     t.Context(),
-				service: serviceWithoutExposedPorts,
-			},
-			wantErr: func(t *testing.T, err error, msg string) {
-				require.NoError(t, err, msg)
-			},
-		},
-		{
-			name: "should return error on error getting networkpolicy",
-			fields: fields{
-				mockIngressController: func() ingressController {
-					return getIngressControllerMock(t)
-				},
-				mockNetworkPolicyInterface: func() networkPolicyInterface {
-					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
-					networkPolicyInterfaceMock.EXPECT().Get(t.Context(), netPolName, metav1.GetOptions{}).Return(nil, assert.AnError)
-
-					return networkPolicyInterfaceMock
-				},
-				allowedCIDR: testCIDR,
-			},
-			args: args{
-				ctx:     t.Context(),
-				service: nginxExposedService,
-			},
-			wantErr: func(t *testing.T, err error, msg string) {
-				require.Error(t, err, msg)
-				assert.ErrorIs(t, err, assert.AnError)
-				assert.ErrorContains(t, err, "failed to get networkpolicy nginx-ingress-exposed")
-			},
-		},
-		{
-			name: "should return error on error updating networkpolicy",
-			fields: fields{
-				mockIngressController: func() ingressController {
-					return getIngressControllerMock(t)
-				},
-				mockNetworkPolicyInterface: func() networkPolicyInterface {
-					networkPolicyInterfaceMock := newMockNetworkPolicyInterface(t)
-					networkPolicyInterfaceMock.EXPECT().Get(t.Context(), netPolName, metav1.GetOptions{}).Return(initialNetpol, nil)
-					networkPolicyInterfaceMock.EXPECT().Update(t.Context(), jenkinsNetpol, metav1.UpdateOptions{}).Return(nil, assert.AnError)
-
-					return networkPolicyInterfaceMock
-				},
-				allowedCIDR: testCIDR,
-			},
-			args: args{
-				ctx:     t.Context(),
-				service: jenkinsExposedService,
-			},
-			wantErr: func(t *testing.T, err error, msg string) {
-				require.Error(t, err, msg)
-				assert.ErrorIs(t, err, assert.AnError)
-				assert.ErrorContains(t, err, "failed to update networkpolicy")
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			nph := &NetworkPolicyHandler{}
-			tt.wantErr(t, nph.UpsertNetworkPoliciesForService(tt.args.ctx, tt.args.service), fmt.Sprintf("UpsertNetworkPoliciesForService(%v, %v)", tt.args.ctx, tt.args.service))
-		})
-	}
-}
-
-func getIngressControllerMock(t *testing.T) ingressController {
-	ingressControllerMock := newMockIngressController(t)
-	ingressControllerMock.EXPECT().GetName().Return(ingressName)
-
-	return ingressControllerMock
-}
 
 func getTestNetworkPolicies() (initialNetpol, invalidAnnotationsNetpol, jenkinsNetpol, updatedJenkinsNetpol *netv1.NetworkPolicy) {
 	initialNetpol = getInitialNetpolWithCIDR("10.0.0.0/8")

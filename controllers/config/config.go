@@ -67,7 +67,7 @@ func ReadNetworkPolicyEnabled() (bool, error) {
 func ReadExpositionEnabled() (bool, error) {
 	enabled, found := os.LookupEnv(expositionEnabledEnvVar)
 	if !found {
-		return false, fmt.Errorf("failed to read flag exposition enabled from environment variable [%s], please set the variable and try again", "EXPOSE_EXPOSITION")
+		return false, fmt.Errorf("failed to read flag exposition enabled from environment variable [%s], please set the variable and try again", expositionEnabledEnvVar)
 	}
 
 	parseBool, err := strconv.ParseBool(enabled)

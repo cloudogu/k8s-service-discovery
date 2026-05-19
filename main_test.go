@@ -26,7 +26,7 @@ type FieldIndexerStub struct {
 	mock.Mock
 }
 
-func (f *FieldIndexerStub) IndexField(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+func (f *FieldIndexerStub) IndexField(context.Context, client.Object, string, client.IndexerFunc) error {
 	return nil
 }
 
@@ -112,7 +112,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
@@ -141,7 +140,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
@@ -171,7 +169,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
@@ -202,7 +199,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)

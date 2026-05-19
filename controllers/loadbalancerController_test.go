@@ -544,7 +544,7 @@ externalTrafficPolicy: Local
 			tt.setupLoggerMock(mockLogSink)
 
 			// inject logger into context this way because the context search key is private to the logging framework
-			valuedTestCtx := log.IntoContext(testCtx, logger)
+			valuedTestCtx := log.IntoContext(t.Context(), logger)
 
 			ingressControllerMock := NewMockIngressController(t)
 			tt.setupIngressControllerMock(ingressControllerMock)

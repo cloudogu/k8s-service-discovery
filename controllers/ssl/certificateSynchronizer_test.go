@@ -29,7 +29,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(nil, assert.AnError)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(nil, assert.AnError)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -47,7 +47,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(nil, &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}})
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(nil, &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}})
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -62,7 +62,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(&v1.Secret{}, nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -79,12 +79,12 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
 					m := NewMockGlobalConfigRepository(t)
-					m.EXPECT().Get(testCtx).Return(config.GlobalConfig{}, assert.AnError)
+					m.EXPECT().Get(t.Context()).Return(config.GlobalConfig{}, assert.AnError)
 					return m
 				},
 			},
@@ -99,13 +99,13 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
 					m := NewMockGlobalConfigRepository(t)
 					globalConfig := config.CreateGlobalConfig(config.Entries{serverCertificateID + "/subkey_producing_error": ""})
-					m.EXPECT().Get(testCtx).Return(globalConfig, nil)
+					m.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 					return m
 				},
 			},
@@ -119,17 +119,17 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
 					m := NewMockGlobalConfigRepository(t)
-					m.EXPECT().Get(testCtx).Return(config.CreateGlobalConfig(config.Entries{}), nil)
+					m.EXPECT().Get(t.Context()).Return(config.CreateGlobalConfig(config.Entries{}), nil)
 					expectedGlobalConfig := config.CreateGlobalConfig(config.Entries{})
 					var err error
 					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.crt", "mycert")
 					assert.NoError(t, err)
-					m.EXPECT().Update(testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, assert.AnError)
+					m.EXPECT().Update(t.Context(), expectedGlobalConfig).Return(config.GlobalConfig{}, assert.AnError)
 					return m
 				},
 			},
@@ -144,18 +144,18 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
 					m := NewMockGlobalConfigRepository(t)
-					m.EXPECT().Get(testCtx).Return(config.CreateGlobalConfig(config.Entries{}), nil)
+					m.EXPECT().Get(t.Context()).Return(config.CreateGlobalConfig(config.Entries{}), nil)
 					expectedGlobalConfig := config.CreateGlobalConfig(config.Entries{})
 					var err error
 					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.crt", "mycert")
 					assert.NoError(t, err)
-					firstCall := m.On("Update", testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, cErrs.NewConflictError(assert.AnError)).Once()
-					m.EXPECT().Update(testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, nil).NotBefore(firstCall).Once()
+					firstCall := m.On("Update", t.Context(), expectedGlobalConfig).Return(config.GlobalConfig{}, cErrs.NewConflictError(assert.AnError)).Once()
+					m.EXPECT().Update(t.Context(), expectedGlobalConfig).Return(config.GlobalConfig{}, nil).NotBefore(firstCall).Once()
 					return m
 				},
 			},
@@ -166,7 +166,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 			fields: fields{
 				secretInterfaceFn: func(t *testing.T) secretClient {
 					m := newMockSecretClient(t)
-					m.EXPECT().Get(testCtx, "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
+					m.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(createCertificateSecret(), nil)
 					return m
 				},
 				globalConfigRepoFn: func(t *testing.T) GlobalConfigRepository {
@@ -175,14 +175,14 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					initialGlobalConfig := config.CreateGlobalConfig(config.Entries{})
 					initialGlobalConfig.Config, err = initialGlobalConfig.Set("certificate/server.key", "mykey")
 					assert.NoError(t, err)
-					m.EXPECT().Get(testCtx).Return(initialGlobalConfig, nil)
+					m.EXPECT().Get(t.Context()).Return(initialGlobalConfig, nil)
 					expectedGlobalConfig := config.CreateGlobalConfig(config.Entries{})
 					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.key", "mykey")
 					assert.NoError(t, err)
 					expectedGlobalConfig.Config, err = expectedGlobalConfig.Set("certificate/server.crt", "mycert")
 					assert.NoError(t, err)
 					expectedGlobalConfig.Config = expectedGlobalConfig.Delete("certificate/server.key")
-					m.EXPECT().Update(testCtx, expectedGlobalConfig).Return(config.GlobalConfig{}, nil).Once()
+					m.EXPECT().Update(t.Context(), expectedGlobalConfig).Return(config.GlobalConfig{}, nil).Once()
 					return m
 				},
 			},
@@ -195,8 +195,8 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 				secretInterface:  tt.fields.secretInterfaceFn(t),
 				globalConfigRepo: tt.fields.globalConfigRepoFn(t),
 			}
-			err := r.Synchronize(testCtx)
-			tt.wantErr(t, err, fmt.Sprintf("Synchronize(%v)", testCtx))
+			err := r.Synchronize(t.Context())
+			tt.wantErr(t, err, fmt.Sprintf("Synchronize(%v)", t.Context()))
 		})
 	}
 }

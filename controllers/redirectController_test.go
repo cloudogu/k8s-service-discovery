@@ -339,7 +339,7 @@ func TestRedirectReconciler_Reconcile(t *testing.T) {
 			tt.setupLoggerMock(mockLogSink)
 
 			// inject logger into context this way because the context search key is private to the logging framework
-			valuedTestCtx := log.IntoContext(testCtx, logger)
+			valuedTestCtx := log.IntoContext(t.Context(), logger)
 
 			globalConfigRepoMock := NewMockGlobalConfigRepository(t)
 			tt.setupGlobalConfigMock(globalConfigRepoMock)
