@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type MaintenanceAdapter interface {
@@ -63,4 +64,8 @@ type secretClient interface {
 
 type serviceClient interface {
 	corev1client.ServiceInterface
+}
+
+type k8sClient interface {
+	client.Client
 }
