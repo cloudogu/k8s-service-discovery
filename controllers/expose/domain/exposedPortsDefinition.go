@@ -55,7 +55,6 @@ func CreateExposedPortsDefinitionFromService(service *corev1.Service) (ExposedPo
 			Service:               service.Name,
 			Port:                  exposedPort.Port,
 			RequestedExternalPort: &exposedPort.TargetPort,
-			Protocol:              &protocol,
 		}
 		if protocol == util.ProtocolTCP {
 			tcpRoutes = append(tcpRoutes, route)
@@ -119,6 +118,7 @@ func parseExposedPortsFromService(service *corev1.Service) (util.ExposedPorts, e
 	}
 
 	// Validate: Ports should be in Service Spec
+	var errs []error
 	for _, port := range *cesExposedPorts {
 		found := false
 		for _, servicePort := range service.Spec.Ports {
@@ -128,15 +128,15 @@ func parseExposedPortsFromService(service *corev1.Service) (util.ExposedPorts, e
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("invalid service annotation %q. port %q is not defined in service ports", cesExposedPortsAnnotation, port.Port)
+			errs = append(errs, fmt.Errorf("invalid service annotation %q. port '%d' is not defined in service ports", cesExposedPortsAnnotation, port.Port))
 		}
 	}
 
-	return *cesExposedPorts, nil
+	return *cesExposedPorts, errors.Join(errs...)
 }
 
 func equalsServicePortExposedPort(servicePort corev1.ServicePort, exposedPort util.ExposedPort) bool {
-	if !strings.EqualFold(string(servicePort.Protocol), string(exposedPort.Protocol)) {
+	if !strings.EqualFold(string(servicePort.Protocol), normalizedProtocol(exposedPort.Protocol)) {
 		return false
 	}
 
@@ -174,7 +174,7 @@ func CreateExposedPortsDefinitionFromExposition(exposition *expositionv1.Exposit
 		BaseName:       exposition.Name,
 		Type:           TypeExposition,
 		OwnerReference: ownerReferenceFromObject(exposition),
-		TcpRoutes:      nil,
-		UdpRoutes:      nil,
+		TcpRoutes:      tcpRoutes,
+		UdpRoutes:      udpRoutes,
 	}
 }
