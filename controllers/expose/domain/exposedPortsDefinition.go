@@ -10,6 +10,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -66,18 +67,34 @@ func CreateExposedPortsDefinitionFromService(service *corev1.Service) (ExposedPo
 	}
 
 	return ExposedPortsDefinition{
-		BaseName: service.Name,
-		OwnerReference: metav1.OwnerReference{
-			APIVersion:         service.APIVersion,
-			Kind:               service.Kind,
-			Name:               service.Name,
-			UID:                service.UID,
-			Controller:         new(true),
-			BlockOwnerDeletion: new(true),
-		},
-		TcpRoutes: tcpRoutes,
-		UdpRoutes: udpRoutes,
+		BaseName:       service.Name,
+		Type:           TypeService,
+		OwnerReference: ownerReferenceFromObject(service),
+		TcpRoutes:      tcpRoutes,
+		UdpRoutes:      udpRoutes,
 	}, errors.Join(errs...)
+}
+
+// ownerReferenceFromObject only supports services and expositions
+func ownerReferenceFromObject(obj client.Object) metav1.OwnerReference {
+	var apiVersion, kind string
+	switch obj.(type) {
+	case *corev1.Service:
+		apiVersion = corev1.SchemeGroupVersion.String()
+		kind = "Service"
+	case *expositionv1.Exposition:
+		apiVersion = expositionv1.SchemeGroupVersion.String()
+		kind = "Exposition"
+	}
+
+	return metav1.OwnerReference{
+		APIVersion:         apiVersion,
+		Kind:               kind,
+		Name:               obj.GetName(),
+		UID:                obj.GetUID(),
+		Controller:         new(true),
+		BlockOwnerDeletion: new(true),
+	}
 }
 
 func normalizedProtocol(protocol string) string {
@@ -154,16 +171,10 @@ func CreateExposedPortsDefinitionFromExposition(exposition *expositionv1.Exposit
 	}
 
 	return ExposedPortsDefinition{
-		BaseName: exposition.Name,
-		OwnerReference: metav1.OwnerReference{
-			APIVersion:         exposition.APIVersion,
-			Kind:               exposition.Kind,
-			Name:               exposition.Name,
-			UID:                exposition.UID,
-			Controller:         new(true),
-			BlockOwnerDeletion: new(true),
-		},
-		TcpRoutes: nil,
-		UdpRoutes: nil,
+		BaseName:       exposition.Name,
+		Type:           TypeExposition,
+		OwnerReference: ownerReferenceFromObject(exposition),
+		TcpRoutes:      nil,
+		UdpRoutes:      nil,
 	}
 }

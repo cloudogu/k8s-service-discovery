@@ -17,7 +17,7 @@ import (
 
 type NetworkPolicyHandler struct {
 	generator networkPolicyGenerator
-	client    client.Client
+	client    k8sClient
 	namespace string
 }
 
@@ -44,7 +44,7 @@ func NewNetworkPolicyHandler(
 func (nph *NetworkPolicyHandler) UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error {
 	definition, err := domain.CreateExposedPortsDefinitionFromService(service)
 	if err != nil {
-		return fmt.Errorf("failed to create exposed ports definition from service: %w", err)
+		return fmt.Errorf("failed to create exposed ports definition from service %q: %w", service.Name, err)
 	}
 
 	return nph.upsertForDefinition(ctx, definition)
@@ -65,7 +65,7 @@ func (nph *NetworkPolicyHandler) upsertForDefinition(ctx context.Context, defini
 		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
 	}
 
-	var existingMap map[string]networkingv1.NetworkPolicy
+	existingMap := make(map[string]networkingv1.NetworkPolicy, len(existing.Items))
 	for _, existingObject := range existing.Items {
 		existingMap[existingObject.Name] = existingObject
 	}
@@ -83,7 +83,7 @@ func (nph *NetworkPolicyHandler) upsertForDefinition(ctx context.Context, defini
 			return nil
 		})
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to create or update network policy %q: %w", desiredObject.Name, err))
 		}
 	}
 
@@ -91,7 +91,7 @@ func (nph *NetworkPolicyHandler) upsertForDefinition(ctx context.Context, defini
 	for _, existingObject := range existingMap {
 		err := nph.client.Delete(ctx, &existingObject)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to delete outdated network policy %q: %w", existingObject.Name, err))
 		}
 	}
 

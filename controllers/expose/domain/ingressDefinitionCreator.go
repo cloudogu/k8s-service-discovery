@@ -72,18 +72,11 @@ func (c *IngressDefinitionCreator) CreateFromExposition(ctx context.Context, exp
 	}
 
 	return IngressDefinition{
-		BaseName: exposition.Name,
-		Type:     TypeExposition,
-		Dogu:     doguInformation,
-		OwnerReference: metav1.OwnerReference{
-			APIVersion:         exposition.APIVersion,
-			Kind:               exposition.Kind,
-			Name:               exposition.Name,
-			UID:                exposition.UID,
-			Controller:         new(true),
-			BlockOwnerDeletion: new(true),
-		},
-		HttpRoutes: c.getHttpRoutesForExposition(exposition),
+		BaseName:       exposition.Name,
+		Type:           TypeExposition,
+		Dogu:           doguInformation,
+		OwnerReference: ownerReferenceFromObject(exposition),
+		HttpRoutes:     c.getHttpRoutesForExposition(exposition),
 	}, nil
 }
 
@@ -139,18 +132,11 @@ func (c *IngressDefinitionCreator) CreateFromService(ctx context.Context, servic
 	}
 
 	return IngressDefinition{
-		BaseName: service.Name,
-		Type:     TypeService,
-		Dogu:     doguInformation,
-		OwnerReference: metav1.OwnerReference{
-			APIVersion:         service.APIVersion,
-			Kind:               service.Kind,
-			Name:               service.Name,
-			UID:                service.UID,
-			Controller:         new(true),
-			BlockOwnerDeletion: new(true),
-		},
-		HttpRoutes: httpRoutes,
+		BaseName:       service.Name,
+		Type:           TypeService,
+		Dogu:           doguInformation,
+		OwnerReference: ownerReferenceFromObject(service),
+		HttpRoutes:     httpRoutes,
 	}, nil
 }
 
