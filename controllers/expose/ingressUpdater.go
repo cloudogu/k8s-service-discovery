@@ -46,21 +46,21 @@ func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
 
 // UpsertForService creates or updates the ingress object of the given service.
 func (i *IngressUpdater) UpsertForService(ctx context.Context, service *corev1.Service) error {
-	expositionDefinition, err := i.ingressDefinitionCreator.CreateFromService(ctx, service)
+	ingressDefinition, err := i.ingressDefinitionCreator.CreateFromService(ctx, service)
 	if err != nil {
 		return fmt.Errorf("failed to convert service to exposition definition: %w", err)
 	}
 
-	return i.upsertForDefinition(ctx, expositionDefinition)
+	return i.upsertForDefinition(ctx, ingressDefinition)
 }
 
 func (i *IngressUpdater) UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error {
-	expositionDefinition, err := i.ingressDefinitionCreator.CreateFromExposition(ctx, exposition)
+	ingressDefinition, err := i.ingressDefinitionCreator.CreateFromExposition(ctx, exposition)
 	if err != nil {
 		return fmt.Errorf("failed to convert exposition to exposition definition: %w", err)
 	}
 
-	return i.upsertForDefinition(ctx, expositionDefinition)
+	return i.upsertForDefinition(ctx, ingressDefinition)
 }
 
 func (i *IngressUpdater) upsertForDefinition(ctx context.Context, definition domain.IngressDefinition) error {
