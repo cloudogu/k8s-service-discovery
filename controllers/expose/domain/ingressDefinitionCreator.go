@@ -116,7 +116,7 @@ func (c *IngressDefinitionCreator) CreateFromService(ctx context.Context, servic
 
 	additionalAnnotations, err := getAdditionalIngressAnnotations(service)
 	if err != nil {
-		return IngressDefinition{}, fmt.Errorf("failed to get additional ingress additionalAnnotations: %w", err)
+		return IngressDefinition{}, err
 	}
 
 	httpRoutes, err := c.getHttpRoutesForService(service, cesServices, additionalAnnotations)
@@ -229,7 +229,7 @@ func getAdditionalIngressAnnotations(doguService *corev1.Service) (doguv2.Ingres
 	if exists {
 		err := json.Unmarshal([]byte(annotationsJson), &annotations)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get addtional ingress annotations from dogu service '%s': %w", doguService.Name, err)
+			return nil, fmt.Errorf("failed to get additional ingress annotations from dogu service '%s': %w", doguService.Name, err)
 		}
 	}
 
