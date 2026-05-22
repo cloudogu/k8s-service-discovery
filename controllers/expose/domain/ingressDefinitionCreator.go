@@ -32,15 +32,8 @@ type deploymentReadyChecker interface {
 }
 
 type IngressDefinitionCreator struct {
-	maintenance  maintenanceAdapter
-	readyChecker deploymentReadyChecker
-}
-
-func NewIngressDefinitionCreator(maintenanceAdapter maintenanceAdapter, readyChecker deploymentReadyChecker) *IngressDefinitionCreator {
-	return &IngressDefinitionCreator{
-		maintenance:  maintenanceAdapter,
-		readyChecker: readyChecker,
-	}
+	Maintenance  maintenanceAdapter
+	ReadyChecker deploymentReadyChecker
 }
 
 func getDoguInformation(ctx context.Context, meta metav1.ObjectMeta, maintenanceAdapter maintenanceAdapter, readyChecker deploymentReadyChecker) (*DoguInformation, error) {
@@ -66,7 +59,7 @@ func getDoguInformation(ctx context.Context, meta metav1.ObjectMeta, maintenance
 }
 
 func (c *IngressDefinitionCreator) CreateFromExposition(ctx context.Context, exposition *expositionv1.Exposition) (IngressDefinition, error) {
-	doguInformation, err := getDoguInformation(ctx, exposition.ObjectMeta, c.maintenance, c.readyChecker)
+	doguInformation, err := getDoguInformation(ctx, exposition.ObjectMeta, c.Maintenance, c.ReadyChecker)
 	if err != nil {
 		return IngressDefinition{}, err
 	}
@@ -111,7 +104,7 @@ func (c *IngressDefinitionCreator) getHttpRoutesForExposition(exposition *exposi
 }
 
 func (c *IngressDefinitionCreator) CreateFromService(ctx context.Context, service *corev1.Service) (IngressDefinition, error) {
-	doguInformation, err := getDoguInformation(ctx, service.ObjectMeta, c.maintenance, c.readyChecker)
+	doguInformation, err := getDoguInformation(ctx, service.ObjectMeta, c.Maintenance, c.ReadyChecker)
 	if err != nil {
 		return IngressDefinition{}, err
 	}

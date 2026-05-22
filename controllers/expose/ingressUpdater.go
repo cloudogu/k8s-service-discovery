@@ -34,10 +34,13 @@ type IngressUpdaterDependencies struct {
 // NewIngressUpdater creates a new instance responsible for updating ingress objects.
 func NewIngressUpdater(deps IngressUpdaterDependencies) *IngressUpdater {
 	return &IngressUpdater{
-		ingressDefinitionCreator: domain.NewIngressDefinitionCreator(deps.MaintenanceAdapter, deps.ReadyChecker),
-		generator:                newIngressGenerator(deps.Namespace, deps.IngressClassName),
-		client:                   deps.Client,
-		namespace:                deps.Namespace,
+		ingressDefinitionCreator: &domain.IngressDefinitionCreator{
+			Maintenance:  deps.MaintenanceAdapter,
+			ReadyChecker: deps.ReadyChecker,
+		},
+		generator: newIngressGenerator(deps.Namespace, deps.IngressClassName),
+		client:    deps.Client,
+		namespace: deps.Namespace,
 	}
 }
 
