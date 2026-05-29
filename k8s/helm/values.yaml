@@ -18,8 +18,6 @@ manager:
   imagePullPolicy: IfNotPresent
 ingress:
   controller: k8s-ces-gateway
-exposition:
-  enabled: false
 networkPolicies:
   enabled: true
   denyAll: true
@@ -28,3 +26,12 @@ loadBalancerService:
   annotations: {}
   internalTrafficPolicy: Cluster
   externalTrafficPolicy: Local
+
+# Configuration for discovering exposed ports for loadbalancer other than http / https
+exposition:
+  # Enable exposition of ports
+  enabled: true
+  # Enable port discovery via Services that are annotated (Legacy)
+  discoverServices: true
+  # Enable port discovery via ExpositionCR
+  discoverExpositionCR: true
