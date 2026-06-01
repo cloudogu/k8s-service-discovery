@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	k8sv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
@@ -392,9 +393,16 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeClusterIP,
 		}}
+	testExposition := &expositionv1.Exposition{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-exposition", Namespace: testLBNamespace},
+		Spec: expositionv1.ExpositionSpec{
+			TCP: []expositionv1.TCPEntry{{Name: "ssh", Service: "test-svc", Port: 22}},
+		},
+	}
 
 	tests := []struct {
 		name                       string
+		expoConfig                 ExpositionConfig
 		inClientMock               client.Client
 		setupLoggerMock            func(m *MockLogSink)
 		setupIngressControllerMock func(m *MockIngressController)
@@ -448,7 +456,8 @@ externalTrafficPolicy: Local
 			errMsg:                     "failed to parse loadbalancer config",
 		},
 		{
-			name: "error fetching exposed services",
+			name:       "error fetching exposed services",
+			expoConfig: ExpositionConfig{Enabled: true, DiscoverServices: true},
 			inClientMock: testclient.NewClientBuilder().
 				WithObjects(lbConfigMap).
 				Build(),
@@ -459,7 +468,8 @@ externalTrafficPolicy: Local
 			errMsg:                     "failed to list exposed services",
 		},
 		{
-			name: "error fetching exposed ports of service",
+			name:       "error fetching exposed ports of service",
+			expoConfig: ExpositionConfig{Enabled: true, DiscoverServices: true},
 			inClientMock: createDefaultLBClientMock(lbConfigMap, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -477,6 +487,37 @@ externalTrafficPolicy: Local
 			setupServiceClientMock:     func(m *mockServiceClient) {},
 			expErr:                     true,
 			errMsg:                     "failed to get exposed ports from services",
+		},
+		{
+			name:                       "success with ExpositionConfig enabled and services",
+			expoConfig:                 ExpositionConfig{Enabled: true, DiscoverServices: true},
+			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
+			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
+			setupIngressControllerMock: createNoErrorExposePorts(),
+			setupServiceClientMock:     createSvcNewLoadbalancer(false),
+			expErr:                     false,
+		},
+		{
+			name:                       "success with ExpositionConfig enabled and expositions",
+			expoConfig:                 ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			inClientMock:               createLBClientWithScheme(t, lbConfigMap, testExposition),
+			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
+			setupIngressControllerMock: createNoErrorExposePorts(),
+			setupServiceClientMock:     createSvcNewLoadbalancer(false),
+			expErr:                     false,
+		},
+		{
+			name:       "error fetching expositions",
+			expoConfig: ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			inClientMock: testclient.NewClientBuilder().
+				WithScheme(getScheme(t)).
+				WithObjects(lbConfigMap).
+				Build(),
+			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
+			setupIngressControllerMock: func(m *MockIngressController) {},
+			setupServiceClientMock:     func(m *mockServiceClient) {},
+			expErr:                     true,
+			errMsg:                     "failed to list expositions",
 		},
 		{
 			name:                       "error upserting loadbalancer - get current loadbalancer",
@@ -553,6 +594,7 @@ externalTrafficPolicy: Local
 			tt.setupServiceClientMock(serviceClientMock)
 
 			lbReconciler := &LoadBalancerReconciler{
+				ExpositionConfig:  tt.expoConfig,
 				Client:            tt.inClientMock,
 				IngressController: ingressControllerMock,
 				SvcClient:         serviceClientMock,
@@ -645,5 +687,330 @@ func createDefaultLoadbalancerLoggerMock() func(m *MockLogSink) {
 		m.EXPECT().WithValues().Return(m)
 		m.EXPECT().Enabled(mock.Anything).Return(true).Maybe()
 		m.EXPECT().Info(0, mock.Anything).Return().Maybe()
+	}
+}
+
+func createLBClientWithScheme(t *testing.T, obj ...client.Object) client.Client {
+	t.Helper()
+	return testclient.NewClientBuilder().
+		WithScheme(getScheme(t)).
+		WithObjects(obj...).
+		WithIndex(&corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
+			return []string{"true"}
+		}).
+		WithIndex(&expositionv1.Exposition{}, exposedPortIndexKey, func(object client.Object) []string {
+			return []string{"true"}
+		}).
+		Build()
+}
+
+func Test_exposedPortExpositionPredicate(t *testing.T) {
+	pred := exposedPortExpositionPredicate()
+
+	expositionWithTCP := &expositionv1.Exposition{
+		Spec: expositionv1.ExpositionSpec{
+			TCP: []expositionv1.TCPEntry{{Name: "ssh", Service: "svc", Port: 22}},
+		},
+	}
+	expositionWithUDP := &expositionv1.Exposition{
+		Spec: expositionv1.ExpositionSpec{
+			UDP: []expositionv1.UDPEntry{{Name: "dns", Service: "svc", Port: 53}},
+		},
+	}
+	emptyExposition := &expositionv1.Exposition{}
+	nonExposition := &corev1.ConfigMap{}
+
+	t.Run("create", func(t *testing.T) {
+		assert.True(t, pred.CreateFunc(event.CreateEvent{Object: expositionWithTCP}))
+		assert.True(t, pred.CreateFunc(event.CreateEvent{Object: expositionWithUDP}))
+		assert.False(t, pred.CreateFunc(event.CreateEvent{Object: emptyExposition}))
+		assert.False(t, pred.CreateFunc(event.CreateEvent{Object: nonExposition}))
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		assert.True(t, pred.DeleteFunc(event.DeleteEvent{Object: expositionWithTCP}))
+		assert.True(t, pred.DeleteFunc(event.DeleteEvent{Object: expositionWithUDP}))
+		assert.False(t, pred.DeleteFunc(event.DeleteEvent{Object: emptyExposition}))
+		assert.False(t, pred.DeleteFunc(event.DeleteEvent{Object: nonExposition}))
+	})
+
+	t.Run("generic", func(t *testing.T) {
+		assert.True(t, pred.GenericFunc(event.GenericEvent{Object: expositionWithTCP}))
+		assert.True(t, pred.GenericFunc(event.GenericEvent{Object: expositionWithUDP}))
+		assert.False(t, pred.GenericFunc(event.GenericEvent{Object: emptyExposition}))
+		assert.False(t, pred.GenericFunc(event.GenericEvent{Object: nonExposition}))
+	})
+
+	t.Run("update", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			objectOld client.Object
+			objectNew client.Object
+			want      bool
+		}{
+			{
+				name:      "old is non-Exposition",
+				objectOld: nonExposition,
+				objectNew: expositionWithTCP,
+				want:      false,
+			},
+			{
+				name:      "new is non-Exposition",
+				objectOld: expositionWithTCP,
+				objectNew: nonExposition,
+				want:      false,
+			},
+			{
+				name:      "same TCP entries",
+				objectOld: expositionWithTCP,
+				objectNew: expositionWithTCP,
+				want:      false,
+			},
+			{
+				name:      "TCP count differs",
+				objectOld: expositionWithTCP,
+				objectNew: &expositionv1.Exposition{
+					Spec: expositionv1.ExpositionSpec{
+						TCP: []expositionv1.TCPEntry{
+							{Name: "ssh", Service: "svc", Port: 22},
+							{Name: "extra", Service: "svc", Port: 8080},
+						},
+					},
+				},
+				want: true,
+			},
+			{
+				name:      "UDP count differs",
+				objectOld: expositionWithUDP,
+				objectNew: &expositionv1.Exposition{
+					Spec: expositionv1.ExpositionSpec{
+						UDP: []expositionv1.UDPEntry{
+							{Name: "dns", Service: "svc", Port: 53},
+							{Name: "extra", Service: "svc", Port: 5353},
+						},
+					},
+				},
+				want: true,
+			},
+			{
+				name: "same TCP entries different order",
+				objectOld: &expositionv1.Exposition{
+					Spec: expositionv1.ExpositionSpec{
+						TCP: []expositionv1.TCPEntry{
+							{Name: "aaa", Service: "svc", Port: 1000},
+							{Name: "bbb", Service: "svc", Port: 2000},
+						},
+					},
+				},
+				objectNew: &expositionv1.Exposition{
+					Spec: expositionv1.ExpositionSpec{
+						TCP: []expositionv1.TCPEntry{
+							{Name: "bbb", Service: "svc", Port: 2000},
+							{Name: "aaa", Service: "svc", Port: 1000},
+						},
+					},
+				},
+				want: false,
+			},
+			{
+				name:      "TCP entry port changed",
+				objectOld: expositionWithTCP,
+				objectNew: &expositionv1.Exposition{
+					Spec: expositionv1.ExpositionSpec{
+						TCP: []expositionv1.TCPEntry{{Name: "ssh", Service: "svc", Port: 2222}},
+					},
+				},
+				want: true,
+			},
+			{
+				name:      "UDP entry port changed",
+				objectOld: expositionWithUDP,
+				objectNew: &expositionv1.Exposition{
+					Spec: expositionv1.ExpositionSpec{
+						UDP: []expositionv1.UDPEntry{{Name: "dns", Service: "svc", Port: 5353}},
+					},
+				},
+				want: true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result := pred.UpdateFunc(event.UpdateEvent{
+					ObjectOld: tt.objectOld,
+					ObjectNew: tt.objectNew,
+				})
+				assert.Equal(t, tt.want, result)
+			})
+		}
+	})
+}
+
+func Test_createLoadBalancerExposedPorts(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    types.ExposedPorts
+		expected types.ExposedPorts
+	}{
+		{
+			name:  "empty input returns defaults only",
+			input: types.ExposedPorts{},
+			expected: types.ExposedPorts{
+				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+		},
+		{
+			name: "custom port added alongside defaults",
+			input: types.ExposedPorts{
+				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+			},
+			expected: types.ExposedPorts{
+				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+		},
+		{
+			name: "port 80 in input is stripped and replaced by default",
+			input: types.ExposedPorts{
+				{Name: "myhttp", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+			},
+			expected: types.ExposedPorts{
+				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+		},
+		{
+			name: "port 443 in input is stripped and replaced by default",
+			input: types.ExposedPorts{
+				{Name: "myhttps", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+			expected: types.ExposedPorts{
+				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+		},
+		{
+			name: "both 80 and 443 in input are stripped",
+			input: types.ExposedPorts{
+				{Name: "p80", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "p443", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+			expected: types.ExposedPorts{
+				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+		},
+		{
+			name: "80, 443, and custom port: 80+443 stripped, custom kept with defaults",
+			input: types.ExposedPorts{
+				{Name: "p80", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "p443", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+			},
+			expected: types.ExposedPorts{
+				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := createLoadBalancerExposedPorts(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func Test_getExposedPorts_generic(t *testing.T) {
+	const expPortAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports"
+
+	tests := []struct {
+		name      string
+		input     []types.Service
+		expected  types.ExposedPorts
+		expErr    bool
+		errSubstr string
+	}{
+		{
+			name:     "empty list returns empty result",
+			input:    []types.Service{},
+			expected: types.ExposedPorts{},
+		},
+		{
+			name: "single service with valid ports",
+			input: []types.Service{
+				types.Service(corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-svc",
+						Annotations: map[string]string{
+							expPortAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000}]`,
+						},
+					},
+				}),
+			},
+			expected: types.ExposedPorts{
+				{Name: "test-svc-50000", ServiceName: "test-svc", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+			},
+		},
+		{
+			name: "multiple services ports are combined",
+			input: []types.Service{
+				types.Service(corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "svc-a",
+						Annotations: map[string]string{
+							expPortAnnotation: `[{"protocol":"tcp","port":1000,"targetPort":1000}]`,
+						},
+					},
+				}),
+				types.Service(corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "svc-b",
+						Annotations: map[string]string{
+							expPortAnnotation: `[{"protocol":"udp","port":2000,"targetPort":2000}]`,
+						},
+					},
+				}),
+			},
+			expected: types.ExposedPorts{
+				{Name: "svc-a-1000", ServiceName: "svc-a", Protocol: corev1.ProtocolTCP, Port: 1000, TargetPort: 1000},
+				{Name: "svc-b-2000", ServiceName: "svc-b", Protocol: corev1.ProtocolUDP, Port: 2000, TargetPort: 2000},
+			},
+		},
+		{
+			name: "service with invalid JSON annotation returns error",
+			input: []types.Service{
+				types.Service(corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bad-svc",
+						Annotations: map[string]string{
+							expPortAnnotation: `INVALID JSON`,
+						},
+					},
+				}),
+			},
+			expected:  nil,
+			expErr:    true,
+			errSubstr: "failed to get exposed ports from object with type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getExposedPorts(tt.input)
+
+			if tt.expErr {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errSubstr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
