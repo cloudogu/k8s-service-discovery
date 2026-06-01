@@ -13,9 +13,9 @@ func (e Exposition) HasExposedPorts() bool {
 	return len(e.Spec.TCP)+len(e.Spec.UDP) > 0
 }
 
-func (e Exposition) GetExposedPorts() ExposedPorts {
+func (e Exposition) GetExposedPorts() (ExposedPorts, error) {
 	if !e.HasExposedPorts() {
-		return ExposedPorts{}
+		return ExposedPorts{}, nil
 	}
 
 	exposedPorts := make(ExposedPorts, 0, len(e.Spec.TCP)+len(e.Spec.UDP))
@@ -29,7 +29,8 @@ func (e Exposition) GetExposedPorts() ExposedPorts {
 	}
 
 	exposedPorts.SortByName()
-	return exposedPorts
+
+	return exposedPorts, nil
 }
 
 func mapUdpEntry(expositionName string, entry expositionv1.UDPEntry) ExposedPort {
