@@ -15,7 +15,7 @@ import (
 
 const (
 	traefikMiddlewareAnnotation = "traefik.ingress.kubernetes.io/router.middlewares"
-	redirectMiddlewareName      = "alternative-fqdn@kubernetescrd"
+	redirectMiddlewareFmt       = "%s-alternative-fqdn@kubernetescrd"
 	redirectIngressPath         = "/"
 	redirectPathType            = networking.PathTypePrefix
 	redirectEndpointName        = "ces-loadbalancer"
@@ -65,7 +65,7 @@ func (i IngressRedirector) RedirectAlternativeFQDN(ctx context.Context, namespac
 
 func (i IngressRedirector) createRedirectIngress(namespace string, objectName string, altFQDNMap map[string][]string) *networking.Ingress {
 	annotations := map[string]string{
-		traefikMiddlewareAnnotation: redirectMiddlewareName,
+		traefikMiddlewareAnnotation: fmt.Sprintf(redirectMiddlewareFmt, namespace),
 	}
 	fdns := make([]string, 0, len(altFQDNMap))
 	tlsList := make([]networking.IngressTLS, 0, len(altFQDNMap))
