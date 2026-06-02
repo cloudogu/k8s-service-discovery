@@ -497,7 +497,7 @@ func assertRedirectIngress(t *testing.T, ingress *v1.Ingress, altFQDNList []type
 
 	rAnnotation, ok := annotations[traefikMiddlewareAnnotation]
 	require.True(t, ok)
-	require.Equal(t, "alternative-fqdn@kubernetescrd", rAnnotation)
+	require.Equal(t, "testNamespace-alternative-fqdn@kubernetescrd", rAnnotation)
 
 	// labels
 	labels := ingress.GetLabels()
