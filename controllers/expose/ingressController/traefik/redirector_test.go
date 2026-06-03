@@ -190,6 +190,8 @@ func TestIngressRedirector_createRedirectIngress(t *testing.T) {
 				assert.Equal(t, ingressClassName, *ingress.Spec.IngressClassName)
 				assert.Len(t, ingress.Spec.TLS, 1)
 				assert.Len(t, ingress.Spec.Rules, 1)
+				assert.Equal(t, fmt.Sprintf("%s-alternative-fqdn@kubernetescrd", namespace),
+					ingress.Annotations["traefik.ingress.kubernetes.io/router.middlewares"])
 			},
 		},
 		{
@@ -495,7 +497,7 @@ func assertRedirectIngress(t *testing.T, ingress *v1.Ingress, altFQDNList []type
 
 	rAnnotation, ok := annotations[traefikMiddlewareAnnotation]
 	require.True(t, ok)
-	require.Equal(t, "alternative-fqdn@kubernetescrd", rAnnotation)
+	require.Equal(t, "testNamespace-alternative-fqdn@kubernetescrd", rAnnotation)
 
 	// labels
 	labels := ingress.GetLabels()
