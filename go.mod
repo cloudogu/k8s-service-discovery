@@ -8,8 +8,8 @@ require (
 	github.com/bombsimon/logrusr/v2 v2.0.1
 	github.com/cloudogu/ces-commons-lib v0.3.0
 	github.com/cloudogu/cesapp-lib v0.18.2
-	github.com/cloudogu/k8s-dogu-lib/v2 v2.12.0
-	github.com/cloudogu/k8s-dogu-operator/v3 v3.19.2
+	github.com/cloudogu/k8s-dogu-lib/v2 v2.13.0
+	github.com/cloudogu/k8s-dogu-operator/v3 v3.25.0
 	github.com/cloudogu/k8s-exposition-lib v1.0.0
 	github.com/cloudogu/k8s-registry-lib v1.0.0
 	github.com/cloudogu/retry-lib v0.1.0
