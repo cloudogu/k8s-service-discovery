@@ -34,8 +34,8 @@ func indexKeyOfExposedPort(port ExposedPort) indexKey {
 	return indexKey{
 		name:       port.Name,
 		protocol:   string(port.Protocol),
-		port:       fmt.Sprintf("%d", port.Port),
-		targetPort: fmt.Sprintf("%d", port.TargetPort),
+		port:       fmt.Sprintf("%d", port.ServicePort),
+		targetPort: fmt.Sprintf("%d", port.RequestedExternalPort),
 	}
 }
 
@@ -98,20 +98,44 @@ func (eps ExposedPorts) SetNodePorts(servicePorts []corev1.ServicePort) {
 	}
 }
 
+func (eps ExposedPorts) MapTCPPorts() ExposedPorts {
+	tcpPorts := make(ExposedPorts, 0, len(eps))
+
+	for _, p := range eps {
+		if p.Protocol == corev1.ProtocolTCP {
+			tcpPorts = append(tcpPorts, p)
+		}
+	}
+
+	return tcpPorts
+}
+
+func (eps ExposedPorts) MapUDPPorts() ExposedPorts {
+	udpPorts := make(ExposedPorts, 0, len(eps))
+
+	for _, p := range eps {
+		if p.Protocol == corev1.ProtocolUDP {
+			udpPorts = append(udpPorts, p)
+		}
+	}
+
+	return udpPorts
+}
+
 // ExposedPort represent an exposed port by a dogu service.
 // Fields:
 // - Name: name of the port
 // - ServiceName: name of the dogu service the port belongs to
 // - Protocol: protocol used for the port, usually TCP or UDP
-// - Port: Incoming port
-// - TargetPort: port within the container/pod
+// - ServicePort: Incoming port
+// - RequestedExternalPort: port within the container/pod
 type ExposedPort struct {
-	Name        string
-	ServiceName string
-	Protocol    corev1.Protocol
-	Port        int32
-	TargetPort  int32
-	nodePort    int32
+	Name                  string
+	ServiceName           string
+	Protocol              corev1.Protocol
+	ServicePort           int32
+	RequestedExternalPort int32
+	nodePort              int32
 }
 
 // ToServicePort maps the ExposedPort to a Kubernetes ServicePort
@@ -119,15 +143,15 @@ func (ep ExposedPort) ToServicePort() corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:       ep.Name,
 		Protocol:   ep.Protocol,
-		Port:       ep.Port,
-		TargetPort: intstr.FromInt32(ep.TargetPort),
+		Port:       ep.ServicePort,
+		TargetPort: intstr.FromInt32(ep.RequestedExternalPort),
 		NodePort:   ep.nodePort,
 	}
 }
 
-// PortString returns ExposedPort.Port as string.
+// PortString returns ExposedPort.ServicePort as string.
 func (ep ExposedPort) PortString() string {
-	return fmt.Sprintf("%d", ep.Port)
+	return fmt.Sprintf("%d", ep.ServicePort)
 }
 
 // CreateDefaultPorts create default exposed ports used for the loadbalancer. They include ports for http as well as
@@ -135,16 +159,16 @@ func (ep ExposedPort) PortString() string {
 func CreateDefaultPorts() ExposedPorts {
 	return []ExposedPort{
 		{
-			Name:       "http",
-			Protocol:   corev1.ProtocolTCP,
-			Port:       httpPort,
-			TargetPort: httpPort,
+			Name:                  "http",
+			Protocol:              corev1.ProtocolTCP,
+			ServicePort:           httpPort,
+			RequestedExternalPort: httpPort,
 		},
 		{
-			Name:       "https",
-			Protocol:   corev1.ProtocolTCP,
-			Port:       httpsPort,
-			TargetPort: httpsPort,
+			Name:                  "https",
+			Protocol:              corev1.ProtocolTCP,
+			ServicePort:           httpsPort,
+			RequestedExternalPort: httpsPort,
 		},
 	}
 }
