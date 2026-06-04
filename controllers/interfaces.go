@@ -69,3 +69,8 @@ type serviceClient interface {
 type k8sClient interface {
 	client.Client
 }
+
+type ExpositionService interface {
+	GetOwnableTypes() []client.Object
+	ProcessExposition(ctx context.Context, exposition types.Exposition) error
+}
