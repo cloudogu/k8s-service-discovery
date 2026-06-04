@@ -15,7 +15,7 @@ type ExpositionConfig struct {
 	// This is a legacy feature and will be deprecated in future versions.
 	DiscoverServices bool
 
-	// DiscoverExpositions enables port discovery via the ExpositionOld Custom Resource (CR).
+	// DiscoverExpositions enables port discovery via the Exposition Custom Resource (CR).
 	// This is the recommended way to configure port expositions moving forward.
 	DiscoverExpositions bool
 }
@@ -61,7 +61,8 @@ type RegexReplacement struct {
 	Replacement string
 }
 
-// SetOwnerFunc represents a function to set the owner for a resource
+// SetOwnerFunc sets the owner reference on the given Kubernetes object,
+// enabling automatic garbage collection via OwnerReferences.
 type SetOwnerFunc func(targetObject client.Object) error
 
 // Exposition represents the complete specification for exposing an application's
@@ -70,7 +71,7 @@ type Exposition struct {
 	// Name is the unique identifier for this exposition configuration.
 	Name string
 
-	// Namespace of the exposition.
+	// Namespace is the Kubernetes namespace in which the exposition is defined.
 	Namespace string
 
 	// HttpRoutes lists all HTTP-based routing rules.
