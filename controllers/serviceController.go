@@ -72,7 +72,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Watches(
 			&doguv2.Dogu{},
-			handler.EnqueueRequestsFromMapFunc(r.mapRequestsFromDoguCR),
+			handler.EnqueueRequestsFromMapFunc(mapRequestsFromDoguCR),
 			builder.WithPredicates(doguHealthyConditionChangedPredicate()),
 		).
 		Watches(
@@ -133,7 +133,7 @@ func doguHealthyConditionChangedPredicate() predicate.Predicate {
 
 // mapRequestsFromDoguCR enqueues the Dogu's Service for reconciliation. The
 // Service shares the Dogu's name by convention.
-func (r *ServiceReconciler) mapRequestsFromDoguCR(_ context.Context, obj client.Object) []reconcile.Request {
+func mapRequestsFromDoguCR(_ context.Context, obj client.Object) []reconcile.Request {
 	dogu, ok := obj.(*doguv2.Dogu)
 	if !ok {
 		return nil

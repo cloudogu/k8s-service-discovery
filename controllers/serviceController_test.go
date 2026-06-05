@@ -209,8 +209,7 @@ func TestServiceReconciler_mapRequestsFromDoguCR(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &ServiceReconciler{}
-			assert.Equal(t, tt.want, r.mapRequestsFromDoguCR(t.Context(), tt.obj))
+			assert.Equal(t, tt.want, mapRequestsFromDoguCR(t.Context(), tt.obj))
 		})
 	}
 }
