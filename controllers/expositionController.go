@@ -6,19 +6,15 @@ import (
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
-	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -80,43 +76,14 @@ func (r *ExpositionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Watches(
 			&corev1.ConfigMap{},
-			handler.EnqueueRequestsFromMapFunc(r.mapRequestsFromMaintenanceConfigMap),
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(mapRequestsFromMaintenanceConfigMap(
+				r.Client,
+				func() client.ObjectList { return &expositionv1.ExpositionList{} },
+				"exposition-maintenance",
+			)),
+			builder.WithPredicates(maintenanceConfigMapPredicate()),
 		).
 		Complete(r)
-}
-
-func (r *ExpositionReconciler) mapRequestsFromMaintenanceConfigMap(ctx context.Context, object client.Object) []reconcile.Request {
-	logger := log.FromContext(ctx).WithName("map exposition requests from maintenance config map")
-
-	if object.GetName() != repository.MaintenanceConfigMapName {
-		return nil
-	}
-
-	doguLabelReq, err := labels.NewRequirement(doguv2.DoguLabelName, selection.Exists, nil)
-	if err != nil {
-		logger.Error(err, "failed to create selector for dogu label")
-		return nil
-	}
-
-	var doguExpositions expositionv1.ExpositionList
-	doguLabelSelector := labels.NewSelector().Add(*doguLabelReq)
-	err = r.Client.List(ctx, &doguExpositions,
-		&client.ListOptions{
-			Namespace:     object.GetNamespace(),
-			LabelSelector: doguLabelSelector,
-		})
-	if err != nil {
-		logger.Error(err, "failed to list dogu expositions")
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0, len(doguExpositions.Items))
-	for _, exposition := range doguExpositions.Items {
-		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{Namespace: exposition.Namespace, Name: exposition.Labels[doguv2.DoguLabelName]}})
-	}
-
-	return requests
 }
 
 func mapRequestsFromDeployment(_ context.Context, object client.Object) []reconcile.Request {
