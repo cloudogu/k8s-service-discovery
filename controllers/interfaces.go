@@ -3,11 +3,9 @@ package controllers
 import (
 	"context"
 
-	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,19 +19,6 @@ type GlobalConfigRepository interface {
 	Get(context.Context) (libconfig.GlobalConfig, error)
 	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
 	Update(ctx context.Context, globalConfig libconfig.GlobalConfig) (libconfig.GlobalConfig, error)
-}
-
-// IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
-type IngressUpdater interface {
-	// UpsertForService creates or updates the ingress objects of the given service.
-	UpsertForService(ctx context.Context, service *corev1.Service) error
-	// UpsertForExposition creates or updates the ingress objects of the given exposition.
-	UpsertForExposition(ctx context.Context, exposition *expositionv1.Exposition) error
-}
-
-type NetworkPolicyUpdater interface {
-	UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error
-	UpsertNetworkPoliciesForExposition(ctx context.Context, exposition *expositionv1.Exposition) error
 }
 
 type certificateSynchronizer interface {

@@ -27,11 +27,11 @@ loadBalancerService:
   internalTrafficPolicy: Cluster
   externalTrafficPolicy: Local
 
-# Configuration for discovering exposed ports for loadbalancer other than http / https
+# Configuration for exposing ports and http routes
 exposition:
-  # Enable exposition of ports
-  enabled: true
-  # Enable port discovery via Services that are annotated (Legacy)
+  # Enable exposition of ports via the load balancer
+  exposePorts: true
+  # Enable port and http route discovery via Services that are annotated (Legacy)
   discoverServices: true
-  # Enable port discovery via ExpositionCR
+  # Enable port and http route discovery via ExpositionCR
   discoverExpositionCR: true

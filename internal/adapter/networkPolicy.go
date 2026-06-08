@@ -16,9 +16,9 @@ import (
 )
 
 type NetworkPolicy struct {
-	client        client.Client
-	labelSelector metav1.LabelSelector
-	allowedCIDR   string
+	Client        client.Client
+	LabelSelector metav1.LabelSelector
+	AllowedCIDR   string
 }
 
 func (n NetworkPolicy) GetOwnableTypes() []client.Object {
@@ -31,7 +31,7 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 	if len(exposition.TcpRoutes)+len(exposition.UdpRoutes) == 0 {
 		stub := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: exposition.Namespace}}
 
-		if err := n.client.Delete(ctx, stub); err != nil && !apierrors.IsNotFound(err) {
+		if err := n.Client.Delete(ctx, stub); err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete network policy %q: %w", name, err)
 		}
 
@@ -44,7 +44,7 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 	}
 
 	target := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: exposition.Namespace}}
-	if _, cuErr := controllerutil.CreateOrUpdate(ctx, n.client, target, func() error {
+	if _, cuErr := controllerutil.CreateOrUpdate(ctx, n.Client, target, func() error {
 		target.Labels = desired.Labels
 		target.Annotations = desired.Annotations
 		target.OwnerReferences = desired.OwnerReferences
@@ -72,7 +72,7 @@ func (n NetworkPolicy) createNetworkPolicy(exposition types.Exposition) (*networ
 			Labels:    util.K8sCesServiceDiscoveryLabels,
 		},
 		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: n.labelSelector,
+			PodSelector: n.LabelSelector,
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
@@ -80,7 +80,7 @@ func (n NetworkPolicy) createNetworkPolicy(exposition types.Exposition) (*networ
 					From: []networkingv1.NetworkPolicyPeer{
 						{
 							IPBlock: &networkingv1.IPBlock{
-								CIDR: n.allowedCIDR,
+								CIDR: n.AllowedCIDR,
 							},
 						},
 					},

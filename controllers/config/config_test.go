@@ -205,12 +205,14 @@ func TestReadExpositionConfig(t *testing.T) {
 		expErrStr string
 	}{
 		{
-			name: "return disabled config when exposition is disabled",
+			name: "return disabled config when all is disabled",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "false")
+				t.Setenv(expositionExposePortsEnvVar, "false")
+				t.Setenv(expositionDiscoverServicesEnvVar, "false")
+				t.Setenv(expositionDiscoverExpositionCrEnvVar, "false")
 			},
 			exp: controllers.ExpositionConfig{
-				Enabled:             false,
+				ExposePorts:         false,
 				DiscoverServices:    false,
 				DiscoverExpositions: false,
 			},
@@ -218,36 +220,36 @@ func TestReadExpositionConfig(t *testing.T) {
 		{
 			name: "return full config when all env vars are set",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "true")
+				t.Setenv(expositionExposePortsEnvVar, "true")
 				t.Setenv(expositionDiscoverServicesEnvVar, "true")
 				t.Setenv(expositionDiscoverExpositionCrEnvVar, "false")
 			},
 			exp: controllers.ExpositionConfig{
-				Enabled:             true,
+				ExposePorts:         true,
 				DiscoverServices:    true,
 				DiscoverExpositions: false,
 			},
 		},
 		{
-			name: "return error when EXPOSITION_ENABLED is not set",
+			name: "return error when EXPOSITION_EXPOSE_PORTS is not set",
 			setup: func(t *testing.T) {
-				tUnsetenv(t, expositionEnabledEnvVar)
+				tUnsetenv(t, expositionExposePortsEnvVar)
 			},
 			expErr:    true,
-			expErrStr: "EXPOSITION_ENABLED",
+			expErrStr: "EXPOSITION_EXPOSE_PORTS",
 		},
 		{
-			name: "return error when EXPOSITION_ENABLED is invalid",
+			name: "return error when EXPOSITION_EXPOSE_PORTS is invalid",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "invalid")
+				t.Setenv(expositionExposePortsEnvVar, "invalid")
 			},
 			expErr:    true,
-			expErrStr: "EXPOSITION_ENABLED",
+			expErrStr: "EXPOSITION_EXPOSE_PORTS",
 		},
 		{
 			name: "return error when EXPOSITION_DISCOVER_SERVICES is not set",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "true")
+				t.Setenv(expositionExposePortsEnvVar, "true")
 				tUnsetenv(t, expositionDiscoverServicesEnvVar)
 			},
 			expErr:    true,
@@ -256,7 +258,7 @@ func TestReadExpositionConfig(t *testing.T) {
 		{
 			name: "return error when EXPOSITION_DISCOVER_SERVICES is invalid",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "true")
+				t.Setenv(expositionExposePortsEnvVar, "true")
 				t.Setenv(expositionDiscoverServicesEnvVar, "invalid")
 			},
 			expErr:    true,
@@ -265,7 +267,7 @@ func TestReadExpositionConfig(t *testing.T) {
 		{
 			name: "return error when EXPOSITION_DISCOVER_EXPOSITION_CR is not set",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "true")
+				t.Setenv(expositionExposePortsEnvVar, "true")
 				t.Setenv(expositionDiscoverServicesEnvVar, "true")
 				tUnsetenv(t, expositionDiscoverExpositionCrEnvVar)
 			},
@@ -275,7 +277,7 @@ func TestReadExpositionConfig(t *testing.T) {
 		{
 			name: "return error when EXPOSITION_DISCOVER_EXPOSITION_CR is invalid",
 			setup: func(t *testing.T) {
-				t.Setenv(expositionEnabledEnvVar, "true")
+				t.Setenv(expositionExposePortsEnvVar, "true")
 				t.Setenv(expositionDiscoverServicesEnvVar, "true")
 				t.Setenv(expositionDiscoverExpositionCrEnvVar, "invalid")
 			},

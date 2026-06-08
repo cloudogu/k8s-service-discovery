@@ -41,16 +41,16 @@ type ingressController interface {
 // backend, then delegates the actual ingress materialization to an
 // ingressController.
 type Ingress struct {
-	dogu        doguAdapter
-	maintenance maintenanceAdapter
-	controller  ingressController
+	Dogu        doguAdapter
+	Maintenance maintenanceAdapter
+	Controller  ingressController
 }
 
 // GetOwnableTypes delegates to the underlying ingressController so
 // that the ExpositionService can register every ingress-related
 // Kubernetes type the controller may produce.
 func (i Ingress) GetOwnableTypes() []client.Object {
-	return i.controller.GetOwnableTypes()
+	return i.Controller.GetOwnableTypes()
 }
 
 // ProcessExposition reads the dogu's application state and the global
@@ -59,12 +59,12 @@ func (i Ingress) GetOwnableTypes() []client.Object {
 // active, and forwards the (possibly modified) Exposition to the
 // ingressController.
 func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
-	doguApplicationState, err := i.dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
+	doguApplicationState, err := i.Dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get status of dogu: %w", err)
 	}
 
-	_, maintenanceMode, err := i.maintenance.GetStatus(ctx)
+	_, maintenanceMode, err := i.Maintenance.GetStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get status of global maintenance mode: %w", err)
 	}
@@ -77,8 +77,8 @@ func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposit
 		exposition.HttpRoutes = i.redirectHttpRoutesToStaticBackend(exposition.HttpRoutes)
 	}
 
-	if lErr := i.controller.ProcessExposition(ctx, doguApplicationState, exposition); lErr != nil {
-		return fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.controller, doguApplicationState, lErr)
+	if lErr := i.Controller.ProcessExposition(ctx, doguApplicationState, exposition); lErr != nil {
+		return fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr)
 	}
 
 	return nil

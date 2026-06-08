@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type processor interface {
+type Processor interface {
 	internal.ExpositionProcessor
 }
 
@@ -17,11 +17,11 @@ type processor interface {
 // a collection of specialized adapters that process Exposition.
 type ExpositionService struct {
 	// processors contains all adapters that need to be executed for an exposition.
-	processors []processor
+	processors []Processor
 }
 
 // NewExpositionService creates a new composite domain service.
-func NewExpositionService(processors ...processor) *ExpositionService {
+func NewExpositionService(processors ...Processor) *ExpositionService {
 	return &ExpositionService{
 		processors: processors,
 	}

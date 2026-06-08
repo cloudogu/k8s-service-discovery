@@ -135,7 +135,7 @@ func TestDogu_GetStatus(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := Dogu{client: tt.clientFn(t)}
+			d := Dogu{Client: tt.clientFn(t)}
 			got, err := d.GetStatus(t.Context(), doguTestNamespace, doguTestName)
 			if !tt.wantErr(t, err) {
 				return

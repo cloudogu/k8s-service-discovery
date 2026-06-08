@@ -42,8 +42,8 @@ spec:
           value: "{{ .Values.networkPolicies.enabled | default "true" }}"
         - name: NETWORK_POLICIES_CIDR
           value: {{ .Values.networkPolicies.ingressControllerAllowedCIDR | default "0.0.0.0/0" }}
-        - name: EXPOSITION_ENABLED
-          value: {{ .Values.exposition.enabled | quote }}
+        - name: EXPOSITION_EXPOSE_PORTS
+          value: {{ .Values.exposition.exposePorts | quote }}
         - name: EXPOSITION_DISCOVER_SERVICES
           value: {{ .Values.exposition.discoverServices | quote }}
         - name: EXPOSITION_DISCOVER_EXPOSITION_CR

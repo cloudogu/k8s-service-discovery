@@ -1,73 +1,9 @@
 package expose
 
 import (
-	"context"
-
-	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
-	"github.com/cloudogu/k8s-registry-lib/repository"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/domain"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
-	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	netv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type maintenanceAdapter interface {
-	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
-}
-
-// DeploymentReadyChecker checks the readiness from deployments.
-type DeploymentReadyChecker interface {
-	// IsReady checks whether the application of the deployment is ready, i.e., contains at least one ready pod.
-	IsReady(ctx context.Context, deploymentName string) (bool, error)
-}
-
-type ingressDefinitionCreator interface {
-	CreateFromService(ctx context.Context, service *corev1.Service) (domain.IngressDefinition, error)
-	CreateFromExposition(ctx context.Context, exposition *expositionv1.Exposition) (domain.IngressDefinition, error)
-}
-
-type ingressGenerator interface {
-	GenerateWithMiddlewares(definition domain.IngressDefinition) ([]*networkingv1.Ingress, []*traefikapi.Middleware)
-}
-
-type networkPolicyGenerator interface {
-	Generate(definition domain.ExposedPortsDefinition) []*networkingv1.NetworkPolicy
-}
-
-type k8sClient interface {
-	client.Client
-}
-
-// used for mocks
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type deploymentInterface interface {
-	appsv1.DeploymentInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
-type ingressInterface interface {
-	netv1.IngressInterface
-}
-
-type ingressController interface {
-	GetName() string
-	GetSelector() map[string]string
-	GetRewriteAnnotationKey() string
-}
-
-type networkPolicyInterface interface {
-	netv1.NetworkPolicyInterface
-}
-
-//nolint:unused
-//goland:noinspection GoUnusedType
 type middlewareInterface interface {
 	traefikv1alpha1.MiddlewareInterface
 }

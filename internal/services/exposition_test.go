@@ -17,25 +17,25 @@ func TestNewExpositionService(t *testing.T) {
 	}
 	tests := []struct {
 		name         string
-		processorsFn func(t *testing.T) []processor
+		processorsFn func(t *testing.T) []Processor
 		want         want
 	}{
 		{
 			name:         "no processors",
-			processorsFn: func(t *testing.T) []processor { return nil },
+			processorsFn: func(t *testing.T) []Processor { return nil },
 			want:         want{len: 0},
 		},
 		{
 			name: "one processor",
-			processorsFn: func(t *testing.T) []processor {
-				return []processor{newMockProcessor(t)}
+			processorsFn: func(t *testing.T) []Processor {
+				return []Processor{NewMockProcessor(t)}
 			},
 			want: want{len: 1},
 		},
 		{
 			name: "three processors preserve order",
-			processorsFn: func(t *testing.T) []processor {
-				return []processor{newMockProcessor(t), newMockProcessor(t), newMockProcessor(t)}
+			processorsFn: func(t *testing.T) []Processor {
+				return []Processor{NewMockProcessor(t), NewMockProcessor(t), NewMockProcessor(t)}
 			},
 			want: want{len: 3},
 		},
@@ -59,42 +59,42 @@ func TestExpositionService_GetOwnableTypes(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		processorsFn func(t *testing.T) []processor
+		processorsFn func(t *testing.T) []Processor
 		want         []client.Object
 	}{
 		{
 			name:         "no processors yields nil",
-			processorsFn: func(t *testing.T) []processor { return nil },
+			processorsFn: func(t *testing.T) []Processor { return nil },
 			want:         nil,
 		},
 		{
 			name: "one processor with two types",
-			processorsFn: func(t *testing.T) []processor {
-				m := newMockProcessor(t)
+			processorsFn: func(t *testing.T) []Processor {
+				m := NewMockProcessor(t)
 				m.EXPECT().GetOwnableTypes().Return([]client.Object{cm, svc})
-				return []processor{m}
+				return []Processor{m}
 			},
 			want: []client.Object{cm, svc},
 		},
 		{
 			name: "two processors aggregate in order",
-			processorsFn: func(t *testing.T) []processor {
-				first := newMockProcessor(t)
+			processorsFn: func(t *testing.T) []Processor {
+				first := NewMockProcessor(t)
 				first.EXPECT().GetOwnableTypes().Return([]client.Object{cm})
-				second := newMockProcessor(t)
+				second := NewMockProcessor(t)
 				second.EXPECT().GetOwnableTypes().Return([]client.Object{svc})
-				return []processor{first, second}
+				return []Processor{first, second}
 			},
 			want: []client.Object{cm, svc},
 		},
 		{
 			name: "processor returning nil contributes nothing",
-			processorsFn: func(t *testing.T) []processor {
-				first := newMockProcessor(t)
+			processorsFn: func(t *testing.T) []Processor {
+				first := NewMockProcessor(t)
 				first.EXPECT().GetOwnableTypes().Return(nil)
-				second := newMockProcessor(t)
+				second := NewMockProcessor(t)
 				second.EXPECT().GetOwnableTypes().Return([]client.Object{cm})
-				return []processor{first, second}
+				return []Processor{first, second}
 			},
 			want: []client.Object{cm},
 		},
@@ -110,8 +110,8 @@ func TestExpositionService_GetOwnableTypes(t *testing.T) {
 func TestExpositionService_ProcessExposition(t *testing.T) {
 	exposition := types.Exposition{Name: "ldap", Namespace: "ns"}
 
-	expectProc := func(t *testing.T, expectCall bool, ret error) *mockProcessor {
-		m := newMockProcessor(t)
+	expectProc := func(t *testing.T, expectCall bool, ret error) *MockProcessor {
+		m := NewMockProcessor(t)
 		if expectCall {
 			m.EXPECT().ProcessExposition(mock.Anything, exposition).Return(ret)
 		}
@@ -120,34 +120,34 @@ func TestExpositionService_ProcessExposition(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		processorsFn func(t *testing.T) []processor
+		processorsFn func(t *testing.T) []Processor
 		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
 			name:         "no processors returns nil",
-			processorsFn: func(t *testing.T) []processor { return nil },
+			processorsFn: func(t *testing.T) []Processor { return nil },
 			wantErr:      assert.NoError,
 		},
 		{
 			name: "single processor success",
-			processorsFn: func(t *testing.T) []processor {
-				return []processor{expectProc(t, true, nil)}
+			processorsFn: func(t *testing.T) []Processor {
+				return []Processor{expectProc(t, true, nil)}
 			},
 			wantErr: assert.NoError,
 		},
 		{
 			name: "single processor error",
-			processorsFn: func(t *testing.T) []processor {
-				return []processor{expectProc(t, true, assert.AnError)}
+			processorsFn: func(t *testing.T) []Processor {
+				return []Processor{expectProc(t, true, assert.AnError)}
 			},
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorContains(t, err, "failed to process exposition with *services.mockProcessor", i...)
+				return assert.ErrorContains(t, err, "failed to process exposition with *services.MockProcessor", i...)
 			},
 		},
 		{
 			name: "three processors all succeed; all called",
-			processorsFn: func(t *testing.T) []processor {
-				return []processor{
+			processorsFn: func(t *testing.T) []Processor {
+				return []Processor{
 					expectProc(t, true, nil),
 					expectProc(t, true, nil),
 					expectProc(t, true, nil),
@@ -157,8 +157,8 @@ func TestExpositionService_ProcessExposition(t *testing.T) {
 		},
 		{
 			name: "chain stops at first error; later processor not called",
-			processorsFn: func(t *testing.T) []processor {
-				return []processor{
+			processorsFn: func(t *testing.T) []Processor {
+				return []Processor{
 					expectProc(t, true, nil),
 					expectProc(t, true, assert.AnError),
 					expectProc(t, false, nil), // must not be invoked

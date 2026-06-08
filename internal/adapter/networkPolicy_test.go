@@ -46,7 +46,7 @@ func errOwner(_ client.Object) error { return assert.AnError }
 
 func fixedNetworkPolicy(t *testing.T, c client.Client) NetworkPolicy {
 	t.Helper()
-	return NetworkPolicy{client: c, labelSelector: testLabelSelector, allowedCIDR: testCIDR}
+	return NetworkPolicy{Client: c, LabelSelector: testLabelSelector, AllowedCIDR: testCIDR}
 }
 
 func TestNetworkPolicy_GetOwnableTypes(t *testing.T) {

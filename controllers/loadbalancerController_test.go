@@ -457,7 +457,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:       "error fetching exposed services",
-			expoConfig: ExpositionConfig{Enabled: true, DiscoverServices: true},
+			expoConfig: ExpositionConfig{ExposePorts: true, DiscoverServices: true},
 			inClientMock: testclient.NewClientBuilder().
 				WithObjects(lbConfigMap).
 				Build(),
@@ -469,7 +469,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:       "error fetching exposed ports of service",
-			expoConfig: ExpositionConfig{Enabled: true, DiscoverServices: true},
+			expoConfig: ExpositionConfig{ExposePorts: true, DiscoverServices: true},
 			inClientMock: createDefaultLBClientMock(lbConfigMap, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -490,7 +490,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:                       "success with ExpositionConfig enabled and services",
-			expoConfig:                 ExpositionConfig{Enabled: true, DiscoverServices: true},
+			expoConfig:                 ExpositionConfig{ExposePorts: true, DiscoverServices: true},
 			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
@@ -499,7 +499,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:                       "success with ExpositionConfig enabled and expositions",
-			expoConfig:                 ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			expoConfig:                 ExpositionConfig{ExposePorts: true, DiscoverExpositions: true},
 			inClientMock:               createLBClientWithScheme(t, lbConfigMap, testExposition),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
@@ -508,7 +508,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:       "error fetching expositions",
-			expoConfig: ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			expoConfig: ExpositionConfig{ExposePorts: true, DiscoverExpositions: true},
 			inClientMock: testclient.NewClientBuilder().
 				WithScheme(getScheme(t)).
 				WithObjects(lbConfigMap).

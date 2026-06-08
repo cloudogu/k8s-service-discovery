@@ -30,15 +30,14 @@ const (
 // ExpositionConfig defines the configuration for discovering exposed ports
 // for the load-balancer (excluding standard HTTP/HTTPS traffic).
 type ExpositionConfig struct {
-	// Enabled determines whether the exposition feature is active as a whole.
-	// If set to false, no ports other than http / https will be exposed via this controller.
-	Enabled bool
+	// ExposePorts determines whether ports other than http / https will be exposed via this controller.
+	ExposePorts bool
 
-	// DiscoverServices enables port discovery via annotated corev1.Service objects.
+	// DiscoverServices enables port and http route discovery via annotated corev1.Service objects.
 	// This is a legacy feature and will be deprecated in future versions.
 	DiscoverServices bool
 
-	// DiscoverExpositions enables port discovery via the Exposition Custom Resource (CR).
+	// DiscoverExpositions enables port and http route discovery via the Exposition Custom Resource (CR).
 	// This is the recommended way to configure port expositions moving forward.
 	DiscoverExpositions bool
 }
@@ -192,7 +191,7 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Named("loadbalancer-configmap")
 
-	if !r.ExpositionConfig.Enabled {
+	if !r.ExpositionConfig.ExposePorts {
 		return ctrlBuilder.Complete(r)
 	}
 
@@ -224,7 +223,7 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *LoadBalancerReconciler) getExposedPorts(ctx context.Context) (types.ExposedPorts, error) {
-	if !r.ExpositionConfig.Enabled {
+	if !r.ExpositionConfig.ExposePorts {
 		return types.ExposedPorts{}, nil
 	}
 

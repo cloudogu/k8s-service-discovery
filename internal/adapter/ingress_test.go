@@ -31,7 +31,7 @@ func TestIngress_GetOwnableTypes(t *testing.T) {
 	ctrl := newMockIngressController(t)
 	ctrl.EXPECT().GetOwnableTypes().Return(want)
 
-	i := Ingress{controller: ctrl}
+	i := Ingress{Controller: ctrl}
 	assert.Equal(t, want, i.GetOwnableTypes())
 }
 
@@ -179,9 +179,9 @@ func TestIngress_ProcessExposition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := Ingress{
-				dogu:        tt.fields.doguFn(t),
-				maintenance: tt.fields.maintenanceFn(t),
-				controller:  tt.fields.controllerFn(t),
+				Dogu:        tt.fields.doguFn(t),
+				Maintenance: tt.fields.maintenanceFn(t),
+				Controller:  tt.fields.controllerFn(t),
 			}
 			err := i.ProcessExposition(t.Context(), exposition)
 			tt.wantErr(t, err)

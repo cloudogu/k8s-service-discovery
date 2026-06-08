@@ -10,12 +10,13 @@ import (
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/dogustart"
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/expose/ingressController"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/logging"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/adapter"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/services"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
@@ -122,33 +123,37 @@ func startManager() error {
 		return fmt.Errorf("failed to register migration cleanup handler: %w", err)
 	}
 
-	deploymentReadyChecker := dogustart.NewDeploymentReadyChecker(clientSet.k8sClient, watchNamespace)
 	maintenanceAdapter := repository.NewMaintenanceModeAdapter(ServiceDiscoveryMaintenanceOwner, serviceDiscManager.GetClient(), watchNamespace)
-
-	ingressUpdater := expose.NewIngressUpdater(expose.IngressUpdaterDependencies{
-		Namespace:          watchNamespace,
-		IngressClassName:   IngressClassName,
-		MaintenanceAdapter: maintenanceAdapter,
-		ReadyChecker:       deploymentReadyChecker,
-		Client:             serviceDiscManager.GetClient(),
-	})
 
 	cidr, err := config.ReadNetworkPolicyCIDR()
 	if err != nil {
 		return err
 	}
 
+	doguAdapter := adapter.Dogu{Client: serviceDiscManager.GetClient()}
+	ingressControllerAdapter := &adapter.TraefikIngressController{IngressClass: IngressClassName, Client: serviceDiscManager.GetClient()}
+	ingressAdapter := adapter.Ingress{Dogu: doguAdapter, Maintenance: maintenanceAdapter, Controller: ingressControllerAdapter}
+
+	processors := []services.Processor{ingressAdapter}
+
 	networkPoliciesEnabled, err := config.ReadNetworkPolicyEnabled()
 	if err != nil {
 		return err
 	}
 
-	networkPolicyUpdater := expose.NewNetworkPolicyHandler(!networkPoliciesEnabled, watchNamespace, controller, cidr, serviceDiscManager.GetClient())
+	if networkPoliciesEnabled {
+		networkPolicyAdapter := adapter.NetworkPolicy{
+			Client:        serviceDiscManager.GetClient(),
+			LabelSelector: metav1.LabelSelector{MatchLabels: controller.GetSelector()},
+			AllowedCIDR:   cidr,
+		}
+		processors = append(processors, networkPolicyAdapter)
+	}
+	expositionService := services.NewExpositionService(processors...)
 
-	expositionEnabled, err := config.ReadExpositionEnabled()
+	expositionConfig, err := config.ReadExpositionConfig()
 	if err != nil {
-		logger.Error(err, "assuming default of exposition disabled")
-		expositionEnabled = false
+		return fmt.Errorf("failed to read exposition config: %w", err)
 	}
 
 	if err = configureManager(
@@ -157,9 +162,8 @@ func startManager() error {
 		globalConfigRepo,
 		watchNamespace,
 		controller,
-		ingressUpdater,
-		networkPolicyUpdater,
-		expositionEnabled,
+		expositionService,
+		expositionConfig,
 		certSync,
 	); err != nil {
 		return fmt.Errorf("failed to configure service discovery manager: %w", err)
@@ -203,26 +207,15 @@ type certificateSynchronizer interface {
 	Synchronize(ctx context.Context) error
 }
 
-func configureManager(
-	k8sManager k8sManager,
-	k8sClients k8sClientSet,
-	globalConfigRepo controllers.GlobalConfigRepository,
-	namespace string,
-	ingressController controllers.IngressController,
-	ingressUpdater controllers.IngressUpdater,
-	networkPolicyUpdater controllers.NetworkPolicyUpdater,
-	expositionEnabled bool,
-	certSync certificateSynchronizer,
-) error {
+func configureManager(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig controllers.ExpositionConfig, certSync certificateSynchronizer) error {
 	if err := configureReconciler(
 		k8sManager,
 		k8sClients,
 		globalConfigRepo,
 		namespace,
 		ingressController,
-		ingressUpdater,
-		networkPolicyUpdater,
-		expositionEnabled,
+		expositionService,
+		expositionConfig,
 		certSync,
 	); err != nil {
 		return fmt.Errorf("failed to configure reconciler: %w", err)
@@ -287,31 +280,21 @@ func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string,
 	return nil
 }
 
-func configureReconciler(
-	k8sManager k8sManager,
-	k8sClients k8sClientSet,
-	globalConfigRepo controllers.GlobalConfigRepository,
-	namespace string,
-	ingressController controllers.IngressController,
-	ingressUpdater controllers.IngressUpdater,
-	networkPolicyUpdater controllers.NetworkPolicyUpdater,
-	expositionEnabled bool,
-	certSync certificateSynchronizer,
-) error {
-	reconciler := &controllers.ServiceReconciler{
-		Client:               k8sManager.GetClient(),
-		IngressUpdater:       ingressUpdater,
-		NetworkPolicyUpdater: networkPolicyUpdater,
-	}
-	if err := reconciler.SetupWithManager(k8sManager); err != nil {
-		return fmt.Errorf("failed to setup service reconciler with the manager: %w", err)
+func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig controllers.ExpositionConfig, certSync certificateSynchronizer) error {
+	if expositionConfig.DiscoverServices {
+		serviceReconciler := &controllers.ServiceReconciler{
+			Client:            k8sManager.GetClient(),
+			ExpositionService: expositionService,
+		}
+		if err := serviceReconciler.SetupWithManager(k8sManager); err != nil {
+			return fmt.Errorf("failed to setup service reconciler with the manager: %w", err)
+		}
 	}
 
-	if expositionEnabled {
+	if expositionConfig.DiscoverExpositions {
 		expositionReconciler := controllers.ExpositionReconciler{
-			Client:               k8sManager.GetClient(),
-			IngressUpdater:       ingressUpdater,
-			NetworkPolicyUpdater: networkPolicyUpdater,
+			Client:            k8sManager.GetClient(),
+			ExpositionService: expositionService,
 		}
 		if err := expositionReconciler.SetupWithManager(k8sManager); err != nil {
 			return fmt.Errorf("failed to setup exposition reconciler with the manager: %w", err)
@@ -329,18 +312,16 @@ func configureReconciler(
 		Redirector:         ingressController,
 		Namespace:          namespace,
 	}
-
 	if err := redirectReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup redirct reconciler with the manager: %w", err)
 	}
 
-	loadbalacnerReconciler := &controllers.LoadBalancerReconciler{
+	loadbalancerReconciler := &controllers.LoadBalancerReconciler{
 		Client:            k8sManager.GetClient(),
 		IngressController: ingressController,
 		SvcClient:         k8sClients.serviceClient,
 	}
-
-	if err := loadbalacnerReconciler.SetupWithManager(k8sManager); err != nil {
+	if err := loadbalancerReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup loadbalancer reconciler with the manager: %w", err)
 	}
 

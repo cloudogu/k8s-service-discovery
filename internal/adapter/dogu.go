@@ -14,7 +14,7 @@ import (
 // Dogu reads dogu CRs from the cluster and translates their status
 // into the domain ApplicationState consumed by the Ingress processor.
 type Dogu struct {
-	client client.Client
+	Client client.Client
 }
 
 // GetStatus fetches the dogu CR identified by (namespace, doguName)
@@ -30,7 +30,7 @@ func (d Dogu) GetStatus(ctx context.Context, namespace string, doguName string) 
 		Name:      doguName,
 	}
 
-	if lErr := d.client.Get(ctx, doguKey, dogu); lErr != nil {
+	if lErr := d.Client.Get(ctx, doguKey, dogu); lErr != nil {
 		return 0, fmt.Errorf("failed to get dogu: %w", lErr)
 	}
 
