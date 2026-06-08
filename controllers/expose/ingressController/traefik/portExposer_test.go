@@ -34,8 +34,8 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "successfully create TCP and UDP IngressRoutes",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
-				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, Port: 5353, TargetPort: 5353},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
+				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 5353, RequestedExternalPort: 5353},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError).Times(2)
@@ -61,8 +61,8 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "ignore unsupported protocol",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
-				{Name: "svc-9999", ServiceName: "svc", Protocol: "SCTP", Port: 9999, TargetPort: 9999},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
+				{Name: "svc-9999", ServiceName: "svc", Protocol: "SCTP", ServicePort: 9999, RequestedExternalPort: 9999},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError).Times(2)
@@ -77,7 +77,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "update IngressRouteTCP when it already exists",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
@@ -102,7 +102,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "update IngressRouteUDP when it already exists",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, Port: 5353, TargetPort: 5353},
+				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 5353, RequestedExternalPort: 5353},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
@@ -127,7 +127,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "set owner references from ingress on IngressRouteTCP",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ownerRef := metav1.OwnerReference{Name: "some-owner", UID: "abc123"}
@@ -150,7 +150,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "return error when IngressRouteTCP cannot be created",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
@@ -166,7 +166,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "return error when IngressRouteTCP already exists but cannot be fetched for update",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
@@ -184,7 +184,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "return error when IngressRouteTCP cannot be updated",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, Port: 2222, TargetPort: 2222},
+				{Name: "svc-2222", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 2222, RequestedExternalPort: 2222},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)
@@ -207,7 +207,7 @@ func TestPortExposer_ExposePorts(t *testing.T) {
 		{
 			name: "return error when IngressRouteUDP cannot be created",
 			inExposedPorts: types.ExposedPorts{
-				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, Port: 5353, TargetPort: 5353},
+				{Name: "svc-5353", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 5353, RequestedExternalPort: 5353},
 			},
 			setupMocks: func(traefikMock *mockTraefikInterface, ingressMock *mockIngressInterface) {
 				ingressMock.EXPECT().Get(mock.Anything, "svc", mock.Anything).Return(nil, assert.AnError)

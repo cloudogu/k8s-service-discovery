@@ -100,11 +100,11 @@ func mapServiceExposedPort(svcName string, svcPort ServiceExposedPortDTO) (Expos
 	}
 
 	return ExposedPort{
-		Name:        fmt.Sprintf("%s-%d", svcName, svcPort.Port),
-		ServiceName: svcName,
-		Protocol:    protocol,
-		Port:        exPort,
-		TargetPort:  exTargetPort,
+		Name:                  fmt.Sprintf("%s-%d", svcName, svcPort.Port),
+		ServiceName:           svcName,
+		Protocol:              protocol,
+		ServicePort:           exPort,
+		RequestedExternalPort: exTargetPort,
 	}, nil
 }
 
