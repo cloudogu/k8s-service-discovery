@@ -21,9 +21,14 @@ const traefikMiddlewareAnnotationKey = "traefik.ingress.kubernetes.io/router.mid
 
 const ownedByLabelKey = "k8s-service-discovery.cloudogu.com/owned-by"
 
+const (
+	staticContentMaintenanceRewrite    = "maintenance-mode@kubernetescrd"
+	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
+)
+
 type TraefikIngressController struct {
-	ingressClass string
-	client       client.Client
+	IngressClass string
+	Client       client.Client
 }
 
 func (t *TraefikIngressController) GetOwnableTypes() []client.Object {
@@ -31,7 +36,7 @@ func (t *TraefikIngressController) GetOwnableTypes() []client.Object {
 }
 
 func (t *TraefikIngressController) ProcessExposition(ctx context.Context, appState types.ApplicationState, exposition types.Exposition) error {
-	ingresses, middlewares, err := t.generate(exposition)
+	ingresses, middlewares, err := t.generate(exposition, appState)
 	if err != nil {
 		return fmt.Errorf("failed to generate ingresses or middlewares: %w", err)
 	}
@@ -54,28 +59,32 @@ func (t *TraefikIngressController) ProcessExposition(ctx context.Context, appSta
 	return nil
 }
 
-func (t *TraefikIngressController) generate(exposition types.Exposition) ([]*networkingv1.Ingress, []*traefikapi.Middleware, error) {
-	var ingresses []*networkingv1.Ingress
+func (t *TraefikIngressController) generate(exposition types.Exposition, appState types.ApplicationState) ([]*networkingv1.Ingress, []*traefikapi.Middleware, error) {
+	if appState == types.ApplicationStopped {
+		return nil, nil, nil
+	}
+
+	ingresses := make([]*networkingv1.Ingress, 0, len(exposition.HttpRoutes))
 	var middlewares []*traefikapi.Middleware
 	var errs []error
 	for _, route := range exposition.HttpRoutes {
-		var middlewareName string
-		if route.Rewrite != nil {
+		var middlewareRef string
+		if appState == types.ApplicationMaintenance {
+			middlewareRef = staticContentMaintenanceRewrite
+		} else if appState == types.ApplicationIsStarting {
+			middlewareRef = staticContentDoguIsStartingRewrite
+		} else if route.Rewrite != nil {
 			middleware := t.generateMiddleware(exposition, route)
 			err := exposition.SetOwner(middleware)
-			if err != nil {
-				errs = append(errs, err)
-			}
+			errs = append(errs, err)
 
-			middlewareName = middleware.Name
+			middlewareRef = fmt.Sprintf("%s-%s@kubernetescrd", exposition.Namespace, middleware.Name)
 			middlewares = append(middlewares, middleware)
 		}
 
-		ingress := t.generateIngress(exposition, route, middlewareName)
+		ingress := t.generateIngress(exposition, route, middlewareRef)
 		err := exposition.SetOwner(ingress)
-		if err != nil {
-			errs = append(errs, err)
-		}
+		errs = append(errs, err)
 
 		ingresses = append(ingresses, ingress)
 	}
@@ -83,10 +92,10 @@ func (t *TraefikIngressController) generate(exposition types.Exposition) ([]*net
 	return ingresses, middlewares, errors.Join(errs...)
 }
 
-func (t *TraefikIngressController) generateIngress(exposition types.Exposition, httpRoute types.HttpRoute, middlewareName string) *networkingv1.Ingress {
+func (t *TraefikIngressController) generateIngress(exposition types.Exposition, httpRoute types.HttpRoute, middlewareRef string) *networkingv1.Ingress {
 	annotations := make(map[string]string, 1)
-	if middlewareName != "" {
-		annotations[traefikMiddlewareAnnotationKey] = fmt.Sprintf("%s-%s@kubernetescrd", exposition.Namespace, middlewareName)
+	if middlewareRef != "" {
+		annotations[traefikMiddlewareAnnotationKey] = middlewareRef
 	}
 
 	selectionLabels := map[string]string{ownedByLabelKey: exposition.Name}
@@ -100,7 +109,7 @@ func (t *TraefikIngressController) generateIngress(exposition types.Exposition, 
 			Labels:      selectionLabels,
 		},
 		Spec: networkingv1.IngressSpec{
-			IngressClassName: &t.ingressClass,
+			IngressClassName: &t.IngressClass,
 			Rules: []networkingv1.IngressRule{{
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
@@ -157,7 +166,7 @@ func (t *TraefikIngressController) generateMiddleware(exposition types.Expositio
 func (t *TraefikIngressController) upsertIngresses(ctx context.Context, exposition types.Exposition, desiredState []*networkingv1.Ingress) error {
 	var errs []error
 	existing := &networkingv1.IngressList{}
-	err := t.client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
+	err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
 	}
@@ -172,7 +181,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 		// only keep track of those that are not in the desired state to delete later
 		delete(existingMap, desiredObject.Name)
 
-		_, err := controllerutil.CreateOrUpdate(ctx, t.client, updateRef, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
 			updateRef.Annotations = desiredObject.Annotations
 			updateRef.OwnerReferences = desiredObject.OwnerReferences
 			updateRef.Labels = desiredObject.Labels
@@ -186,7 +195,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 
 	// delete objects not in desired state
 	for _, existingObject := range existingMap {
-		err := t.client.Delete(ctx, &existingObject)
+		err := t.Client.Delete(ctx, &existingObject)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete outdated ingress %q: %w", existingObject.Name, err))
 		}
@@ -198,7 +207,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposition types.Exposition, desiredState []*traefikapi.Middleware) error {
 	var errs []error
 	existing := &traefikapi.MiddlewareList{}
-	err := t.client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
+	err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to list existing middlewares: %w", err))
 	}
@@ -213,7 +222,7 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 		// only keep track of those that are not in the desired state to delete later
 		delete(existingMap, desiredObject.Name)
 
-		_, err := controllerutil.CreateOrUpdate(ctx, t.client, updateRef, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
 			updateRef.Annotations = desiredObject.Annotations
 			updateRef.OwnerReferences = desiredObject.OwnerReferences
 			updateRef.Labels = desiredObject.Labels
@@ -227,7 +236,7 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 
 	// delete objects not in desired state
 	for _, existingObject := range existingMap {
-		err := t.client.Delete(ctx, &existingObject)
+		err := t.Client.Delete(ctx, &existingObject)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete outdated middleware %q: %w", existingObject.Name, err))
 		}
