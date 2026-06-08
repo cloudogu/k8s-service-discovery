@@ -21,6 +21,11 @@ const traefikMiddlewareAnnotationKey = "traefik.ingress.kubernetes.io/router.mid
 
 const ownedByLabelKey = "k8s-service-discovery.cloudogu.com/owned-by"
 
+const (
+	staticContentMaintenanceRewrite    = "maintenance-mode@kubernetescrd"
+	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
+)
+
 type TraefikIngressController struct {
 	ingressClass string
 	client       client.Client
@@ -31,7 +36,7 @@ func (t *TraefikIngressController) GetOwnableTypes() []client.Object {
 }
 
 func (t *TraefikIngressController) ProcessExposition(ctx context.Context, appState types.ApplicationState, exposition types.Exposition) error {
-	ingresses, middlewares, err := t.generate(exposition)
+	ingresses, middlewares, err := t.generate(exposition, appState)
 	if err != nil {
 		return fmt.Errorf("failed to generate ingresses or middlewares: %w", err)
 	}
@@ -54,28 +59,32 @@ func (t *TraefikIngressController) ProcessExposition(ctx context.Context, appSta
 	return nil
 }
 
-func (t *TraefikIngressController) generate(exposition types.Exposition) ([]*networkingv1.Ingress, []*traefikapi.Middleware, error) {
-	var ingresses []*networkingv1.Ingress
+func (t *TraefikIngressController) generate(exposition types.Exposition, appState types.ApplicationState) ([]*networkingv1.Ingress, []*traefikapi.Middleware, error) {
+	if appState == types.ApplicationStopped {
+		return nil, nil, nil
+	}
+
+	ingresses := make([]*networkingv1.Ingress, 0, len(exposition.HttpRoutes))
 	var middlewares []*traefikapi.Middleware
 	var errs []error
 	for _, route := range exposition.HttpRoutes {
-		var middlewareName string
-		if route.Rewrite != nil {
+		var middlewareRef string
+		if appState == types.ApplicationMaintenance {
+			middlewareRef = staticContentMaintenanceRewrite
+		} else if appState == types.ApplicationIsStarting {
+			middlewareRef = staticContentDoguIsStartingRewrite
+		} else if route.Rewrite != nil {
 			middleware := t.generateMiddleware(exposition, route)
 			err := exposition.SetOwner(middleware)
-			if err != nil {
-				errs = append(errs, err)
-			}
+			errs = append(errs, err)
 
-			middlewareName = middleware.Name
+			middlewareRef = fmt.Sprintf("%s-%s@kubernetescrd", exposition.Namespace, middleware.Name)
 			middlewares = append(middlewares, middleware)
 		}
 
-		ingress := t.generateIngress(exposition, route, middlewareName)
+		ingress := t.generateIngress(exposition, route, middlewareRef)
 		err := exposition.SetOwner(ingress)
-		if err != nil {
-			errs = append(errs, err)
-		}
+		errs = append(errs, err)
 
 		ingresses = append(ingresses, ingress)
 	}
@@ -83,10 +92,10 @@ func (t *TraefikIngressController) generate(exposition types.Exposition) ([]*net
 	return ingresses, middlewares, errors.Join(errs...)
 }
 
-func (t *TraefikIngressController) generateIngress(exposition types.Exposition, httpRoute types.HttpRoute, middlewareName string) *networkingv1.Ingress {
+func (t *TraefikIngressController) generateIngress(exposition types.Exposition, httpRoute types.HttpRoute, middlewareRef string) *networkingv1.Ingress {
 	annotations := make(map[string]string, 1)
-	if middlewareName != "" {
-		annotations[traefikMiddlewareAnnotationKey] = fmt.Sprintf("%s-%s@kubernetescrd", exposition.Namespace, middlewareName)
+	if middlewareRef != "" {
+		annotations[traefikMiddlewareAnnotationKey] = middlewareRef
 	}
 
 	selectionLabels := map[string]string{ownedByLabelKey: exposition.Name}
