@@ -27,8 +27,8 @@ const (
 )
 
 type TraefikIngressController struct {
-	ingressClass string
-	client       client.Client
+	IngressClass string
+	Client       client.Client
 }
 
 func (t *TraefikIngressController) GetOwnableTypes() []client.Object {
@@ -109,7 +109,7 @@ func (t *TraefikIngressController) generateIngress(exposition types.Exposition, 
 			Labels:      selectionLabels,
 		},
 		Spec: networkingv1.IngressSpec{
-			IngressClassName: &t.ingressClass,
+			IngressClassName: &t.IngressClass,
 			Rules: []networkingv1.IngressRule{{
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
@@ -166,7 +166,7 @@ func (t *TraefikIngressController) generateMiddleware(exposition types.Expositio
 func (t *TraefikIngressController) upsertIngresses(ctx context.Context, exposition types.Exposition, desiredState []*networkingv1.Ingress) error {
 	var errs []error
 	existing := &networkingv1.IngressList{}
-	err := t.client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
+	err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to list existing ingresses: %w", err))
 	}
@@ -181,7 +181,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 		// only keep track of those that are not in the desired state to delete later
 		delete(existingMap, desiredObject.Name)
 
-		_, err := controllerutil.CreateOrUpdate(ctx, t.client, updateRef, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
 			updateRef.Annotations = desiredObject.Annotations
 			updateRef.OwnerReferences = desiredObject.OwnerReferences
 			updateRef.Labels = desiredObject.Labels
@@ -195,7 +195,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 
 	// delete objects not in desired state
 	for _, existingObject := range existingMap {
-		err := t.client.Delete(ctx, &existingObject)
+		err := t.Client.Delete(ctx, &existingObject)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete outdated ingress %q: %w", existingObject.Name, err))
 		}
@@ -207,7 +207,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposition types.Exposition, desiredState []*traefikapi.Middleware) error {
 	var errs []error
 	existing := &traefikapi.MiddlewareList{}
-	err := t.client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
+	err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to list existing middlewares: %w", err))
 	}
@@ -222,7 +222,7 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 		// only keep track of those that are not in the desired state to delete later
 		delete(existingMap, desiredObject.Name)
 
-		_, err := controllerutil.CreateOrUpdate(ctx, t.client, updateRef, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
 			updateRef.Annotations = desiredObject.Annotations
 			updateRef.OwnerReferences = desiredObject.OwnerReferences
 			updateRef.Labels = desiredObject.Labels
@@ -236,7 +236,7 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 
 	// delete objects not in desired state
 	for _, existingObject := range existingMap {
-		err := t.client.Delete(ctx, &existingObject)
+		err := t.Client.Delete(ctx, &existingObject)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete outdated middleware %q: %w", existingObject.Name, err))
 		}
