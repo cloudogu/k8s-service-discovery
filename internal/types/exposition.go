@@ -87,3 +87,26 @@ type Exposition struct {
 	// enabling automatic garbage collection via OwnerReferences.
 	SetOwner SetOwnerFunc
 }
+
+// ApplicationState represents the operational status of an application
+// within the ecosystem. It is used to determine routing behavior and
+// resource availability.
+type ApplicationState int8
+
+const (
+	// ApplicationStopped indicates that the application is fully shut down
+	// and no replicas are currently active or scheduled.
+	ApplicationStopped ApplicationState = iota
+
+	// ApplicationRunning indicates that the application is healthy, active,
+	// and ready to accept incoming network traffic.
+	ApplicationRunning
+
+	// ApplicationIsStarting indicates that the application infrastructure (e.g., Pods)
+	// is being deployed or initializing, but not yet ready for traffic.
+	ApplicationIsStarting
+
+	// ApplicationMaintenance indicates that the application is temporarily locked
+	// for administrative tasks, during which a maintenance page should be displayed.
+	ApplicationMaintenance
+)
