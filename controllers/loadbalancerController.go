@@ -124,15 +124,15 @@ func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]type
 	return serviceList, nil
 }
 
-func (r *LoadBalancerReconciler) getExpositions(ctx context.Context) ([]types.Exposition, error) {
+func (r *LoadBalancerReconciler) getExpositions(ctx context.Context) ([]types.ExpositionOld, error) {
 	var k8sExpositionList expositionv1.ExpositionList
 	if lErr := r.Client.List(ctx, &k8sExpositionList, client.MatchingFields{exposedPortIndexKey: "true"}); lErr != nil {
 		return nil, fmt.Errorf("failed to list expositions: %w", lErr)
 	}
 
-	expositionList := make([]types.Exposition, 0, len(k8sExpositionList.Items))
+	expositionList := make([]types.ExpositionOld, 0, len(k8sExpositionList.Items))
 	for _, k8sExposition := range k8sExpositionList.Items {
-		expositionList = append(expositionList, types.Exposition(k8sExposition))
+		expositionList = append(expositionList, types.ExpositionOld(k8sExposition))
 	}
 
 	return expositionList, nil
@@ -443,7 +443,7 @@ func isExposedPortService(obj metav1.Object) bool {
 func createLoadBalancerExposedPorts(doguPorts types.ExposedPorts) types.ExposedPorts {
 	// Delete default ports 80 and 443 as they are handled by the loadbalancer
 	doguPorts = slices.DeleteFunc(doguPorts, func(port types.ExposedPort) bool {
-		return port.Port == 80 || port.Port == 443
+		return port.ServicePort == 80 || port.ServicePort == 443
 	})
 
 	exposedPorts := types.CreateDefaultPorts()

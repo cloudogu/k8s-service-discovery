@@ -856,63 +856,63 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 			name:  "empty input returns defaults only",
 			input: types.ExposedPorts{},
 			expected: types.ExposedPorts{
-				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 		},
 		{
 			name: "custom port added alongside defaults",
 			input: types.ExposedPorts{
-				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
 			},
 			expected: types.ExposedPorts{
-				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
-				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 		},
 		{
 			name: "port 80 in input is stripped and replaced by default",
 			input: types.ExposedPorts{
-				{Name: "myhttp", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
+				{Name: "myhttp", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
 			},
 			expected: types.ExposedPorts{
-				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 		},
 		{
 			name: "port 443 in input is stripped and replaced by default",
 			input: types.ExposedPorts{
-				{Name: "myhttps", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "myhttps", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 			expected: types.ExposedPorts{
-				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 		},
 		{
 			name: "both 80 and 443 in input are stripped",
 			input: types.ExposedPorts{
-				{Name: "p80", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "p443", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "p80", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "p443", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 			expected: types.ExposedPorts{
-				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 		},
 		{
 			name: "80, 443, and custom port: 80+443 stripped, custom kept with defaults",
 			input: types.ExposedPorts{
-				{Name: "p80", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "p443", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
-				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+				{Name: "p80", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "p443", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
+				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
 			},
 			expected: types.ExposedPorts{
-				{Name: "custom", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
-				{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: 80},
-				{Name: "https", Protocol: corev1.ProtocolTCP, Port: 443, TargetPort: 443},
+				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
 			},
 		},
 	}
@@ -953,7 +953,7 @@ func Test_getExposedPorts_generic(t *testing.T) {
 				}),
 			},
 			expected: types.ExposedPorts{
-				{Name: "test-svc-50000", ServiceName: "test-svc", Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: 50000},
+				{Name: "test-svc-50000", ServiceName: "test-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
 			},
 		},
 		{
@@ -977,8 +977,8 @@ func Test_getExposedPorts_generic(t *testing.T) {
 				}),
 			},
 			expected: types.ExposedPorts{
-				{Name: "svc-a-1000", ServiceName: "svc-a", Protocol: corev1.ProtocolTCP, Port: 1000, TargetPort: 1000},
-				{Name: "svc-b-2000", ServiceName: "svc-b", Protocol: corev1.ProtocolUDP, Port: 2000, TargetPort: 2000},
+				{Name: "svc-a-1000", ServiceName: "svc-a", Protocol: corev1.ProtocolTCP, ServicePort: 1000, RequestedExternalPort: 1000},
+				{Name: "svc-b-2000", ServiceName: "svc-b", Protocol: corev1.ProtocolUDP, ServicePort: 2000, RequestedExternalPort: 2000},
 			},
 		},
 		{

@@ -244,18 +244,18 @@ func TestCreateLoadBalancer(t *testing.T) {
 	//given
 	ePorts := ExposedPorts{
 		{
-			Name:        "a-80",
-			ServiceName: "a",
-			Protocol:    "TCP",
-			Port:        80,
-			TargetPort:  80,
+			Name:                  "a-80",
+			ServiceName:           "a",
+			Protocol:              "TCP",
+			ServicePort:           80,
+			RequestedExternalPort: 80,
 		},
 		{
-			Name:        "a-443",
-			ServiceName: "a",
-			Protocol:    "TCP",
-			Port:        443,
-			TargetPort:  443,
+			Name:                  "a-443",
+			ServiceName:           "a",
+			Protocol:              "TCP",
+			ServicePort:           443,
+			RequestedExternalPort: 443,
 		},
 	}
 
