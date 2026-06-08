@@ -110,3 +110,18 @@ const (
 	// for administrative tasks, during which a maintenance page should be displayed.
 	ApplicationMaintenance
 )
+
+func (a ApplicationState) String() string {
+	switch a {
+	case ApplicationStopped:
+		return "Stopped"
+	case ApplicationRunning:
+		return "Running"
+	case ApplicationIsStarting:
+		return "IsStarting"
+	case ApplicationMaintenance:
+		return "Maintenance"
+	default:
+		return ""
+	}
+}
