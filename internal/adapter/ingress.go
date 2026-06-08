@@ -19,7 +19,7 @@ const (
 // doguAdapter reports the operational state of the dogu whose
 // ingress is being reconciled.
 type doguAdapter interface {
-	GetStatus(ctx context.Context) (types.ApplicationState, error)
+	GetStatus(ctx context.Context, namespace string, doguName string) (types.ApplicationState, error)
 }
 
 // maintenanceAdapter reports the global ecosystem-wide maintenance
@@ -59,7 +59,7 @@ func (i Ingress) GetOwnableTypes() []client.Object {
 // active, and forwards the (possibly modified) Exposition to the
 // ingressController.
 func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
-	doguApplicationState, err := i.dogu.GetStatus(ctx)
+	doguApplicationState, err := i.dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get status of dogu: %w", err)
 	}

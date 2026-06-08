@@ -22,9 +22,9 @@ func (_m *mockDoguAdapter) EXPECT() *mockDoguAdapter_Expecter {
 	return &mockDoguAdapter_Expecter{mock: &_m.Mock}
 }
 
-// GetStatus provides a mock function with given fields: ctx
-func (_m *mockDoguAdapter) GetStatus(ctx context.Context) (types.ApplicationState, error) {
-	ret := _m.Called(ctx)
+// GetStatus provides a mock function with given fields: ctx, namespace, doguName
+func (_m *mockDoguAdapter) GetStatus(ctx context.Context, namespace string, doguName string) (types.ApplicationState, error) {
+	ret := _m.Called(ctx, namespace, doguName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStatus")
@@ -32,17 +32,17 @@ func (_m *mockDoguAdapter) GetStatus(ctx context.Context) (types.ApplicationStat
 
 	var r0 types.ApplicationState
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (types.ApplicationState, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (types.ApplicationState, error)); ok {
+		return rf(ctx, namespace, doguName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) types.ApplicationState); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) types.ApplicationState); ok {
+		r0 = rf(ctx, namespace, doguName)
 	} else {
 		r0 = ret.Get(0).(types.ApplicationState)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, doguName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -57,13 +57,15 @@ type mockDoguAdapter_GetStatus_Call struct {
 
 // GetStatus is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *mockDoguAdapter_Expecter) GetStatus(ctx interface{}) *mockDoguAdapter_GetStatus_Call {
-	return &mockDoguAdapter_GetStatus_Call{Call: _e.mock.On("GetStatus", ctx)}
+//   - namespace string
+//   - doguName string
+func (_e *mockDoguAdapter_Expecter) GetStatus(ctx interface{}, namespace interface{}, doguName interface{}) *mockDoguAdapter_GetStatus_Call {
+	return &mockDoguAdapter_GetStatus_Call{Call: _e.mock.On("GetStatus", ctx, namespace, doguName)}
 }
 
-func (_c *mockDoguAdapter_GetStatus_Call) Run(run func(ctx context.Context)) *mockDoguAdapter_GetStatus_Call {
+func (_c *mockDoguAdapter_GetStatus_Call) Run(run func(ctx context.Context, namespace string, doguName string)) *mockDoguAdapter_GetStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -73,7 +75,7 @@ func (_c *mockDoguAdapter_GetStatus_Call) Return(_a0 types.ApplicationState, _a1
 	return _c
 }
 
-func (_c *mockDoguAdapter_GetStatus_Call) RunAndReturn(run func(context.Context) (types.ApplicationState, error)) *mockDoguAdapter_GetStatus_Call {
+func (_c *mockDoguAdapter_GetStatus_Call) RunAndReturn(run func(context.Context, string, string) (types.ApplicationState, error)) *mockDoguAdapter_GetStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

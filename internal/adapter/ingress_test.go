@@ -53,7 +53,7 @@ func TestIngress_ProcessExposition(t *testing.T) {
 	okDogu := func(state types.ApplicationState) func(t *testing.T) doguAdapter {
 		return func(t *testing.T) doguAdapter {
 			m := newMockDoguAdapter(t)
-			m.EXPECT().GetStatus(t.Context()).Return(state, nil)
+			m.EXPECT().GetStatus(t.Context(), "ns", "ldap").Return(state, nil)
 			return m
 		}
 	}
@@ -135,7 +135,7 @@ func TestIngress_ProcessExposition(t *testing.T) {
 			fields: fields{
 				doguFn: func(t *testing.T) doguAdapter {
 					m := newMockDoguAdapter(t)
-					m.EXPECT().GetStatus(t.Context()).Return(types.ApplicationStopped, assert.AnError)
+					m.EXPECT().GetStatus(t.Context(), "ns", "ldap").Return(types.ApplicationStopped, assert.AnError)
 					return m
 				},
 				maintenanceFn: noMaintenance,
