@@ -41,11 +41,10 @@ type ingressController interface {
 // backend, then delegates the actual ingress materialization to an
 // ingressController.
 type Ingress struct {
-	ingressClass string
-	client       client.Client
-	dogu         doguAdapter
-	maintenance  maintenanceAdapter
-	controller   ingressController
+	client      client.Client
+	dogu        doguAdapter
+	maintenance maintenanceAdapter
+	controller  ingressController
 }
 
 // GetOwnableTypes delegates to the underlying ingressController so
