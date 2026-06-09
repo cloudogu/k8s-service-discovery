@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
+	exositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/adapter"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/services"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
+	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
@@ -55,7 +57,9 @@ type k8sManager interface {
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v2.AddToScheme(scheme))
+	utilruntime.Must(doguv2.AddToScheme(scheme))
+	utilruntime.Must(exositionv1.AddToScheme(scheme))
+	utilruntime.Must(traefikapi.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	if err := logging.ConfigureLogger(); err != nil {
