@@ -16,6 +16,7 @@ import (
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/ssl"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/adapter"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/services"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	traefikv1alpha1 "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/generated/clientset/versioned/typed/traefikio/v1alpha1"
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -211,7 +212,7 @@ type certificateSynchronizer interface {
 	Synchronize(ctx context.Context) error
 }
 
-func configureManager(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig controllers.ExpositionConfig, certSync certificateSynchronizer) error {
+func configureManager(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig types.ExpositionConfig, certSync certificateSynchronizer) error {
 	if err := configureReconciler(
 		k8sManager,
 		k8sClients,
@@ -284,7 +285,7 @@ func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string,
 	return nil
 }
 
-func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig controllers.ExpositionConfig, certSync certificateSynchronizer) error {
+func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig types.ExpositionConfig, certSync certificateSynchronizer) error {
 	if expositionConfig.DiscoverServices {
 		serviceReconciler := &controllers.ServiceReconciler{
 			Client:            k8sManager.GetClient(),
@@ -321,6 +322,7 @@ func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalC
 	}
 
 	loadbalancerReconciler := &controllers.LoadBalancerReconciler{
+		ExpositionConfig:  expositionConfig,
 		Client:            k8sManager.GetClient(),
 		IngressController: ingressController,
 		SvcClient:         k8sClients.serviceClient,

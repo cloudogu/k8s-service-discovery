@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -200,7 +200,7 @@ func TestReadExpositionConfig(t *testing.T) {
 	tests := []struct {
 		name      string
 		setup     func(t *testing.T)
-		exp       controllers.ExpositionConfig
+		exp       types.ExpositionConfig
 		expErr    bool
 		expErrStr string
 	}{
@@ -211,8 +211,8 @@ func TestReadExpositionConfig(t *testing.T) {
 				t.Setenv(expositionDiscoverServicesEnvVar, "false")
 				t.Setenv(expositionDiscoverExpositionCrEnvVar, "false")
 			},
-			exp: controllers.ExpositionConfig{
-				ExposePorts:         false,
+			exp: types.ExpositionConfig{
+				Enabled:             false,
 				DiscoverServices:    false,
 				DiscoverExpositions: false,
 			},
@@ -224,8 +224,8 @@ func TestReadExpositionConfig(t *testing.T) {
 				t.Setenv(expositionDiscoverServicesEnvVar, "true")
 				t.Setenv(expositionDiscoverExpositionCrEnvVar, "false")
 			},
-			exp: controllers.ExpositionConfig{
-				ExposePorts:         true,
+			exp: types.ExpositionConfig{
+				Enabled:             true,
 				DiscoverServices:    true,
 				DiscoverExpositions: false,
 			},

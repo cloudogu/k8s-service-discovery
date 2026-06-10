@@ -55,7 +55,8 @@ func Test_loadbalancerConfigPredicate(t *testing.T) {
 func Test_exposedPortServicePredicate(t *testing.T) {
 	const exposedPortServiceAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports"
 
-	expPortServicePredicate := exposedPortServicePredicate()
+	r := &LoadBalancerReconciler{Client: testclient.NewClientBuilder().Build()}
+	expPortServicePredicate := r.exposedPortServicePredicate()
 
 	t.Run("reconcile exposed port service on create", func(t *testing.T) {
 		assert.True(t, expPortServicePredicate.CreateFunc(event.CreateEvent{Object: &corev1.Service{
@@ -68,7 +69,8 @@ func Test_exposedPortServicePredicate(t *testing.T) {
 				},
 			},
 			Spec: corev1.ServiceSpec{
-				Type: corev1.ServiceTypeClusterIP,
+				Type:  corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)}},
 			}}},
 		))
 	})
@@ -106,7 +108,8 @@ func Test_exposedPortServicePredicate(t *testing.T) {
 				},
 			},
 			Spec: corev1.ServiceSpec{
-				Type: corev1.ServiceTypeClusterIP,
+				Type:  corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)}},
 			}}},
 		))
 	})
@@ -144,7 +147,8 @@ func Test_exposedPortServicePredicate(t *testing.T) {
 				},
 			},
 			Spec: corev1.ServiceSpec{
-				Type: corev1.ServiceTypeClusterIP,
+				Type:  corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)}},
 			}}},
 		))
 	})
@@ -281,15 +285,17 @@ func Test_exposedPortServicePredicate(t *testing.T) {
 			}))
 		})
 
-		t.Run("ignore when getting exposed ports fails on oldObject", func(t *testing.T) {
-			assert.False(t, expPortServicePredicate.UpdateFunc(event.UpdateEvent{
+		t.Run("reconcile when old service has unparseable annotation", func(t *testing.T) {
+			// old fails to map (invalid protocol) → treated as non-dogu-service transition → reconcile
+			assert.True(t, expPortServicePredicate.UpdateFunc(event.UpdateEvent{
 				ObjectOld: invalidExposedPorts,
 				ObjectNew: exposedDoguService,
 			}))
 		})
 
-		t.Run("ignore when getting exposed ports fails on newObject", func(t *testing.T) {
-			assert.False(t, expPortServicePredicate.UpdateFunc(event.UpdateEvent{
+		t.Run("reconcile when new service has unparseable annotation", func(t *testing.T) {
+			// new fails to map (invalid protocol) → treated as non-dogu-service transition → reconcile
+			assert.True(t, expPortServicePredicate.UpdateFunc(event.UpdateEvent{
 				ObjectOld: exposedDoguService,
 				ObjectNew: invalidExposedPorts,
 			}))
@@ -391,7 +397,8 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)}},
 		}}
 	testExposition := &expositionv1.Exposition{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-exposition", Namespace: testLBNamespace},
@@ -402,7 +409,7 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 
 	tests := []struct {
 		name                       string
-		expoConfig                 ExpositionConfig
+		expoConfig                 types.ExpositionConfig
 		inClientMock               client.Client
 		setupLoggerMock            func(m *MockLogSink)
 		setupIngressControllerMock func(m *MockIngressController)
@@ -457,7 +464,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:       "error fetching exposed services",
-			expoConfig: ExpositionConfig{ExposePorts: true, DiscoverServices: true},
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
 			inClientMock: testclient.NewClientBuilder().
 				WithObjects(lbConfigMap).
 				Build(),
@@ -468,29 +475,24 @@ externalTrafficPolicy: Local
 			errMsg:                     "failed to list exposed services",
 		},
 		{
-			name:       "error fetching exposed ports of service",
-			expoConfig: ExpositionConfig{ExposePorts: true, DiscoverServices: true},
+			// services with corrupted annotations are logged and skipped, not fatal
+			name:       "success when one service has corrupted exposed port annotation",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
 			inClientMock: createDefaultLBClientMock(lbConfigMap, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						k8sv2.DoguLabelName: "testDogu",
-					},
-					Annotations: map[string]string{
-						exposedPortServiceAnnotation: `INVALID`,
-					},
+					Labels:      map[string]string{k8sv2.DoguLabelName: "testDogu"},
+					Annotations: map[string]string{exposedPortServiceAnnotation: `INVALID`},
 				},
-				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeClusterIP,
-				}}),
+				Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
+			}),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: func(m *MockIngressController) {},
-			setupServiceClientMock:     func(m *mockServiceClient) {},
-			expErr:                     true,
-			errMsg:                     "failed to get exposed ports from services",
+			setupIngressControllerMock: createNoErrorExposePorts(),
+			setupServiceClientMock:     createSvcNewLoadbalancer(false),
+			expErr:                     false,
 		},
 		{
 			name:                       "success with ExpositionConfig enabled and services",
-			expoConfig:                 ExpositionConfig{ExposePorts: true, DiscoverServices: true},
+			expoConfig:                 types.ExpositionConfig{Enabled: true, DiscoverServices: true},
 			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
@@ -499,7 +501,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:                       "success with ExpositionConfig enabled and expositions",
-			expoConfig:                 ExpositionConfig{ExposePorts: true, DiscoverExpositions: true},
+			expoConfig:                 types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
 			inClientMock:               createLBClientWithScheme(t, lbConfigMap, testExposition),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
@@ -508,7 +510,7 @@ externalTrafficPolicy: Local
 		},
 		{
 			name:       "error fetching expositions",
-			expoConfig: ExpositionConfig{ExposePorts: true, DiscoverExpositions: true},
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
 			inClientMock: testclient.NewClientBuilder().
 				WithScheme(getScheme(t)).
 				WithObjects(lbConfigMap).
@@ -572,6 +574,22 @@ externalTrafficPolicy: Local
 			setupServiceClientMock: createSvcNewLoadbalancer(false),
 			expErr:                 true,
 			errMsg:                 "failed to update exposed ports in ingress controller",
+		},
+		{
+			name:                       "skip update when loadbalancer already in desired state",
+			inClientMock:               createDefaultLBClientMock(lbConfigMap),
+			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
+			setupIngressControllerMock: createNoErrorExposePorts(),
+			setupServiceClientMock: func(m *mockServiceClient) {
+				selector := map[string]string{"service.name": "service"}
+				desiredLB := types.CreateLoadBalancer(testLBNamespace, types.LoadbalancerConfig{
+					ExternalTrafficPolicy: "Local",
+					InternalTrafficPolicy: "Cluster",
+				}, types.CreateDefaultPorts(), selector)
+				m.EXPECT().Get(mock.Anything, types.LoadbalancerName, mock.Anything).Return(desiredLB.ToK8sService(), nil)
+				// Update must NOT be called
+			},
+			expErr: false,
 		},
 	}
 
@@ -687,6 +705,7 @@ func createDefaultLoadbalancerLoggerMock() func(m *MockLogSink) {
 		m.EXPECT().WithValues().Return(m)
 		m.EXPECT().Enabled(mock.Anything).Return(true).Maybe()
 		m.EXPECT().Info(0, mock.Anything).Return().Maybe()
+		m.EXPECT().Error(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	}
 }
 
@@ -925,87 +944,94 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 	}
 }
 
-func Test_getExposedPorts_generic(t *testing.T) {
+func TestLoadBalancerReconciler_getExposedPortsForServices(t *testing.T) {
 	const expPortAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports"
 
+	lbConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: types.LoadBalancerConfigName, Namespace: testLBNamespace}}
+
 	tests := []struct {
-		name      string
-		input     []types.Service
-		expected  types.ExposedPorts
-		expErr    bool
-		errSubstr string
+		name        string
+		expoConfig  types.ExpositionConfig
+		clientFn    func(t *testing.T) client.Client
+		expected    types.ExposedPorts
+		expErr      bool
+		errSubstStr string
 	}{
 		{
-			name:     "empty list returns empty result",
-			input:    []types.Service{},
+			name:       "returns empty when DiscoverServices is disabled",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: false},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				return createDefaultLBClientMock(lbConfigMap)
+			},
 			expected: types.ExposedPorts{},
 		},
 		{
-			name: "single service with valid ports",
-			input: []types.Service{
-				types.Service(corev1.Service{
+			name:       "returns ports from indexed services",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				svc := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-svc",
+						Name:      "dogu-svc",
+						Namespace: testLBNamespace,
+						Labels:    map[string]string{k8sv2.DoguLabelName: "dogu"},
 						Annotations: map[string]string{
 							expPortAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000}]`,
 						},
 					},
-				}),
+					Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, Ports: []corev1.ServicePort{
+						{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)},
+					}},
+				}
+				return createDefaultLBClientMock(lbConfigMap, svc)
 			},
 			expected: types.ExposedPorts{
-				{Name: "test-svc-50000", ServiceName: "test-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+				{Name: "port-50000-50000", ServiceName: "dogu-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
 			},
 		},
 		{
-			name: "multiple services ports are combined",
-			input: []types.Service{
-				types.Service(corev1.Service{
+			name:       "logs and skips service with invalid annotation",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				badSvc := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "svc-a",
-						Annotations: map[string]string{
-							expPortAnnotation: `[{"protocol":"tcp","port":1000,"targetPort":1000}]`,
-						},
+						Name:        "bad-svc",
+						Namespace:   testLBNamespace,
+						Labels:      map[string]string{k8sv2.DoguLabelName: "bad"},
+						Annotations: map[string]string{expPortAnnotation: `INVALID`},
 					},
-				}),
-				types.Service(corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "svc-b",
-						Annotations: map[string]string{
-							expPortAnnotation: `[{"protocol":"udp","port":2000,"targetPort":2000}]`,
-						},
-					},
-				}),
+					Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
+				}
+				return createDefaultLBClientMock(lbConfigMap, badSvc)
 			},
-			expected: types.ExposedPorts{
-				{Name: "svc-a-1000", ServiceName: "svc-a", Protocol: corev1.ProtocolTCP, ServicePort: 1000, RequestedExternalPort: 1000},
-				{Name: "svc-b-2000", ServiceName: "svc-b", Protocol: corev1.ProtocolUDP, ServicePort: 2000, RequestedExternalPort: 2000},
-			},
+			expected: types.ExposedPorts{},
 		},
 		{
-			name: "service with invalid JSON annotation returns error",
-			input: []types.Service{
-				types.Service(corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bad-svc",
-						Annotations: map[string]string{
-							expPortAnnotation: `INVALID JSON`,
-						},
-					},
-				}),
+			name:       "returns error when list fails (no index registered)",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				return testclient.NewClientBuilder().WithObjects(lbConfigMap).Build()
 			},
-			expected:  nil,
-			expErr:    true,
-			errSubstr: "failed to get exposed ports from object with type",
+			expErr:      true,
+			errSubstStr: "failed to list exposed services",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := getExposedPorts(tt.input)
+			r := &LoadBalancerReconciler{
+				ExpositionConfig: tt.expoConfig,
+				Client:           tt.clientFn(t),
+			}
+
+			result, err := r.getExposedPortsForServices(t.Context())
 
 			if tt.expErr {
 				require.Error(t, err)
-				assert.ErrorContains(t, err, tt.errSubstr)
+				assert.ErrorContains(t, err, tt.errSubstStr)
 				return
 			}
 
@@ -1013,4 +1039,133 @@ func Test_getExposedPorts_generic(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestLoadBalancerReconciler_getExposedPortsForExpositions(t *testing.T) {
+	lbConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: types.LoadBalancerConfigName, Namespace: testLBNamespace}}
+
+	tests := []struct {
+		name        string
+		expoConfig  types.ExpositionConfig
+		clientFn    func(t *testing.T) client.Client
+		expected    types.ExposedPorts
+		expErr      bool
+		errSubstStr string
+	}{
+		{
+			name:       "returns empty when DiscoverExpositions is disabled",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: false},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				return createLBClientWithScheme(t, lbConfigMap)
+			},
+			expected: types.ExposedPorts{},
+		},
+		{
+			name:       "returns TCP and UDP ports from indexed expositions",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				exp := &expositionv1.Exposition{
+					ObjectMeta: metav1.ObjectMeta{Name: "ssh-exp", Namespace: testLBNamespace},
+					Spec: expositionv1.ExpositionSpec{
+						TCP: []expositionv1.TCPEntry{{Name: "ssh", Service: "svc", Port: 22}},
+						UDP: []expositionv1.UDPEntry{{Name: "dns", Service: "svc", Port: 53}},
+					},
+				}
+				return createLBClientWithScheme(t, lbConfigMap, exp)
+			},
+			expected: types.ExposedPorts{
+				{Name: "ssh", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
+				{Name: "dns", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
+			},
+		},
+		{
+			name:       "returns error when list fails (no index registered)",
+			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			clientFn: func(t *testing.T) client.Client {
+				t.Helper()
+				return testclient.NewClientBuilder().WithScheme(getScheme(t)).WithObjects(lbConfigMap).Build()
+			},
+			expErr:      true,
+			errSubstStr: "failed to list expositions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &LoadBalancerReconciler{
+				ExpositionConfig: tt.expoConfig,
+				Client:           tt.clientFn(t),
+			}
+
+			result, err := r.getExposedPortsForExpositions(t.Context())
+
+			if tt.expErr {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errSubstStr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func Test_exposedService(t *testing.T) {
+	tcpPort := types.ExposedPort{Name: "ssh", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22}
+	udpPort := types.ExposedPort{Name: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53}
+
+	t.Run("HasExposedPorts", func(t *testing.T) {
+		tests := []struct {
+			name string
+			es   exposedService
+			want bool
+		}{
+			{name: "empty", es: exposedService{types.Exposition{}}, want: false},
+			{name: "tcp only", es: exposedService{types.Exposition{TcpRoutes: types.ExposedPorts{tcpPort}}}, want: true},
+			{name: "udp only", es: exposedService{types.Exposition{UdpRoutes: types.ExposedPorts{udpPort}}}, want: true},
+			{name: "both", es: exposedService{types.Exposition{TcpRoutes: types.ExposedPorts{tcpPort}, UdpRoutes: types.ExposedPorts{udpPort}}}, want: true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.want, tt.es.HasExposedPorts())
+			})
+		}
+	})
+
+	t.Run("GetExposedPorts", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			es       exposedService
+			expected types.ExposedPorts
+		}{
+			{
+				name:     "empty",
+				es:       exposedService{types.Exposition{}},
+				expected: types.ExposedPorts{},
+			},
+			{
+				name:     "tcp only",
+				es:       exposedService{types.Exposition{TcpRoutes: types.ExposedPorts{tcpPort}}},
+				expected: types.ExposedPorts{tcpPort},
+			},
+			{
+				name:     "udp only",
+				es:       exposedService{types.Exposition{UdpRoutes: types.ExposedPorts{udpPort}}},
+				expected: types.ExposedPorts{udpPort},
+			},
+			{
+				name:     "both",
+				es:       exposedService{types.Exposition{TcpRoutes: types.ExposedPorts{tcpPort}, UdpRoutes: types.ExposedPorts{udpPort}}},
+				expected: types.ExposedPorts{tcpPort, udpPort},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				assert.Equal(t, tt.expected, tt.es.GetExposedPorts())
+			})
+		}
+	})
 }

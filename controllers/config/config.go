@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/cloudogu/k8s-service-discovery/v2/controllers"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -68,39 +68,39 @@ func ReadNetworkPolicyEnabled() (bool, error) {
 	return parseBool, nil
 }
 
-func ReadExpositionConfig() (controllers.ExpositionConfig, error) {
+func ReadExpositionConfig() (types.ExpositionConfig, error) {
 	exposePorts, found := os.LookupEnv(expositionExposePortsEnvVar)
 	if !found {
-		return controllers.ExpositionConfig{}, fmt.Errorf("failed to read config for exposition expose ports from environment variable [%s], please set the variable and try again", expositionExposePortsEnvVar)
+		return types.ExpositionConfig{}, fmt.Errorf("failed to read config for exposition expose ports from environment variable [%s], please set the variable and try again", expositionExposePortsEnvVar)
 	}
 
 	exposePortsBool, err := strconv.ParseBool(exposePorts)
 	if err != nil {
-		return controllers.ExpositionConfig{}, fmt.Errorf("failed to parse boolean for environment variable [%s], verify that variable is either true or false", expositionExposePortsEnvVar)
+		return types.ExpositionConfig{}, fmt.Errorf("failed to parse boolean for environment variable [%s], verify that variable is either true or false", expositionExposePortsEnvVar)
 	}
 
 	discoverServices, found := os.LookupEnv(expositionDiscoverServicesEnvVar)
 	if !found {
-		return controllers.ExpositionConfig{}, fmt.Errorf("failed to read config for exposition discover services from environment variable [%s], please set the variable and try again", expositionDiscoverServicesEnvVar)
+		return types.ExpositionConfig{}, fmt.Errorf("failed to read config for exposition discover services from environment variable [%s], please set the variable and try again", expositionDiscoverServicesEnvVar)
 	}
 
 	discoverServicesBool, err := strconv.ParseBool(discoverServices)
 	if err != nil {
-		return controllers.ExpositionConfig{}, fmt.Errorf("failed to parse boolean for environment variable [%s], verify that variable is either true or false", expositionDiscoverServicesEnvVar)
+		return types.ExpositionConfig{}, fmt.Errorf("failed to parse boolean for environment variable [%s], verify that variable is either true or false", expositionDiscoverServicesEnvVar)
 	}
 
 	discoverExpositions, found := os.LookupEnv(expositionDiscoverExpositionCrEnvVar)
 	if !found {
-		return controllers.ExpositionConfig{}, fmt.Errorf("failed to read config for exposition discover exposition CR from environment variable [%s], please set the variable and try again", expositionDiscoverExpositionCrEnvVar)
+		return types.ExpositionConfig{}, fmt.Errorf("failed to read config for exposition discover exposition CR from environment variable [%s], please set the variable and try again", expositionDiscoverExpositionCrEnvVar)
 	}
 
 	discoverExpositionsBool, err := strconv.ParseBool(discoverExpositions)
 	if err != nil {
-		return controllers.ExpositionConfig{}, fmt.Errorf("failed to parse boolean for environment variable [%s], verify that variable is either true or false", expositionDiscoverExpositionCrEnvVar)
+		return types.ExpositionConfig{}, fmt.Errorf("failed to parse boolean for environment variable [%s], verify that variable is either true or false", expositionDiscoverExpositionCrEnvVar)
 	}
 
-	return controllers.ExpositionConfig{
-		ExposePorts:         exposePortsBool,
+	return types.ExpositionConfig{
+		Enabled:             exposePortsBool,
 		DiscoverServices:    discoverServicesBool,
 		DiscoverExpositions: discoverExpositionsBool,
 	}, nil

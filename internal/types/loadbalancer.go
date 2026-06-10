@@ -127,7 +127,7 @@ func (lb *LoadBalancer) Equals(o LoadBalancer) bool {
 	}
 
 	if lb.Spec.ExternalTrafficPolicy != o.Spec.ExternalTrafficPolicy ||
-		lb.Spec.InternalTrafficPolicy != o.Spec.InternalTrafficPolicy {
+		ptr.Deref(lb.Spec.InternalTrafficPolicy, "") != ptr.Deref(o.Spec.InternalTrafficPolicy, "") {
 		return false
 	}
 
