@@ -103,7 +103,7 @@ func (t *TraefikIngressController) generateIngress(exposition types.Exposition, 
 
 	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        fmt.Sprintf("%s-%s", exposition.Name, httpRoute.Name),
+			Name:        httpRoute.Name,
 			Namespace:   exposition.Namespace,
 			Annotations: annotations,
 			Labels:      selectionLabels,
@@ -152,7 +152,7 @@ func (t *TraefikIngressController) generateMiddleware(exposition types.Expositio
 
 	return &traefikapi.Middleware{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-rewrite", exposition.Name, httpRoute.Name),
+			Name:      fmt.Sprintf("%s-rewrite", httpRoute.Name),
 			Namespace: exposition.Namespace,
 			Labels:    selectionLabels,
 		},

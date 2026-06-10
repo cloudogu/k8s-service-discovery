@@ -67,11 +67,11 @@ func TestTraefikIngressController_GetOwnableTypes(t *testing.T) {
 }
 
 func TestTraefikIngressController_ProcessExposition(t *testing.T) {
-	baseRoute := types.HttpRoute{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap"}
+	baseRoute := types.HttpRoute{Name: "ldap-ui", Service: "ldap-ui", Port: 8080, Path: "/ldap"}
 	rewrittenRoute := baseRoute
 	rewrittenRoute.Rewrite = &types.HttpRewrite{StripPrefix: new("/ldap")}
 	regexRoute := types.HttpRoute{
-		Name:    "api",
+		Name:    "ldap-api",
 		Service: "ldap-api",
 		Port:    9090,
 		Path:    "/api",

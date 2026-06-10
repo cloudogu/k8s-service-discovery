@@ -162,22 +162,22 @@ func Test_mapExpositionCRToHttpRoutes(t *testing.T) {
 		},
 		{
 			name: "one entry without rewrite",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "ldap"}, Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
 				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap"},
 			}}},
 			want: []types.HttpRoute{
-				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-ui-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 		},
 		{
 			name: "entry with strip-prefix only",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "ldap"}, Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
 				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &expositionv1.Rewrite{
 					StripPrefix: stringPtr("/ldap"),
 				}},
 			}}},
 			want: []types.HttpRoute{
-				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{
+				{Name: "ldap-ui-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{
 					StripPrefix: stringPtr("/ldap"),
 					Regex:       nil,
 				}},
@@ -185,13 +185,13 @@ func Test_mapExpositionCRToHttpRoutes(t *testing.T) {
 		},
 		{
 			name: "entry with regex only",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "ldap"}, Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
 				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &expositionv1.Rewrite{
 					Regex: &expositionv1.RegexRewrite{Pattern: "^/old", Replacement: "/new"},
 				}},
 			}}},
 			want: []types.HttpRoute{
-				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{
+				{Name: "ldap-ui-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{
 					StripPrefix: nil,
 					Regex:       &types.RegexReplacement{Pattern: "^/old", Replacement: "/new"},
 				}},
@@ -199,13 +199,13 @@ func Test_mapExpositionCRToHttpRoutes(t *testing.T) {
 		},
 		{
 			name: "two entries preserve order",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "ldap"}, Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
 				{Name: "a", Service: "svc-a", Port: 80, Path: "/a"},
 				{Name: "b", Service: "svc-b", Port: 81, Path: "/b"},
 			}}},
 			want: []types.HttpRoute{
-				{Name: "a", Service: "svc-a", Port: 80, Path: "/a"},
-				{Name: "b", Service: "svc-b", Port: 81, Path: "/b"},
+				{Name: "ldap-a-80", Service: "svc-a", Port: 80, Path: "/a"},
+				{Name: "ldap-b-81", Service: "svc-b", Port: 81, Path: "/b"},
 			},
 		},
 	}
@@ -229,31 +229,31 @@ func Test_mapExpositionCRToTCPExposedPorts(t *testing.T) {
 		},
 		{
 			name: "RequestedExternalPort nil falls back to Port",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{TCP: []expositionv1.TCPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "scm"}, Spec: expositionv1.ExpositionSpec{TCP: []expositionv1.TCPEntry{
 				{Name: "ssh", Service: "scm", Port: 22, RequestedExternalPort: nil},
 			}}},
 			want: types.ExposedPorts{
-				{Name: "ssh", ServiceName: "scm", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
+				{Name: "scm-ssh", ServiceName: "scm", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
 			},
 		},
 		{
 			name: "RequestedExternalPort set is preserved",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{TCP: []expositionv1.TCPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "scm"}, Spec: expositionv1.ExpositionSpec{TCP: []expositionv1.TCPEntry{
 				{Name: "ssh", Service: "scm", Port: 22, RequestedExternalPort: int32Ptr(33000)},
 			}}},
 			want: types.ExposedPorts{
-				{Name: "ssh", ServiceName: "scm", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 33000},
+				{Name: "scm-ssh", ServiceName: "scm", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 33000},
 			},
 		},
 		{
 			name: "two entries mix fallback and explicit",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{TCP: []expositionv1.TCPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "scm"}, Spec: expositionv1.ExpositionSpec{TCP: []expositionv1.TCPEntry{
 				{Name: "ssh", Service: "scm", Port: 22, RequestedExternalPort: nil},
 				{Name: "ldaps", Service: "ldap", Port: 636, RequestedExternalPort: int32Ptr(33001)},
 			}}},
 			want: types.ExposedPorts{
-				{Name: "ssh", ServiceName: "scm", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
-				{Name: "ldaps", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, ServicePort: 636, RequestedExternalPort: 33001},
+				{Name: "scm-ssh", ServiceName: "scm", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
+				{Name: "scm-ldaps", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, ServicePort: 636, RequestedExternalPort: 33001},
 			},
 		},
 	}
@@ -277,31 +277,31 @@ func Test_mapExpositionCRToUDPExposedPorts(t *testing.T) {
 		},
 		{
 			name: "RequestedExternalPort nil falls back to Port",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{UDP: []expositionv1.UDPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "scm"}, Spec: expositionv1.ExpositionSpec{UDP: []expositionv1.UDPEntry{
 				{Name: "dns", Service: "dns", Port: 53, RequestedExternalPort: nil},
 			}}},
 			want: types.ExposedPorts{
-				{Name: "dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
+				{Name: "scm-dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
 			},
 		},
 		{
 			name: "RequestedExternalPort set is preserved",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{UDP: []expositionv1.UDPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "scm"}, Spec: expositionv1.ExpositionSpec{UDP: []expositionv1.UDPEntry{
 				{Name: "dns", Service: "dns", Port: 53, RequestedExternalPort: int32Ptr(35353)},
 			}}},
 			want: types.ExposedPorts{
-				{Name: "dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 35353},
+				{Name: "scm-dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 35353},
 			},
 		},
 		{
 			name: "two entries mix fallback and explicit",
-			cr: &expositionv1.Exposition{Spec: expositionv1.ExpositionSpec{UDP: []expositionv1.UDPEntry{
+			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "scm"}, Spec: expositionv1.ExpositionSpec{UDP: []expositionv1.UDPEntry{
 				{Name: "dns", Service: "dns", Port: 53, RequestedExternalPort: nil},
 				{Name: "ntp", Service: "ntp", Port: 123, RequestedExternalPort: int32Ptr(35123)},
 			}}},
 			want: types.ExposedPorts{
-				{Name: "dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
-				{Name: "ntp", ServiceName: "ntp", Protocol: corev1.ProtocolUDP, ServicePort: 123, RequestedExternalPort: 35123},
+				{Name: "scm-dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
+				{Name: "scm-ntp", ServiceName: "ntp", Protocol: corev1.ProtocolUDP, ServicePort: 123, RequestedExternalPort: 35123},
 			},
 		},
 	}

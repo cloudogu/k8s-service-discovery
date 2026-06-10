@@ -131,7 +131,7 @@ func mapExpositionCRToHttpRoutes(cr *expositionv1.Exposition) []types.HttpRoute 
 		}
 
 		httpRoutes = append(httpRoutes, types.HttpRoute{
-			Name:    httpEntry.Name,
+			Name:    fmt.Sprintf("%s-%s-%d", cr.Name, httpEntry.Name, httpEntry.Port),
 			Service: httpEntry.Service,
 			Port:    httpEntry.Port,
 			Path:    httpEntry.Path,
@@ -154,7 +154,7 @@ func mapExpositionCRToTCPExposedPorts(cr *expositionv1.Exposition) types.Exposed
 		}
 
 		tcpRoutes = append(tcpRoutes, types.ExposedPort{
-			Name:                  tcpRoute.Name,
+			Name:                  fmt.Sprintf("%s-%s", cr.Name, tcpRoute.Name),
 			ServiceName:           tcpRoute.Service,
 			Protocol:              corev1.ProtocolTCP,
 			ServicePort:           tcpRoute.Port,
@@ -178,7 +178,7 @@ func mapExpositionCRToUDPExposedPorts(cr *expositionv1.Exposition) types.Exposed
 		}
 
 		udpRoutes = append(udpRoutes, types.ExposedPort{
-			Name:                  udpRoute.Name,
+			Name:                  fmt.Sprintf("%s-%s", cr.Name, udpRoute.Name),
 			ServiceName:           udpRoute.Service,
 			Protocol:              corev1.ProtocolUDP,
 			ServicePort:           udpRoute.Port,

@@ -156,7 +156,7 @@ func createHttpRoutes(name string, services []cesServiceDTO) ([]types.HttpRoute,
 		}
 
 		httpRoutes = append(httpRoutes, types.HttpRoute{
-			Name:    name,
+			Name:    fmt.Sprintf("%s-%d", name, cesService.Port),
 			Service: cesService.Name,
 			Port:    cesService.Port,
 			Path:    targetPath,
@@ -262,7 +262,7 @@ func mapServiceExposedPort(svcName string, svcPort ServiceExposedPortDTO) (types
 	}
 
 	return types.ExposedPort{
-		Name:                  fmt.Sprintf("port-%d-%d", svcPort.Port, svcPort.TargetPort),
+		Name:                  fmt.Sprintf("%s-expose-%d-%d", svcName, svcPort.Port, svcPort.TargetPort),
 		ServiceName:           svcName,
 		Protocol:              protocol,
 		RequestedExternalPort: exPort,

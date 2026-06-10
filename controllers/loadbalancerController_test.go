@@ -987,7 +987,7 @@ func TestLoadBalancerReconciler_getExposedPortsForServices(t *testing.T) {
 				return createDefaultLBClientMock(lbConfigMap, svc)
 			},
 			expected: types.ExposedPorts{
-				{Name: "port-50000-50000", ServiceName: "dogu-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+				{Name: "dogu-svc-expose-50000-50000", ServiceName: "dogu-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
 			},
 		},
 		{
@@ -1076,8 +1076,8 @@ func TestLoadBalancerReconciler_getExposedPortsForExpositions(t *testing.T) {
 				return createLBClientWithScheme(t, lbConfigMap, exp)
 			},
 			expected: types.ExposedPorts{
-				{Name: "ssh", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
-				{Name: "dns", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
+				{Name: "ssh-exp-ssh", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
+				{Name: "ssh-exp-dns", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
 			},
 		},
 		{

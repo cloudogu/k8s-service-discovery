@@ -171,7 +171,7 @@ func Test_mapServiceExposedPort(t *testing.T) {
 			svcName: "ldap",
 			dto:     ServiceExposedPortDTO{Protocol: "tcp", Port: 8080, TargetPort: 80},
 			want: types.ExposedPort{
-				Name:                  "port-8080-80",
+				Name:                  "ldap-expose-8080-80",
 				ServiceName:           "ldap",
 				Protocol:              corev1.ProtocolTCP,
 				RequestedExternalPort: 8080,
@@ -183,7 +183,7 @@ func Test_mapServiceExposedPort(t *testing.T) {
 			svcName: "ldap",
 			dto:     ServiceExposedPortDTO{Protocol: "UDP", Port: 5000, TargetPort: 5000},
 			want: types.ExposedPort{
-				Name:                  "port-5000-5000",
+				Name:                  "ldap-expose-5000-5000",
 				ServiceName:           "ldap",
 				Protocol:              corev1.ProtocolUDP,
 				RequestedExternalPort: 5000,
@@ -250,8 +250,8 @@ func Test_mapExposedPortList(t *testing.T) {
 				{Protocol: "UDP", Port: 5000, TargetPort: 5000},
 			},
 			want: types.ExposedPorts{
-				{Name: "port-8080-80", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 8080, ServicePort: 80},
-				{Name: "port-5000-5000", ServiceName: "ldap", Protocol: corev1.ProtocolUDP, RequestedExternalPort: 5000, ServicePort: 5000},
+				{Name: "ldap-expose-8080-80", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 8080, ServicePort: 80},
+				{Name: "ldap-expose-5000-5000", ServiceName: "ldap", Protocol: corev1.ProtocolUDP, RequestedExternalPort: 5000, ServicePort: 5000},
 			},
 		},
 		{
@@ -262,7 +262,7 @@ func Test_mapExposedPortList(t *testing.T) {
 				{Protocol: "ICMP", Port: 9000, TargetPort: 9000},
 			},
 			want: types.ExposedPorts{
-				{Name: "port-8080-80", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 8080, ServicePort: 80},
+				{Name: "ldap-expose-8080-80", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 8080, ServicePort: 80},
 			},
 			wantErr: "unsupported protocol for exposed port: ICMP",
 		},
@@ -345,8 +345,8 @@ func Test_mapExposedPorts(t *testing.T) {
 				}},
 			},
 			want: types.ExposedPorts{
-				{Name: "port-8080-80", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 8080, ServicePort: 80},
-				{Name: "port-5000-5000", ServiceName: "ldap", Protocol: corev1.ProtocolUDP, RequestedExternalPort: 5000, ServicePort: 5000},
+				{Name: "ldap-expose-8080-80", ServiceName: "ldap", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 8080, ServicePort: 80},
+				{Name: "ldap-expose-5000-5000", ServiceName: "ldap", Protocol: corev1.ProtocolUDP, RequestedExternalPort: 5000, ServicePort: 5000},
 			},
 		},
 	}
@@ -429,7 +429,7 @@ func Test_createHttpRoutes(t *testing.T) {
 				{Name: "ldap-ui", Port: 8080, Location: "/ldap", Pass: "/ldap"},
 			},
 			want: []types.HttpRoute{
-				{Name: "ldap", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 		},
 		{
@@ -440,7 +440,7 @@ func Test_createHttpRoutes(t *testing.T) {
 			},
 			want: []types.HttpRoute{
 				{
-					Name:    "ldap",
+					Name:    "ldap-8080",
 					Service: "ldap-ui",
 					Port:    8080,
 					Path:    "/ldap",
@@ -459,7 +459,7 @@ func Test_createHttpRoutes(t *testing.T) {
 			},
 			want: []types.HttpRoute{
 				{
-					Name:    "ldap",
+					Name:    "ldap-8080",
 					Service: "ldap-ui",
 					Port:    8080,
 					Path:    "^/foo",
@@ -478,7 +478,7 @@ func Test_createHttpRoutes(t *testing.T) {
 				{Name: "ldap-ui", Port: 8080, Location: "/ldap", Pass: "/ldap"},
 			},
 			want: []types.HttpRoute{
-				{Name: "ldap", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 			wantErr: "failed to get serviceRewrite config for ces service",
 		},
@@ -536,7 +536,7 @@ func Test_mapCesServicesToHttpRoutes(t *testing.T) {
 				Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 8080}}},
 			},
 			want: []types.HttpRoute{
-				{Name: "ldap", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 		},
 	}
