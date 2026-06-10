@@ -43,7 +43,7 @@ func (s *ExpositionService) GetOwnableTypes() []client.Object {
 func (s *ExpositionService) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
 	for _, p := range s.processors {
 		if err := p.ProcessExposition(ctx, exposition); err != nil {
-			return fmt.Errorf("failed to process exposition with %T", p)
+			return fmt.Errorf("failed to process exposition with %T: %w", p, err)
 		}
 	}
 
