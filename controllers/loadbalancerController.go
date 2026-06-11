@@ -267,7 +267,7 @@ func (r *LoadBalancerReconciler) getExposedPortsForExpositions(ctx context.Conte
 	exposedPorts := make(types.ExposedPorts, 0, len(expositionList))
 
 	for _, expositionCR := range expositionList {
-		exposition, mErr := mapExpositionCRToExposition(&expositionCR, r.Client.Scheme())
+		exposition, mErr := mapExpositionCRToExposition(&expositionCR, r.Client)
 		if mErr != nil {
 			// don't let a single corrupted exposition block exposing ports from other expositions
 			logger.Error(mErr, "failed to map expositionCR to exposition while exposing ports", "exposition", expositionCR.Name)

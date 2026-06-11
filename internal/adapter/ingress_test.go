@@ -1,11 +1,14 @@
 package adapter
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -22,8 +25,28 @@ var (
 
 func stringPtr(s string) *string { return &s }
 
-func fixedExposition(routes []types.HttpRoute) types.Exposition {
-	return types.Exposition{Name: "ldap", Namespace: "ns", HttpRoutes: routes}
+type conditionCall struct {
+	conditionType string
+	status        bool
+	reason        string
+	message       string
+}
+
+func fixedExposition(routes []types.HttpRoute, condition *conditionCall) types.Exposition {
+	return types.Exposition{
+		Name:       "ldap",
+		Namespace:  "ns",
+		HttpRoutes: routes,
+		SetCondition: func(_ context.Context, conditionType string, conditionStatus bool, reason string, msg string) error {
+			*condition = conditionCall{
+				conditionType: conditionType,
+				status:        conditionStatus,
+				reason:        reason,
+				message:       msg,
+			}
+			return nil
+		},
+	}
 }
 
 func TestIngress_GetOwnableTypes(t *testing.T) {
@@ -41,7 +64,6 @@ func TestIngress_ProcessExposition(t *testing.T) {
 		maintenanceFn func(t *testing.T) maintenanceAdapter
 		controllerFn  func(t *testing.T) ingressController
 	}
-	exposition := fixedExposition(originalRoutes)
 
 	okMaintenance := func(active bool) func(t *testing.T) maintenanceAdapter {
 		return func(t *testing.T) maintenanceAdapter {
@@ -60,7 +82,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 	expectController := func(wantState types.ApplicationState, wantRoutes []types.HttpRoute, ret error) func(t *testing.T) ingressController {
 		return func(t *testing.T) ingressController {
 			m := newMockIngressController(t)
-			m.EXPECT().ProcessExposition(t.Context(), wantState, fixedExposition(wantRoutes)).Return(ret)
+			m.EXPECT().ProcessExposition(t.Context(), wantState, mock.MatchedBy(func(got types.Exposition) bool {
+				return got.Name == "ldap" &&
+					got.Namespace == "ns" &&
+					reflect.DeepEqual(wantRoutes, got.HttpRoutes) &&
+					got.SetCondition != nil
+			})).Return(ret)
 			return m
 		}
 	}
@@ -72,9 +99,10 @@ func TestIngress_ProcessExposition(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		fields  fields
-		wantErr assert.ErrorAssertionFunc
+		name          string
+		fields        fields
+		wantErr       assert.ErrorAssertionFunc
+		wantCondition conditionCall
 	}{
 		{
 			name: "dogu Stopped, no maintenance — routes untouched",
@@ -84,6 +112,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				controllerFn:  expectController(types.ApplicationStopped, originalRoutes, nil),
 			},
 			wantErr: assert.NoError,
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        true,
+				reason:        ingressesDoguStoppedConditionReason,
+				message:       ingressesDoguStoppedConditionMessage,
+			},
 		},
 		{
 			name: "dogu Running, no maintenance — routes untouched",
@@ -93,6 +127,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				controllerFn:  expectController(types.ApplicationRunning, originalRoutes, nil),
 			},
 			wantErr: assert.NoError,
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        true,
+				reason:        ingressesCreatedConditionReason,
+				message:       ingressesCreatedConditionMessage,
+			},
 		},
 		{
 			name: "dogu IsStarting — routes redirected to static backend",
@@ -102,6 +142,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				controllerFn:  expectController(types.ApplicationIsStarting, redirectedRoutes, nil),
 			},
 			wantErr: assert.NoError,
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        true,
+				reason:        ingressesDoguStartingConditionReason,
+				message:       ingressesDoguStartingConditionMessage,
+			},
 		},
 		{
 			name: "dogu Maintenance — routes redirected to static backend",
@@ -111,6 +157,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				controllerFn:  expectController(types.ApplicationMaintenance, redirectedRoutes, nil),
 			},
 			wantErr: assert.NoError,
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        true,
+				reason:        ingressesMaintenanceModeActiveConditionReason,
+				message:       ingressesMaintenanceModeActiveConditionMessage,
+			},
 		},
 		{
 			name: "global maintenance promotes Running to Maintenance and redirects",
@@ -120,6 +172,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				controllerFn:  expectController(types.ApplicationMaintenance, redirectedRoutes, nil),
 			},
 			wantErr: assert.NoError,
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        true,
+				reason:        ingressesMaintenanceModeActiveConditionReason,
+				message:       ingressesMaintenanceModeActiveConditionMessage,
+			},
 		},
 		{
 			name: "global maintenance promotes Stopped to Maintenance and redirects",
@@ -129,6 +187,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				controllerFn:  expectController(types.ApplicationMaintenance, redirectedRoutes, nil),
 			},
 			wantErr: assert.NoError,
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        true,
+				reason:        ingressesMaintenanceModeActiveConditionReason,
+				message:       ingressesMaintenanceModeActiveConditionMessage,
+			},
 		},
 		{
 			name: "dogu.GetStatus errors are wrapped",
@@ -144,6 +208,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get status of dogu", i...)
+			},
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        false,
+				reason:        ingressesGetStatusFailedConditionReason,
+				message:       "failed to get status of dogu: assert.AnError general error for testing",
 			},
 		},
 		{
@@ -161,6 +231,12 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get status of global maintenance mode", i...)
 			},
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        false,
+				reason:        ingressesGetStatusFailedConditionReason,
+				message:       "failed to get status of global maintenance mode: assert.AnError general error for testing",
+			},
 		},
 		{
 			name: "controller.ProcessExposition errors are wrapped with state info",
@@ -174,10 +250,18 @@ func TestIngress_ProcessExposition(t *testing.T) {
 					assert.ErrorContains(t, err, "failed to process exposition from", i...) &&
 					assert.ErrorContains(t, err, "while dogu is in state Running", i...)
 			},
+			wantCondition: conditionCall{
+				conditionType: IngressesConditionType,
+				status:        false,
+				reason:        ingressesCreateOrUpdateFailedConditionReason,
+				message:       "failed to process exposition from *adapter.mockIngressController while dogu is in state Running: assert.AnError general error for testing",
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			gotCondition := conditionCall{}
+			exposition := fixedExposition(originalRoutes, &gotCondition)
 			i := Ingress{
 				Dogu:        tt.fields.doguFn(t),
 				Maintenance: tt.fields.maintenanceFn(t),
@@ -185,6 +269,7 @@ func TestIngress_ProcessExposition(t *testing.T) {
 			}
 			err := i.ProcessExposition(t.Context(), exposition)
 			tt.wantErr(t, err)
+			assert.Equal(t, tt.wantCondition, gotCondition)
 		})
 	}
 }
