@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +23,53 @@ import (
 func int32Ptr(v int32) *int32 { return &v }
 
 func stringPtr(v string) *string { return &v }
+
+type assertingStatusWriter struct {
+	t          *testing.T
+	assertFunc func(t *testing.T, obj client.Object)
+	updateErr  error
+}
+
+func (w *assertingStatusWriter) Create(context.Context, client.Object, client.Object, ...client.SubResourceCreateOption) error {
+	w.t.Fatalf("unexpected status create")
+	return nil
+}
+
+func (w *assertingStatusWriter) Update(_ context.Context, obj client.Object, _ ...client.SubResourceUpdateOption) error {
+	w.assertFunc(w.t, obj)
+	return w.updateErr
+}
+
+func (w *assertingStatusWriter) Patch(context.Context, client.Object, client.Patch, ...client.SubResourcePatchOption) error {
+	w.t.Fatalf("unexpected status patch")
+	return nil
+}
+
+func (w *assertingStatusWriter) Apply(context.Context, runtime.ApplyConfiguration, ...client.SubResourceApplyOption) error {
+	w.t.Fatalf("unexpected status apply")
+	return nil
+}
+
+func assertReadyCondition(
+	t *testing.T,
+	obj client.Object,
+	status metav1.ConditionStatus,
+	reason string,
+	message string,
+	observedGeneration int64,
+) {
+	t.Helper()
+
+	cr, ok := obj.(*expositionv1.Exposition)
+	require.True(t, ok)
+
+	condition := meta.FindStatusCondition(cr.Status.Conditions, ReadyConditionType)
+	require.NotNil(t, condition)
+	assert.Equal(t, status, condition.Status)
+	assert.Equal(t, reason, condition.Reason)
+	assert.Equal(t, message, condition.Message)
+	assert.Equal(t, observedGeneration, condition.ObservedGeneration)
+}
 
 func TestExpositionReconciler_Reconcile(t *testing.T) {
 	expectedKey := client.ObjectKey{Namespace: testNamespace, Name: "test"}
@@ -83,9 +132,23 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr := obj.(*expositionv1.Exposition)
 							cr.Name = "test"
 							cr.Namespace = testNamespace
+							cr.Generation = 2
 						}).
 						Return(nil)
 					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Status().Return(&assertingStatusWriter{
+						t: t,
+						assertFunc: func(t *testing.T, obj client.Object) {
+							assertReadyCondition(
+								t,
+								obj,
+								metav1.ConditionFalse,
+								ProcessingFailedConditionReason,
+								"failed to process exposition from exposition CR: assert.AnError general error for testing",
+								2,
+							)
+						},
+					})
 					return m
 				},
 				ExpositionServiceFn: func(t *testing.T) ExpositionService {
@@ -115,9 +178,23 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr := obj.(*expositionv1.Exposition)
 							cr.Name = "test"
 							cr.Namespace = testNamespace
+							cr.Generation = 3
 						}).
 						Return(nil)
 					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Status().Return(&assertingStatusWriter{
+						t: t,
+						assertFunc: func(t *testing.T, obj client.Object) {
+							assertReadyCondition(
+								t,
+								obj,
+								metav1.ConditionTrue,
+								RoutesCreatedConditionReason,
+								RoutesCreatedConditionMessage,
+								3,
+							)
+						},
+					})
 					return m
 				},
 				ExpositionServiceFn: func(t *testing.T) ExpositionService {
@@ -132,6 +209,53 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 			},
 			req:     controllerruntime.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testNamespace, Name: "test"}},
 			wantErr: assert.NoError,
+		},
+		{
+			name: "fail to update success status",
+			fields: fields{
+				ClientFn: func(t *testing.T) client.Client {
+					m := newMockK8sClient(t)
+					m.EXPECT().
+						Get(t.Context(), expectedKey, &expositionv1.Exposition{}).
+						Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
+							cr := obj.(*expositionv1.Exposition)
+							cr.Name = "test"
+							cr.Namespace = testNamespace
+							cr.Generation = 4
+						}).
+						Return(nil)
+					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Status().Return(&assertingStatusWriter{
+						t: t,
+						assertFunc: func(t *testing.T, obj client.Object) {
+							assertReadyCondition(
+								t,
+								obj,
+								metav1.ConditionTrue,
+								RoutesCreatedConditionReason,
+								RoutesCreatedConditionMessage,
+								4,
+							)
+						},
+						updateErr: assert.AnError,
+					})
+					return m
+				},
+				ExpositionServiceFn: func(t *testing.T) ExpositionService {
+					m := NewMockExpositionService(t)
+					m.EXPECT().
+						ProcessExposition(t.Context(), mock.MatchedBy(func(e types.Exposition) bool {
+							return e.Name == "test" && e.Namespace == testNamespace && e.SetOwner != nil
+						})).
+						Return(nil)
+					return m
+				},
+			},
+			req: controllerruntime.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testNamespace, Name: "test"}},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to update exposition status", i...)
+			},
 		},
 	}
 	for _, tt := range tests {
