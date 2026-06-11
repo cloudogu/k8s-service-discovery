@@ -12,7 +12,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,7 +53,7 @@ func (r *ExpositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to get exposition: %w", err)
 	}
 
-	exposition, err := mapExpositionCRToExposition(expositionCR, r.Client.Scheme())
+	exposition, err := mapExpositionCRToExposition(expositionCR, r.Client)
 	if err != nil {
 		return r.handleError(
 			ctx,
@@ -149,7 +148,7 @@ func (r *ExpositionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // and a SetOwner closure that wires the CR as the controller of every
 // generated resource. The current implementation cannot fail; the error
 // return is preserved for symmetry with mapServiceToExposition.
-func mapExpositionCRToExposition(cr *expositionv1.Exposition, scheme *runtime.Scheme) (types.Exposition, error) {
+func mapExpositionCRToExposition(cr *expositionv1.Exposition, c client.Client) (types.Exposition, error) {
 	return types.Exposition{
 		Name:       cr.Name,
 		Namespace:  cr.Namespace,
@@ -157,7 +156,18 @@ func mapExpositionCRToExposition(cr *expositionv1.Exposition, scheme *runtime.Sc
 		TcpRoutes:  mapExpositionCRToTCPExposedPorts(cr),
 		UdpRoutes:  mapExpositionCRToUDPExposedPorts(cr),
 		SetOwner: func(targetObject client.Object) error {
-			return ctrl.SetControllerReference(cr, targetObject, scheme)
+			return ctrl.SetControllerReference(cr, targetObject, c.Scheme())
+		},
+		SetCondition: func(ctx context.Context, conditionType string, conditionStatus bool, reason string, msg string) error {
+			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+				Type:               conditionType,
+				Status:             mapBoolToConditionStatus(conditionStatus),
+				ObservedGeneration: cr.Generation,
+				Reason:             reason,
+				Message:            msg,
+			})
+
+			return c.Status().Update(ctx, cr)
 		},
 	}, nil
 }
@@ -241,4 +251,12 @@ func mapExpositionCRToUDPExposedPorts(cr *expositionv1.Exposition) types.Exposed
 	}
 
 	return udpRoutes
+}
+
+func mapBoolToConditionStatus(boolStatus bool) metav1.ConditionStatus {
+	if boolStatus {
+		return metav1.ConditionTrue
+	}
+
+	return metav1.ConditionFalse
 }

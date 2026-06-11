@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -65,6 +67,10 @@ type RegexReplacement struct {
 // enabling automatic garbage collection via OwnerReferences.
 type SetOwnerFunc func(targetObject client.Object) error
 
+type SetConditionFunc func(ctx context.Context, conditionType string, conditionStatus bool, reason string, msg string) error
+
+type SetAllocatedPortsFunc func(ctx context.Context, port ExposedPort) error
+
 // Exposition represents the complete specification for exposing an application's
 // HTTP, TCP, and UDP endpoints, including resource ownership.
 type Exposition struct {
@@ -86,6 +92,8 @@ type Exposition struct {
 	// SetOwner specifies the Kubernetes object that owns the generated resources,
 	// enabling automatic garbage collection via OwnerReferences.
 	SetOwner SetOwnerFunc
+
+	SetCondition SetConditionFunc
 }
 
 // ApplicationState represents the operational status of an application
