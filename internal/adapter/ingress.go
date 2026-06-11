@@ -2,11 +2,36 @@ package adapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	IngressConditionType = "IngressesReady"
+
+	createdConditionReason  = "Created"
+	createdConditionMessage = "Normal ingresses have been created."
+
+	maintenanceModeActiveConditionReason  = "MaintenanceMode"
+	maintenanceModeActiveConditionMessage = "Ingresses for maintenance mode have been created."
+
+	doguStoppedConditionReason  = "DoguStopped"
+	doguStoppedConditionMessage = "Ingresses for stopped dogu have been handled."
+
+	doguStartingConditionReason  = "DoguStarting"
+	doguStartingConditionMessage = "Ingresses for starting dogu have been created."
+
+	getStatusFailedConditionReason       = "GetStatusFailed"
+	creationFailedConditionReason        = "CreationFailed"
+	maintenanceModeFailedConditionReason = "MaintenanceModeFailed"
+	doguStoppedFailedConditionReason     = "DoguStoppedFailed"
+	doguStartingFailedConditionReason    = "DoguStartingFailed"
+
+	MappingFailedConditionReason = "MappingFailed"
 )
 
 // Service name and port of the static-content backend that serves
@@ -61,12 +86,14 @@ func (i Ingress) GetOwnableTypes() []client.Object {
 func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
 	doguApplicationState, err := i.Dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
 	if err != nil {
-		return fmt.Errorf("failed to get status of dogu: %w", err)
+		return handleIngressExpositionError(ctx, exposition, getStatusFailedConditionReason,
+			fmt.Errorf("failed to get status of dogu: %w", err))
 	}
 
 	_, maintenanceMode, err := i.Maintenance.GetStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get status of global maintenance mode: %w", err)
+		return handleIngressExpositionError(ctx, exposition, getStatusFailedConditionReason,
+			fmt.Errorf("failed to get status of global maintenance mode: %w", err))
 	}
 
 	if maintenanceMode {
@@ -78,10 +105,43 @@ func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposit
 	}
 
 	if lErr := i.Controller.ProcessExposition(ctx, doguApplicationState, exposition); lErr != nil {
-		return fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr)
+		return handleIngressExpositionError(ctx, exposition, appStateToIngressConditionErrorReason(doguApplicationState),
+			fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr))
 	}
 
-	return nil
+	conditionReason, conditionMessage := appStateToIngressConditionReasonMessage(doguApplicationState)
+	return exposition.SetCondition(ctx, IngressConditionType, true, conditionReason, conditionMessage)
+}
+
+func handleIngressExpositionError(ctx context.Context, exposition types.Exposition, reason string, err error) error {
+	conditionErr := exposition.SetCondition(ctx, IngressConditionType, false, reason, err.Error())
+	return errors.Join(err, conditionErr)
+}
+
+func appStateToIngressConditionErrorReason(state types.ApplicationState) string {
+	switch state {
+	case types.ApplicationStopped:
+		return doguStoppedFailedConditionReason
+	case types.ApplicationIsStarting:
+		return doguStartingFailedConditionReason
+	case types.ApplicationMaintenance:
+		return maintenanceModeFailedConditionReason
+	default:
+		return creationFailedConditionReason
+	}
+}
+
+func appStateToIngressConditionReasonMessage(state types.ApplicationState) (string, string) {
+	switch state {
+	case types.ApplicationStopped:
+		return doguStoppedConditionReason, doguStoppedConditionMessage
+	case types.ApplicationIsStarting:
+		return doguStartingConditionReason, doguStartingConditionMessage
+	case types.ApplicationMaintenance:
+		return maintenanceModeActiveConditionReason, maintenanceModeActiveConditionMessage
+	default:
+		return createdConditionReason, createdConditionMessage
+	}
 }
 
 // redirectHttpRoutesToStaticBackend returns a copy of httpRoutes in

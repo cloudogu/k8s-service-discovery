@@ -7,6 +7,7 @@ import (
 
 	doguv2 "github.com/cloudogu/k8s-dogu-lib/v2/api/v2"
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/adapter"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,14 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-)
-
-const (
-	ReadyConditionType              = "Ready"
-	RoutesCreatedConditionReason    = "RoutesCreated"
-	RoutesCreatedConditionMessage   = "Exposition is active and http/tcp/udp routes have been created."
-	MappingFailedConditionReason    = "MappingFailed"
-	ProcessingFailedConditionReason = "ProcessingFailed"
 )
 
 // ExpositionReconciler watches Exposition CRs, maps each one to a domain
@@ -53,28 +46,43 @@ func (r *ExpositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to get exposition: %w", err)
 	}
 
+	initializeErr := r.initializeUnknownConditions(ctx, expositionCR)
+	if initializeErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to initialize conditions with unknown: %w", initializeErr)
+	}
+
 	exposition, err := mapExpositionCRToExposition(expositionCR, r.Client)
 	if err != nil {
 		return r.handleError(
 			ctx,
 			expositionCR,
-			MappingFailedConditionReason,
+			adapter.MappingFailedConditionReason,
 			fmt.Errorf("failed to map exposition CR to domain: %w", err),
 		)
 	}
 
 	if lErr := r.ExpositionService.ProcessExposition(ctx, exposition); lErr != nil {
-		return r.handleError(
-			ctx,
-			expositionCR,
-			ProcessingFailedConditionReason,
-			fmt.Errorf("failed to process exposition from exposition CR: %w", lErr),
-		)
+		return ctrl.Result{}, fmt.Errorf("failed to process exposition from exposition CR: %w", lErr)
 	}
 
 	logger.Info("Successfully processed exposition from exposition CR.", "expositionCR", expositionCR.Name)
 
-	return r.handleSuccess(ctx, expositionCR)
+	return ctrl.Result{}, nil
+}
+
+func (r *ExpositionReconciler) initializeUnknownConditions(ctx context.Context, cr *expositionv1.Exposition) error {
+	conditionTypes := []string{adapter.IngressConditionType} // TODO extend
+	for _, conditionType := range conditionTypes {
+		if meta.FindStatusCondition(cr.Status.Conditions, conditionType) == nil {
+			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
+				Type:               conditionType,
+				Status:             metav1.ConditionUnknown,
+				ObservedGeneration: cr.Generation,
+			})
+		}
+	}
+
+	return r.Client.Status().Update(ctx, cr)
 }
 
 func (r *ExpositionReconciler) handleError(
@@ -84,7 +92,7 @@ func (r *ExpositionReconciler) handleError(
 	reconcilerErr error,
 ) (ctrl.Result, error) {
 	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:               ReadyConditionType,
+		Type:               adapter.IngressConditionType,
 		Status:             metav1.ConditionFalse,
 		ObservedGeneration: cr.Generation,
 		Reason:             conditionReason,
@@ -92,22 +100,6 @@ func (r *ExpositionReconciler) handleError(
 	})
 	updateErr := r.Client.Status().Update(ctx, cr)
 	return ctrl.Result{}, errors.Join(reconcilerErr, updateErr)
-}
-
-func (r *ExpositionReconciler) handleSuccess(ctx context.Context, cr *expositionv1.Exposition) (ctrl.Result, error) {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:               ReadyConditionType,
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: cr.Generation,
-		Reason:             RoutesCreatedConditionReason,
-		Message:            RoutesCreatedConditionMessage,
-	})
-	updateErr := r.Client.Status().Update(ctx, cr)
-	if updateErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update exposition status: %w", updateErr)
-	}
-
-	return ctrl.Result{}, nil
 }
 
 // SetupWithManager registers the reconciler with the Manager. It watches
