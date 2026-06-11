@@ -20,6 +20,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const (
+	validConditionType                = "Valid"
+	mappingFailedConditionReason      = "MappingFailed"
+	mappingSuccessfulConditionReason  = "MappingSuccessful"
+	mappingSuccessfulConditionMessage = "The exposition has been successfully mapped to the domain."
+)
+
 // ExpositionReconciler watches Exposition CRs, maps each one to a domain
 // Exposition and delegates processing to an ExpositionService. It also
 // re-enqueues Expositions on Dogu health-condition changes and on
@@ -52,13 +59,9 @@ func (r *ExpositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	exposition, err := mapExpositionCRToExposition(expositionCR, r.Client)
+	err = r.handleValidationErr(ctx, err, expositionCR)
 	if err != nil {
-		return r.handleError(
-			ctx,
-			expositionCR,
-			adapter.MappingFailedConditionReason,
-			fmt.Errorf("failed to map exposition CR to domain: %w", err),
-		)
+		return ctrl.Result{}, err
 	}
 
 	if lErr := r.ExpositionService.ProcessExposition(ctx, exposition); lErr != nil {
@@ -70,8 +73,29 @@ func (r *ExpositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
+func (r *ExpositionReconciler) handleValidationErr(ctx context.Context, err error, expositionCR *expositionv1.Exposition) error {
+	reason := mappingSuccessfulConditionReason
+	message := mappingSuccessfulConditionMessage
+	if err != nil {
+		reason = mappingFailedConditionReason
+		message = err.Error()
+	}
+
+	meta.SetStatusCondition(&expositionCR.Status.Conditions, metav1.Condition{
+		Type:               validConditionType,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: expositionCR.Generation,
+		Reason:             reason,
+		Message:            message,
+	})
+
+	updateErr := r.Client.Status().Update(ctx, expositionCR)
+	return errors.Join(err, updateErr)
+}
+
 func (r *ExpositionReconciler) initializeUnknownConditions(ctx context.Context, cr *expositionv1.Exposition) error {
-	conditionTypes := []string{adapter.IngressConditionType} // TODO extend
+	// TODO extend
+	conditionTypes := []string{validConditionType, adapter.IngressesConditionType, adapter.NetworkPolicyConditionType}
 	for _, conditionType := range conditionTypes {
 		if meta.FindStatusCondition(cr.Status.Conditions, conditionType) == nil {
 			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
@@ -83,23 +107,6 @@ func (r *ExpositionReconciler) initializeUnknownConditions(ctx context.Context, 
 	}
 
 	return r.Client.Status().Update(ctx, cr)
-}
-
-func (r *ExpositionReconciler) handleError(
-	ctx context.Context,
-	cr *expositionv1.Exposition,
-	conditionReason string,
-	reconcilerErr error,
-) (ctrl.Result, error) {
-	meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
-		Type:               adapter.IngressConditionType,
-		Status:             metav1.ConditionFalse,
-		ObservedGeneration: cr.Generation,
-		Reason:             conditionReason,
-		Message:            reconcilerErr.Error(),
-	})
-	updateErr := r.Client.Status().Update(ctx, cr)
-	return ctrl.Result{}, errors.Join(reconcilerErr, updateErr)
 }
 
 // SetupWithManager registers the reconciler with the Manager. It watches

@@ -11,27 +11,25 @@ import (
 )
 
 const (
-	IngressConditionType = "IngressesReady"
+	IngressesConditionType = "IngressesReady"
 
-	createdConditionReason  = "Created"
-	createdConditionMessage = "Normal ingresses have been created."
+	ingressesCreatedConditionReason  = "Created"
+	ingressesCreatedConditionMessage = "Normal ingresses have been created."
 
-	maintenanceModeActiveConditionReason  = "MaintenanceMode"
-	maintenanceModeActiveConditionMessage = "Ingresses for maintenance mode have been created."
+	ingressesMaintenanceModeActiveConditionReason  = "MaintenanceMode"
+	ingressesMaintenanceModeActiveConditionMessage = "Ingresses for maintenance mode have been created."
 
-	doguStoppedConditionReason  = "DoguStopped"
-	doguStoppedConditionMessage = "Ingresses for stopped dogu have been handled."
+	ingressesDoguStoppedConditionReason  = "DoguStopped"
+	ingressesDoguStoppedConditionMessage = "Ingresses for stopped dogu have been handled."
 
-	doguStartingConditionReason  = "DoguStarting"
-	doguStartingConditionMessage = "Ingresses for starting dogu have been created."
+	ingressesDoguStartingConditionReason  = "DoguStarting"
+	ingressesDoguStartingConditionMessage = "Ingresses for starting dogu have been created."
 
-	getStatusFailedConditionReason       = "GetStatusFailed"
-	creationFailedConditionReason        = "CreationFailed"
-	maintenanceModeFailedConditionReason = "MaintenanceModeFailed"
-	doguStoppedFailedConditionReason     = "DoguStoppedFailed"
-	doguStartingFailedConditionReason    = "DoguStartingFailed"
-
-	MappingFailedConditionReason = "MappingFailed"
+	ingressesGetStatusFailedConditionReason       = "GetStatusFailed"
+	ingressesCreateOrUpdateFailedConditionReason  = "CreateOrUpdateFailed"
+	ingressesMaintenanceModeFailedConditionReason = "MaintenanceModeFailed"
+	ingressesDoguStoppedFailedConditionReason     = "DoguStoppedFailed"
+	ingressesDoguStartingFailedConditionReason    = "DoguStartingFailed"
 )
 
 // Service name and port of the static-content backend that serves
@@ -86,13 +84,15 @@ func (i Ingress) GetOwnableTypes() []client.Object {
 func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
 	doguApplicationState, err := i.Dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
 	if err != nil {
-		return handleIngressExpositionError(ctx, exposition, getStatusFailedConditionReason,
+		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, ingressesGetStatusFailedConditionReason,
 			fmt.Errorf("failed to get status of dogu: %w", err))
 	}
 
 	_, maintenanceMode, err := i.Maintenance.GetStatus(ctx)
 	if err != nil {
-		return handleIngressExpositionError(ctx, exposition, getStatusFailedConditionReason,
+		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, ingressesGetStatusFailedConditionReason,
 			fmt.Errorf("failed to get status of global maintenance mode: %w", err))
 	}
 
@@ -105,42 +105,43 @@ func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposit
 	}
 
 	if lErr := i.Controller.ProcessExposition(ctx, doguApplicationState, exposition); lErr != nil {
-		return handleIngressExpositionError(ctx, exposition, appStateToIngressConditionErrorReason(doguApplicationState),
+		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, appStateToIngressConditionErrorReason(doguApplicationState),
 			fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr))
 	}
 
 	conditionReason, conditionMessage := appStateToIngressConditionReasonMessage(doguApplicationState)
-	return exposition.SetCondition(ctx, IngressConditionType, true, conditionReason, conditionMessage)
+	return exposition.SetCondition(ctx, IngressesConditionType, true, conditionReason, conditionMessage)
 }
 
-func handleIngressExpositionError(ctx context.Context, exposition types.Exposition, reason string, err error) error {
-	conditionErr := exposition.SetCondition(ctx, IngressConditionType, false, reason, err.Error())
+func handleErrorCondition(ctx context.Context, exposition types.Exposition, conditionType, reason string, err error) error {
+	conditionErr := exposition.SetCondition(ctx, conditionType, false, reason, err.Error())
 	return errors.Join(err, conditionErr)
 }
 
 func appStateToIngressConditionErrorReason(state types.ApplicationState) string {
 	switch state {
 	case types.ApplicationStopped:
-		return doguStoppedFailedConditionReason
+		return ingressesDoguStoppedFailedConditionReason
 	case types.ApplicationIsStarting:
-		return doguStartingFailedConditionReason
+		return ingressesDoguStartingFailedConditionReason
 	case types.ApplicationMaintenance:
-		return maintenanceModeFailedConditionReason
+		return ingressesMaintenanceModeFailedConditionReason
 	default:
-		return creationFailedConditionReason
+		return ingressesCreateOrUpdateFailedConditionReason
 	}
 }
 
 func appStateToIngressConditionReasonMessage(state types.ApplicationState) (string, string) {
 	switch state {
 	case types.ApplicationStopped:
-		return doguStoppedConditionReason, doguStoppedConditionMessage
+		return ingressesDoguStoppedConditionReason, ingressesDoguStoppedConditionMessage
 	case types.ApplicationIsStarting:
-		return doguStartingConditionReason, doguStartingConditionMessage
+		return ingressesDoguStartingConditionReason, ingressesDoguStartingConditionMessage
 	case types.ApplicationMaintenance:
-		return maintenanceModeActiveConditionReason, maintenanceModeActiveConditionMessage
+		return ingressesMaintenanceModeActiveConditionReason, ingressesMaintenanceModeActiveConditionMessage
 	default:
-		return createdConditionReason, createdConditionMessage
+		return ingressesCreatedConditionReason, ingressesCreatedConditionMessage
 	}
 }
 

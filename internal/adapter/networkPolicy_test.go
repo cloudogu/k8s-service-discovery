@@ -211,7 +211,7 @@ func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
 				UdpRoutes: tt.udp,
 				SetOwner:  tt.setOwner,
 			}
-			got, err := n.createNetworkPolicy(exposition)
+			got, err := n.generateNetworkPolicy(exposition)
 			if !tt.wantErr(t, err) {
 				return
 			}

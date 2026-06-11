@@ -15,6 +15,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	NetworkPolicyConditionType = "NetworkPolicyReady"
+
+	networkPolicyCreatedConditionReason  = "Created"
+	networkPolicyCreatedConditionMessage = "Network policy has been created."
+
+	networkPolicyDeletionFailedConditionReason       = "DeletionFailed"
+	networkPolicyGenerationFailedConditionReason     = "GenerationFailed"
+	networkPolicyCreateOrUpdateFailedConditionReason = "CreateOrUpdateFailed"
+)
+
 type NetworkPolicy struct {
 	Client        client.Client
 	LabelSelector metav1.LabelSelector
@@ -32,15 +43,19 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 		stub := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: exposition.Namespace}}
 
 		if err := n.Client.Delete(ctx, stub); err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to delete network policy %q: %w", name, err)
+			return handleErrorCondition(ctx, exposition,
+				NetworkPolicyConditionType, networkPolicyDeletionFailedConditionReason,
+				fmt.Errorf("failed to delete network policy %q: %w", name, err))
 		}
 
 		return nil
 	}
 
-	desired, err := n.createNetworkPolicy(exposition)
+	desired, err := n.generateNetworkPolicy(exposition)
 	if err != nil {
-		return fmt.Errorf("failed to create network policy: %w", err)
+		return handleErrorCondition(ctx, exposition,
+			NetworkPolicyConditionType, networkPolicyGenerationFailedConditionReason,
+			fmt.Errorf("failed to generate network policy: %w", err))
 	}
 
 	target := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: exposition.Namespace}}
@@ -52,13 +67,16 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 
 		return nil
 	}); cuErr != nil {
-		return fmt.Errorf("failed to create or update network policy %q: %w", name, cuErr)
+		return handleErrorCondition(ctx, exposition,
+			NetworkPolicyConditionType, networkPolicyCreateOrUpdateFailedConditionReason,
+			fmt.Errorf("failed to create or update network policy %q: %w", name, cuErr))
 	}
 
-	return nil
+	return exposition.SetCondition(ctx, NetworkPolicyConditionType, true,
+		networkPolicyCreatedConditionReason, networkPolicyCreatedConditionMessage)
 }
 
-func (n NetworkPolicy) createNetworkPolicy(exposition types.Exposition) (*networkingv1.NetworkPolicy, error) {
+func (n NetworkPolicy) generateNetworkPolicy(exposition types.Exposition) (*networkingv1.NetworkPolicy, error) {
 	totalPortSize := len(exposition.TcpRoutes) + len(exposition.UdpRoutes)
 	exposedPorts := make([]types.ExposedPort, 0, totalPortSize)
 
