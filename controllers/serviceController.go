@@ -42,7 +42,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, fmt.Errorf("failed to get dogu service: %w", err)
 	}
 
-	exposition, err := mapServiceToExposition(doguService, r.Client.Scheme())
+	exposition, err := mapServiceToExposition(doguService, r.Client)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to map dogu service to exposition: %w", err)
 	}

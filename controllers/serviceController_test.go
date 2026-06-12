@@ -126,7 +126,7 @@ func TestServiceReconciler_Reconcile(t *testing.T) {
 							svc.Namespace = testNamespace
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					return m
 				},
 				ExpositionServiceFn: func(t *testing.T) ExpositionService {
@@ -158,7 +158,7 @@ func TestServiceReconciler_Reconcile(t *testing.T) {
 							svc.Namespace = testNamespace
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					return m
 				},
 				ExpositionServiceFn: func(t *testing.T) ExpositionService {
