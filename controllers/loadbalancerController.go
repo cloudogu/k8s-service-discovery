@@ -33,9 +33,10 @@ const (
 // LoadBalancerReconciler is responsible for reconciling the ces-loadbalancer configmap and to create / update the corresponding
 // loadbalancer service. For this, it also watches Services to detect changes for exposed ports.
 type LoadBalancerReconciler struct {
-	ExpositionConfig  types.ExpositionConfig
-	Client            client.Client
-	IngressController IngressController
+	IngressSelector  map[string]string
+	ExpositionConfig types.ExpositionConfig
+	Client           client.Client
+	PortExposer      PortExposer
 }
 
 // Reconcile implements the controller-runtime reconcile loop for the
@@ -79,9 +80,7 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	validExpositions, collisionMap := checkPortCollisions(expositions)
-	if sErr := setPortsAllocatedConditionError(ctx, collisionMap); sErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed set condition error for collided ports: %w", sErr)
-	}
+	setPortsAllocatedConditionError(ctx, collisionMap)
 
 	uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, validExpositions, setOwnerReference)
 	if uErr != nil {
@@ -90,15 +89,13 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	logger.Info("Successfully applied new state to loadbalancer.")
 
-	if sErr := setPortsAllocatedCondition(ctx, validExpositions); sErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed set condition %s: %w", conditionTypeLBPortAllocation, sErr)
-	}
-
-	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, validExpositions); eErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
+	if eErr := r.PortExposer.ExposePorts(ctx, validExpositions); eErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to expose ports in ingress controller: %w", eErr)
 	}
 
 	logger.Info("Successfully exposed ports in IngressController.")
+
+	setPortsAllocatedCondition(ctx, validExpositions)
 
 	return ctrl.Result{}, nil
 }
@@ -131,7 +128,7 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 		return fmt.Errorf("failed to get service for loadbalancer: %w", gErr)
 	}
 
-	desired := types.CreateLoadBalancer(namespace, cfg, expositions, r.IngressController.GetSelector())
+	desired := types.CreateLoadBalancer(namespace, cfg, expositions, r.IngressSelector)
 
 	if apierrors.IsNotFound(gErr) {
 		newLBService := desired.ToK8sService()
@@ -170,6 +167,10 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 // The controller watches for changes to the ces-loadbalancer configmap as well as dogu services.
 // It also reconciles when the load-balancer changes.
 func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.IngressSelector == nil {
+		return fmt.Errorf("IngressSelector for LoadBalancer is not set")
+	}
+
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&corev1.ConfigMap{},
@@ -471,30 +472,37 @@ func (e exposedService) HasExposedPorts() bool {
 	return len(e.TcpRoutes)+len(e.UdpRoutes) > 0
 }
 
-// checkPortCollisions detects expositions that claim the same external port.
-// It returns the subset of expositions that have no collisions, and a map from
-// each colliding exposition pointer (into the input slice) to the ports it
-// collides on. Callers must not modify the input slice after this call as long
-// as the returned map is in use.
-func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, map[*types.Exposition][]int32) {
-	portMap := make(map[int32][]*types.Exposition, len(expositions))
+// portProtocolKey is the collision key: two ports only collide when both the
+// external port number and the protocol match, since K8s allows the same port
+// number for TCP and UDP as distinct Service port entries.
+type portProtocolKey struct {
+	port     int32
+	protocol corev1.Protocol
+}
+
+// checkPortCollisions detects expositions that claim the same external port
+// and protocol. It returns the subset of expositions that have no collisions,
+// and a map from each colliding exposition pointer (into the input slice) to
+// the colliding (port, protocol) pairs. Callers must not modify the input
+// slice after this call as long as the returned map is in use.
+func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, map[*types.Exposition][]portProtocolKey) {
+	portMap := make(map[portProtocolKey][]*types.Exposition, len(expositions))
 
 	for i := range expositions {
 		e := &expositions[i]
 		expositionPorts := slices.Concat(e.TcpRoutes, e.UdpRoutes)
 		for _, port := range expositionPorts {
-			portMap[port.RequestedExternalPort] = append(portMap[port.RequestedExternalPort], e)
+			key := portProtocolKey{port: port.RequestedExternalPort, protocol: port.Protocol}
+			portMap[key] = append(portMap[key], e)
 		}
 	}
 
-	collisionMap := make(map[*types.Exposition][]int32)
-	hasCollision := make(map[*types.Exposition]bool)
+	collisionMap := make(map[*types.Exposition][]portProtocolKey)
 
-	for p, eList := range portMap {
+	for key, eList := range portMap {
 		if len(eList) > 1 {
 			for _, e := range eList {
-				collisionMap[e] = append(collisionMap[e], p)
-				hasCollision[e] = true
+				collisionMap[e] = append(collisionMap[e], key)
 			}
 		}
 	}
@@ -502,7 +510,7 @@ func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, ma
 	var filteredList []types.Exposition
 	for i := range expositions {
 		e := &expositions[i]
-		if !hasCollision[e] {
+		if _, hasCollision := collisionMap[e]; !hasCollision {
 			filteredList = append(filteredList, *e)
 		}
 	}
@@ -513,30 +521,45 @@ func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, ma
 // setPortsAllocatedConditionError writes a PortCollision condition on every
 // exposition that lost the collision check. Service-based expositions have no
 // SetCondition wired up, so they are silently skipped.
-func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*types.Exposition][]int32) error {
-	for e, ports := range collisionMap {
+func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*types.Exposition][]portProtocolKey) {
+	logger := ctrl.LoggerFrom(ctx)
+
+	for e, keys := range collisionMap {
 		if e.SetCondition == nil {
 			continue
 		}
 
+		msg := collisionMessage(keys)
 		if cErr := e.SetCondition(
 			ctx,
 			conditionTypeLBPortAllocation,
 			false,
 			conditionReasonPortCollision,
-			fmt.Sprintf("port collision for ports: %v", ports),
+			msg,
 		); cErr != nil {
-			return fmt.Errorf("failed update condition for exposition %s: %w", e.Name, cErr)
+			logger.Error(cErr, "failed to set condition", "type", conditionTypeLBPortAllocation, "exposition", e.Name)
 		}
 	}
+}
 
-	return nil
+// collisionMessage builds a human-readable description of the colliding
+// (port, protocol) pairs, e.g. "port collision for: TCP/22, UDP/53".
+func collisionMessage(keys []portProtocolKey) string {
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s/%d", k.protocol, k.port))
+	}
+	return fmt.Sprintf("port collision for: %s", strings.Join(parts, ", "))
 }
 
 // setPortsAllocatedCondition writes a PortsAllocated success condition on
-// every exposition that passed the collision check. Service-based expositions
-// have no SetCondition wired up, so they are silently skipped.
-func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposition) error {
+// every exposition that passed the collision check. Failures are logged and
+// not returned — condition writes are best-effort and must not block the
+// primary reconcile work. Service-based expositions have no SetCondition
+// wired up, so they are silently skipped.
+func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposition) {
+	logger := ctrl.LoggerFrom(ctx)
+
 	for _, e := range expositions {
 		if e.SetCondition == nil {
 			continue
@@ -549,9 +572,7 @@ func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposit
 			conditionReasonPortAllocated,
 			fmt.Sprintf("All requested ports %v were successfully allocated.", slices.Concat(e.TcpRoutes, e.UdpRoutes)),
 		); cErr != nil {
-			return fmt.Errorf("failed update condition for exposition %s: %w", e.Name, cErr)
+			logger.Error(cErr, "failed to set condition", "type", conditionTypeLBPortAllocation, "exposition", e.Name)
 		}
 	}
-
-	return nil
 }
