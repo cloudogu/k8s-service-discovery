@@ -17,6 +17,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -135,7 +136,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr.Generation = 2
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					m.EXPECT().Status().Return(&assertingStatusWriter{
 						t: t,
 						assertFunc: func(t *testing.T, obj client.Object) {
@@ -181,7 +182,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr.Generation = 3
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					m.EXPECT().Status().Return(&assertingStatusWriter{
 						t: t,
 						assertFunc: func(t *testing.T, obj client.Object) {
@@ -224,7 +225,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr.Generation = 4
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t))
+					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					m.EXPECT().Status().Return(&assertingStatusWriter{
 						t: t,
 						assertFunc: func(t *testing.T, obj client.Object) {
@@ -437,7 +438,7 @@ func Test_mapExpositionCRToUDPExposedPorts(t *testing.T) {
 }
 
 func Test_mapExpositionCRToExposition(t *testing.T) {
-	scheme := getScheme(t)
+	scheme := testclient.NewClientBuilder().WithScheme(getScheme(t)).Build()
 	cr := &expositionv1.Exposition{
 		ObjectMeta: metav1.ObjectMeta{Name: "ldap", Namespace: testNamespace, UID: "owner-uid"},
 		Spec: expositionv1.ExpositionSpec{
