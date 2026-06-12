@@ -242,20 +242,24 @@ func TestParseLoadBalancer(t *testing.T) {
 
 func TestCreateLoadBalancer(t *testing.T) {
 	//given
-	ePorts := ExposedPorts{
+	expositions := []Exposition{
 		{
-			Name:                  "a-80",
-			ServiceName:           "a",
-			Protocol:              "TCP",
-			ServicePort:           80,
-			RequestedExternalPort: 80,
-		},
-		{
-			Name:                  "a-443",
-			ServiceName:           "a",
-			Protocol:              "TCP",
-			ServicePort:           443,
-			RequestedExternalPort: 443,
+			TcpRoutes: ExposedPorts{
+				{
+					Name:                  "a-8080",
+					ServiceName:           "a",
+					Protocol:              "TCP",
+					ServicePort:           8080,
+					RequestedExternalPort: 8080,
+				},
+				{
+					Name:                  "a-9000",
+					ServiceName:           "a",
+					Protocol:              "TCP",
+					ServicePort:           9000,
+					RequestedExternalPort: 9000,
+				},
+			},
 		},
 	}
 
@@ -272,7 +276,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 		"k8s.cloudogu.com": "testLoadbalancer",
 	}
 
-	lb := CreateLoadBalancer("testNamespace", lbConfig, ePorts, selector)
+	lb := CreateLoadBalancer("testNamespace", lbConfig, expositions, selector)
 
 	// assert general config
 	assert.Equal(t, LoadbalancerName, lb.Name)
@@ -301,9 +305,10 @@ func TestCreateLoadBalancer(t *testing.T) {
 	}
 
 	// assert Ports
-	assert.Len(t, lb.Spec.Ports, len(ePorts))
-	for _, p := range ePorts {
-		slices.Contains(lb.Spec.Ports, p.ToServicePort())
+	expectedPorts := CreateLoadBalancerExposedPorts(expositions)
+	assert.Len(t, lb.Spec.Ports, len(expectedPorts))
+	for _, p := range expectedPorts {
+		assert.True(t, slices.Contains(lb.Spec.Ports, p.ToServicePort()))
 	}
 }
 
@@ -615,9 +620,9 @@ func TestLoadBalancer_UpdateExposedPorts(t *testing.T) {
 				{"b", corev1.ProtocolUDP, nil, 5, intstr.FromInt32(6), 666},
 			},
 			exp: []corev1.ServicePort{
-				{"a", corev1.ProtocolTCP, nil, 1, intstr.FromInt32(2), 99},
-				{"b", corev1.ProtocolUDP, nil, 5, intstr.FromInt32(6), 666},
-				{"c", corev1.ProtocolUDP, nil, 10, intstr.FromInt32(7), 0}},
+				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(1), 99},
+				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(5), 666},
+				{"c", corev1.ProtocolUDP, nil, 7, intstr.FromInt32(10), 0}},
 		},
 	}
 
