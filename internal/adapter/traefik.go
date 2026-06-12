@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strconv"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
@@ -13,6 +14,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -26,13 +28,23 @@ const (
 	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
 )
 
+const (
+	conditionTypeIngressTCPRoutesCreated = "IngressTCPRoutesCreated"
+	conditionTypeIngressUDPRoutesCreated = "IngressUDPRoutesCreated"
+)
+
 type TraefikIngressController struct {
 	IngressClass string
 	Client       client.Client
 }
 
 func (t *TraefikIngressController) GetOwnableTypes() []client.Object {
-	return []client.Object{&networkingv1.Ingress{}, &traefikapi.Middleware{}}
+	return []client.Object{
+		&networkingv1.Ingress{},
+		&traefikapi.Middleware{},
+		&traefikapi.IngressRouteTCP{},
+		&traefikapi.IngressRouteUDP{},
+	}
 }
 
 func (t *TraefikIngressController) ProcessExposition(ctx context.Context, appState types.ApplicationState, exposition types.Exposition) error {
@@ -59,6 +71,151 @@ func (t *TraefikIngressController) ProcessExposition(ctx context.Context, appSta
 	return nil
 }
 
+func (t *TraefikIngressController) ExposePorts(ctx context.Context, expositions []types.Exposition) error {
+	var errs []error
+	for _, exposition := range expositions {
+		if err := t.exposeTCPRoutes(ctx, exposition); err != nil {
+			errs = append(errs, fmt.Errorf("failed to expose tcp routes for exposition %s: %w", exposition.Name, err))
+		}
+
+		if err := t.exposeUDPRoutes(ctx, exposition); err != nil {
+			errs = append(errs, fmt.Errorf("failed to expose udp routes for exposition %s: %w", exposition.Name, err))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, exposition types.Exposition) error {
+	existing := &traefikapi.IngressRouteTCPList{}
+	if err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)}); err != nil {
+		return fmt.Errorf("failed to list existing tcp routes: %w", err)
+	}
+
+	existingMap := make(map[string]traefikapi.IngressRouteTCP, len(existing.Items))
+	for _, item := range existing.Items {
+		existingMap[item.Name] = item
+	}
+
+	var errs []error
+	for _, tcpPort := range exposition.TcpRoutes {
+		tcpRoute := createIngressRouteTCP(exposition.Name, exposition.Namespace, tcpPort)
+		// mark as desired immediately so it is never deleted even if the upsert fails
+		delete(existingMap, tcpRoute.Name)
+
+		if err := exposition.SetOwner(tcpRoute); err != nil {
+			wErr := fmt.Errorf("failed to set owner reference for IngressTCPRoute from exposition %s: %w", exposition.Name, err)
+			_ = exposition.SetCondition(ctx, conditionTypeIngressTCPRoutesCreated, false, "OwnerReferenceFailed", wErr.Error())
+			errs = append(errs, wErr)
+			continue
+		}
+
+		updateRef := &traefikapi.IngressRouteTCP{ObjectMeta: metav1.ObjectMeta{Name: tcpRoute.Name, Namespace: tcpRoute.Namespace}}
+		if _, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
+			updateRef.Annotations = tcpRoute.Annotations
+			updateRef.OwnerReferences = tcpRoute.OwnerReferences
+			updateRef.Labels = tcpRoute.Labels
+			updateRef.Spec = tcpRoute.Spec
+			return nil
+		}); err != nil {
+			wErr := fmt.Errorf("failed to create or update ingress tcp route %q: %w", tcpRoute.Name, err)
+			_ = exposition.SetCondition(ctx, conditionTypeIngressTCPRoutesCreated, false, "TCPUpdateFailed", wErr.Error())
+			errs = append(errs, wErr)
+			continue
+		}
+	}
+
+	for _, stale := range existingMap {
+		if err := t.Client.Delete(ctx, &stale); err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete outdated tcp route %q: %w", stale.Name, err))
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+
+	if len(exposition.TcpRoutes) == 0 {
+		return nil
+	}
+
+	if err := exposition.SetCondition(
+		ctx,
+		conditionTypeIngressTCPRoutesCreated,
+		true,
+		"IngressRouteTCPReady",
+		"Routes for TCP were successfully created.",
+	); err != nil {
+		return fmt.Errorf("failed to set condition for %s: %w", conditionTypeIngressTCPRoutesCreated, err)
+	}
+
+	return nil
+}
+
+func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, exposition types.Exposition) error {
+	existing := &traefikapi.IngressRouteUDPList{}
+	if err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)}); err != nil {
+		return fmt.Errorf("failed to list existing udp routes: %w", err)
+	}
+
+	existingMap := make(map[string]traefikapi.IngressRouteUDP, len(existing.Items))
+	for _, item := range existing.Items {
+		existingMap[item.Name] = item
+	}
+
+	var errs []error
+	for _, udpPort := range exposition.UdpRoutes {
+		udpRoute := createIngressRouteUDP(exposition.Name, exposition.Namespace, udpPort)
+		// mark as desired immediately so it is never deleted even if the upsert fails
+		delete(existingMap, udpRoute.Name)
+
+		if err := exposition.SetOwner(udpRoute); err != nil {
+			wErr := fmt.Errorf("failed to set owner reference for IngressUDPRoute from exposition %s: %w", exposition.Name, err)
+			_ = exposition.SetCondition(ctx, conditionTypeIngressUDPRoutesCreated, false, "OwnerReferenceFailed", wErr.Error())
+			errs = append(errs, wErr)
+			continue
+		}
+
+		updateRef := &traefikapi.IngressRouteUDP{ObjectMeta: metav1.ObjectMeta{Name: udpRoute.Name, Namespace: udpRoute.Namespace}}
+		if _, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
+			updateRef.Annotations = udpRoute.Annotations
+			updateRef.OwnerReferences = udpRoute.OwnerReferences
+			updateRef.Labels = udpRoute.Labels
+			updateRef.Spec = udpRoute.Spec
+			return nil
+		}); err != nil {
+			wErr := fmt.Errorf("failed to create or update ingress udp route %q: %w", udpRoute.Name, err)
+			_ = exposition.SetCondition(ctx, conditionTypeIngressUDPRoutesCreated, false, "UDPUpdateFailed", wErr.Error())
+			errs = append(errs, wErr)
+			continue
+		}
+	}
+
+	for _, stale := range existingMap {
+		if err := t.Client.Delete(ctx, &stale); err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete outdated udp route %q: %w", stale.Name, err))
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+
+	if len(exposition.UdpRoutes) == 0 {
+		return nil
+	}
+
+	if err := exposition.SetCondition(
+		ctx,
+		conditionTypeIngressUDPRoutesCreated,
+		true,
+		"IngressRouteUDPReady",
+		"Routes for UDP were successfully created.",
+	); err != nil {
+		return fmt.Errorf("failed to set condition for %s: %w", conditionTypeIngressUDPRoutesCreated, err)
+	}
+
+	return nil
+}
+
 func (t *TraefikIngressController) generate(exposition types.Exposition, appState types.ApplicationState) ([]*networkingv1.Ingress, []*traefikapi.Middleware, error) {
 	if appState == types.ApplicationStopped {
 		return nil, nil, nil
@@ -76,7 +233,9 @@ func (t *TraefikIngressController) generate(exposition types.Exposition, appStat
 		} else if route.Rewrite != nil {
 			middleware := t.generateMiddleware(exposition, route)
 			err := exposition.SetOwner(middleware)
-			errs = append(errs, err)
+			if err != nil {
+				errs = append(errs, err)
+			}
 
 			middlewareRef = fmt.Sprintf("%s-%s@kubernetescrd", exposition.Namespace, middleware.Name)
 			middlewares = append(middlewares, middleware)
@@ -84,7 +243,9 @@ func (t *TraefikIngressController) generate(exposition types.Exposition, appStat
 
 		ingress := t.generateIngress(exposition, route, middlewareRef)
 		err := exposition.SetOwner(ingress)
-		errs = append(errs, err)
+		if err != nil {
+			errs = append(errs, err)
+		}
 
 		ingresses = append(ingresses, ingress)
 	}
@@ -247,4 +408,67 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 
 func selectorFromExpositionName(expositionName string) labels.Selector {
 	return labels.Set{ownedByLabelKey: expositionName}.AsSelector()
+}
+
+func createIngressRouteTCP(name string, namespace string, port types.ExposedPort) *traefikapi.IngressRouteTCP {
+	externalPortStr := strconv.Itoa(int(port.RequestedExternalPort))
+
+	selectionLabels := map[string]string{ownedByLabelKey: name}
+	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
+
+	route := &traefikapi.IngressRouteTCP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s-tcp", port.ServiceName, externalPortStr),
+			Namespace: namespace,
+			Labels:    selectionLabels,
+		},
+		Spec: traefikapi.IngressRouteTCPSpec{
+			EntryPoints: []string{fmt.Sprintf("tcp-%s", externalPortStr)},
+			Routes: []traefikapi.RouteTCP{
+				{
+					Match: "HostSNI(`*`)",
+					Services: []traefikapi.ServiceTCP{
+						{
+							Name:      port.ServiceName,
+							Namespace: namespace,
+							Port:      intstr.FromInt32(port.RequestedExternalPort),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return route
+}
+
+func createIngressRouteUDP(name string, namespace string, port types.ExposedPort) *traefikapi.IngressRouteUDP {
+	externalPortStr := strconv.Itoa(int(port.RequestedExternalPort))
+
+	selectionLabels := map[string]string{ownedByLabelKey: name}
+	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
+
+	route := &traefikapi.IngressRouteUDP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s-udp", port.ServiceName, externalPortStr),
+			Namespace: namespace,
+			Labels:    selectionLabels,
+		},
+		Spec: traefikapi.IngressRouteUDPSpec{
+			EntryPoints: []string{fmt.Sprintf("udp-%s", externalPortStr)},
+			Routes: []traefikapi.RouteUDP{
+				{
+					Services: []traefikapi.ServiceUDP{
+						{
+							Name:      port.ServiceName,
+							Namespace: namespace,
+							Port:      intstr.FromInt32(port.RequestedExternalPort),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return route
 }

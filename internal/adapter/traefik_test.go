@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -61,9 +63,11 @@ func TestTraefikIngressController_GetOwnableTypes(t *testing.T) {
 
 	got := ctrl.GetOwnableTypes()
 
-	require.Len(t, got, 2)
+	require.Len(t, got, 4)
 	assert.IsType(t, &networkingv1.Ingress{}, got[0])
 	assert.IsType(t, &traefikapi.Middleware{}, got[1])
+	assert.IsType(t, &traefikapi.IngressRouteTCP{}, got[2])
+	assert.IsType(t, &traefikapi.IngressRouteUDP{}, got[3])
 }
 
 func TestTraefikIngressController_ProcessExposition(t *testing.T) {
@@ -390,4 +394,504 @@ func TestTraefikIngressController_ProcessExposition_joinsIngressAndMiddlewareErr
 	assert.True(t, errors.Is(err, assert.AnError))
 	assert.ErrorContains(t, err, "failed to list existing ingresses")
 	assert.ErrorContains(t, err, "failed to list existing middlewares")
+}
+
+// ── ExposePorts helpers ────────────────────────────────────────────────────
+
+func okCondition(_ context.Context, _ string, _ bool, _ string, _ string) error { return nil }
+
+func fixedTCPExposition(ports types.ExposedPorts) types.Exposition {
+	return types.Exposition{
+		Name:         "ldap",
+		Namespace:    testNamespace,
+		TcpRoutes:    ports,
+		SetOwner:     okOwner,
+		SetCondition: okCondition,
+	}
+}
+
+func fixedUDPExposition(ports types.ExposedPorts) types.Exposition {
+	return types.Exposition{
+		Name:         "ldap",
+		Namespace:    testNamespace,
+		UdpRoutes:    ports,
+		SetOwner:     okOwner,
+		SetCondition: okCondition,
+	}
+}
+
+func tcpPort(service string, port int32) types.ExposedPort {
+	return types.ExposedPort{
+		Name:                  service + "-expose",
+		ServiceName:           service,
+		Protocol:              corev1.ProtocolTCP,
+		ServicePort:           port,
+		RequestedExternalPort: port,
+	}
+}
+
+func udpPort(service string, port int32) types.ExposedPort {
+	return types.ExposedPort{
+		Name:                  service + "-expose",
+		ServiceName:           service,
+		Protocol:              corev1.ProtocolUDP,
+		ServicePort:           port,
+		RequestedExternalPort: port,
+	}
+}
+
+func staleTCPRoute(name string) *traefikapi.IngressRouteTCP {
+	return &traefikapi.IngressRouteTCP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+			Labels:    map[string]string{ownedByLabelKey: "ldap"},
+		},
+	}
+}
+
+func staleUDPRoute(name string) *traefikapi.IngressRouteUDP {
+	return &traefikapi.IngressRouteUDP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+			Labels:    map[string]string{ownedByLabelKey: "ldap"},
+		},
+	}
+}
+
+func foreignTCPRoute(name string) *traefikapi.IngressRouteTCP {
+	return &traefikapi.IngressRouteTCP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+			Labels:    map[string]string{ownedByLabelKey: "foreign"},
+		},
+	}
+}
+
+func foreignUDPRoute(name string) *traefikapi.IngressRouteUDP {
+	return &traefikapi.IngressRouteUDP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+			Labels:    map[string]string{ownedByLabelKey: "foreign"},
+		},
+	}
+}
+
+func getTCPRoute(t *testing.T, c client.Client, name string) *traefikapi.IngressRouteTCP {
+	t.Helper()
+	route := &traefikapi.IngressRouteTCP{}
+	require.NoError(t, c.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: name}, route))
+	return route
+}
+
+func getUDPRoute(t *testing.T, c client.Client, name string) *traefikapi.IngressRouteUDP {
+	t.Helper()
+	route := &traefikapi.IngressRouteUDP{}
+	require.NoError(t, c.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: name}, route))
+	return route
+}
+
+func assertNoTCPRoute(t *testing.T, c client.Client, name string) {
+	t.Helper()
+	err := c.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: name}, &traefikapi.IngressRouteTCP{})
+	assert.True(t, apierrors.IsNotFound(err), "expected IngressRouteTCP %q to be absent, got %v", name, err)
+}
+
+func assertNoUDPRoute(t *testing.T, c client.Client, name string) {
+	t.Helper()
+	err := c.Get(t.Context(), client.ObjectKey{Namespace: testNamespace, Name: name}, &traefikapi.IngressRouteUDP{})
+	assert.True(t, apierrors.IsNotFound(err), "expected IngressRouteUDP %q to be absent, got %v", name, err)
+}
+
+// ── TestTraefikIngressController_ExposePorts ──────────────────────────────
+
+func TestTraefikIngressController_ExposePorts(t *testing.T) {
+	sshPort := tcpPort("svc", 22)
+	dnsPort := udpPort("svc", 53)
+	tcpRouteName := "svc-22-tcp"
+	udpRouteName := "svc-53-udp"
+
+	tests := []struct {
+		name        string
+		clientFn    func(t *testing.T) client.Client
+		expositions []types.Exposition
+		wantErr     assert.ErrorAssertionFunc
+		postCheck   func(t *testing.T, c client.Client)
+	}{
+		{
+			name:        "creates TCP route with correct spec",
+			clientFn:    func(t *testing.T) client.Client { return newTraefikFakeClient(t) },
+			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
+			wantErr:     assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				route := getTCPRoute(t, c, tcpRouteName)
+				assert.Equal(t, testNamespace, route.Namespace)
+				assert.Equal(t, []string{"tcp-22"}, route.Spec.EntryPoints)
+				require.Len(t, route.Spec.Routes, 1)
+				assert.Equal(t, "HostSNI(`*`)", route.Spec.Routes[0].Match)
+				require.Len(t, route.Spec.Routes[0].Services, 1)
+				assert.Equal(t, "svc", route.Spec.Routes[0].Services[0].Name)
+				assert.Equal(t, intstr.FromInt32(22), route.Spec.Routes[0].Services[0].Port)
+				assert.Equal(t, map[string]string{ownedByLabelKey: "ldap"}, filterLabels(route.Labels))
+			},
+		},
+		{
+			name:        "creates UDP route with correct spec",
+			clientFn:    func(t *testing.T) client.Client { return newTraefikFakeClient(t) },
+			expositions: []types.Exposition{fixedUDPExposition(types.ExposedPorts{dnsPort})},
+			wantErr:     assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				route := getUDPRoute(t, c, udpRouteName)
+				assert.Equal(t, []string{"udp-53"}, route.Spec.EntryPoints)
+				require.Len(t, route.Spec.Routes, 1)
+				require.Len(t, route.Spec.Routes[0].Services, 1)
+				assert.Equal(t, "svc", route.Spec.Routes[0].Services[0].Name)
+				assert.Equal(t, intstr.FromInt32(53), route.Spec.Routes[0].Services[0].Port)
+			},
+		},
+		{
+			name: "deletes stale TCP route not in desired state",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClient(t, staleTCPRoute("old-route"))
+			},
+			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
+			wantErr:     assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				getTCPRoute(t, c, tcpRouteName)
+				assertNoTCPRoute(t, c, "old-route")
+			},
+		},
+		{
+			name: "deletes stale UDP route not in desired state",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClient(t, staleUDPRoute("old-udp"))
+			},
+			expositions: []types.Exposition{fixedUDPExposition(types.ExposedPorts{dnsPort})},
+			wantErr:     assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				getUDPRoute(t, c, udpRouteName)
+				assertNoUDPRoute(t, c, "old-udp")
+			},
+		},
+		{
+			name: "preserves foreign TCP route owned by different exposition",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClient(t, foreignTCPRoute("other-route"))
+			},
+			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
+			wantErr:     assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				getTCPRoute(t, c, "other-route")
+			},
+		},
+		{
+			name:        "empty TcpRoutes creates no routes and returns no error",
+			clientFn:    func(t *testing.T) client.Client { return newTraefikFakeClient(t) },
+			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{})},
+			wantErr:     assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				assertNoTCPRoute(t, c, tcpRouteName)
+			},
+		},
+		{
+			name: "TCP list failure returns error",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
+					List: func(_ context.Context, _ client.WithWatch, list client.ObjectList, _ ...client.ListOption) error {
+						if _, ok := list.(*traefikapi.IngressRouteTCPList); ok {
+							return assert.AnError
+						}
+						return nil
+					},
+				})
+			},
+			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to list existing tcp routes", i...)
+			},
+		},
+		{
+			name: "UDP list failure returns error",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
+					List: func(_ context.Context, _ client.WithWatch, list client.ObjectList, _ ...client.ListOption) error {
+						if _, ok := list.(*traefikapi.IngressRouteUDPList); ok {
+							return assert.AnError
+						}
+						return nil
+					},
+				})
+			},
+			expositions: []types.Exposition{fixedUDPExposition(types.ExposedPorts{dnsPort})},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to list existing udp routes", i...)
+			},
+		},
+		{
+			name:     "SetOwner failure on TCP route returns wrapped error",
+			clientFn: func(t *testing.T) client.Client { return newTraefikFakeClient(t) },
+			expositions: []types.Exposition{{
+				Name:         "ldap",
+				Namespace:    testNamespace,
+				TcpRoutes:    types.ExposedPorts{sshPort},
+				SetOwner:     errOwner,
+				SetCondition: okCondition,
+			}},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to set owner reference for IngressTCPRoute", i...)
+			},
+		},
+		{
+			name: "CreateOrUpdate TCP failure returns error, stale route still cleaned up",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClientWithInterceptor(t,
+					interceptor.Funcs{
+						Create: func(_ context.Context, _ client.WithWatch, obj client.Object, _ ...client.CreateOption) error {
+							if _, ok := obj.(*traefikapi.IngressRouteTCP); ok {
+								return assert.AnError
+							}
+							return nil
+						},
+					},
+					staleTCPRoute("stale-tcp"),
+				)
+			},
+			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to create or update ingress tcp route", i...)
+			},
+			postCheck: func(t *testing.T, c client.Client) {
+				assertNoTCPRoute(t, c, "stale-tcp")
+			},
+		},
+		{
+			name: "errors from multiple expositions are all returned",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
+					List: func(_ context.Context, _ client.WithWatch, list client.ObjectList, _ ...client.ListOption) error {
+						if _, ok := list.(*traefikapi.IngressRouteTCPList); ok {
+							return assert.AnError
+						}
+						return nil
+					},
+				})
+			},
+			expositions: []types.Exposition{
+				fixedTCPExposition(types.ExposedPorts{sshPort}),
+				{
+					Name:         "other",
+					Namespace:    testNamespace,
+					TcpRoutes:    types.ExposedPorts{tcpPort("other-svc", 8080)},
+					SetOwner:     okOwner,
+					SetCondition: okCondition,
+				},
+			},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to expose tcp routes for exposition ldap", i...) &&
+					assert.ErrorContains(t, err, "failed to expose tcp routes for exposition other", i...)
+			},
+		},
+		{
+			name:     "SetOwner failure on UDP route returns wrapped error",
+			clientFn: func(t *testing.T) client.Client { return newTraefikFakeClient(t) },
+			expositions: []types.Exposition{{
+				Name:         "ldap",
+				Namespace:    testNamespace,
+				UdpRoutes:    types.ExposedPorts{dnsPort},
+				SetOwner:     errOwner,
+				SetCondition: okCondition,
+			}},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to set owner reference for IngressUDPRoute", i...)
+			},
+		},
+		{
+			name: "CreateOrUpdate UDP failure returns error, stale route still cleaned up",
+			clientFn: func(t *testing.T) client.Client {
+				return newTraefikFakeClientWithInterceptor(t,
+					interceptor.Funcs{
+						Create: func(_ context.Context, _ client.WithWatch, obj client.Object, _ ...client.CreateOption) error {
+							if _, ok := obj.(*traefikapi.IngressRouteUDP); ok {
+								return assert.AnError
+							}
+							return nil
+						},
+					},
+					staleUDPRoute("stale-udp"),
+				)
+			},
+			expositions: []types.Exposition{fixedUDPExposition(types.ExposedPorts{dnsPort})},
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, assert.AnError, i...) &&
+					assert.ErrorContains(t, err, "failed to create or update ingress udp route", i...)
+			},
+			postCheck: func(t *testing.T, c client.Client) {
+				assertNoUDPRoute(t, c, "stale-udp")
+			},
+		},
+		{
+			name:     "SetCondition called with true on successful TCP exposure",
+			clientFn: func(t *testing.T) client.Client { return newTraefikFakeClient(t) },
+			expositions: func() []types.Exposition {
+				var conditionStatus bool
+				expo := fixedTCPExposition(types.ExposedPorts{sshPort})
+				expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
+					conditionStatus = status
+					return nil
+				}
+				_ = conditionStatus
+				return []types.Exposition{expo}
+			}(),
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := tt.clientFn(t)
+			ctrl := fixedTraefikController(c)
+
+			err := ctrl.ExposePorts(t.Context(), tt.expositions)
+
+			if !tt.wantErr(t, err) {
+				return
+			}
+			if tt.postCheck != nil {
+				tt.postCheck(t, c)
+			}
+		})
+	}
+}
+
+func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
+	sshTCP := tcpPort("svc", 22)
+
+	t.Run("success condition set after TCP routes created", func(t *testing.T) {
+		var lastStatus bool
+		var conditionCalls int
+		expo := fixedTCPExposition(types.ExposedPorts{sshTCP})
+		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
+			lastStatus = status
+			conditionCalls++
+			return nil
+		}
+		c := newTraefikFakeClient(t)
+		ctrl := fixedTraefikController(c)
+
+		require.NoError(t, ctrl.ExposePorts(t.Context(), []types.Exposition{expo}))
+
+		assert.Equal(t, 1, conditionCalls)
+		assert.True(t, lastStatus)
+	})
+
+	t.Run("failure condition set when CreateOrUpdate fails", func(t *testing.T) {
+		var lastStatus bool
+		expo := fixedTCPExposition(types.ExposedPorts{sshTCP})
+		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
+			lastStatus = status
+			return nil
+		}
+		c := newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
+			Create: func(_ context.Context, _ client.WithWatch, obj client.Object, _ ...client.CreateOption) error {
+				if _, ok := obj.(*traefikapi.IngressRouteTCP); ok {
+					return assert.AnError
+				}
+				return nil
+			},
+		})
+		ctrl := fixedTraefikController(c)
+
+		err := ctrl.ExposePorts(t.Context(), []types.Exposition{expo})
+
+		require.Error(t, err)
+		assert.False(t, lastStatus)
+	})
+
+	t.Run("no condition set when TcpRoutes is empty", func(t *testing.T) {
+		conditionCalled := false
+		expo := fixedTCPExposition(types.ExposedPorts{})
+		expo.SetCondition = func(_ context.Context, _ string, _ bool, _ string, _ string) error {
+			conditionCalled = true
+			return nil
+		}
+		c := newTraefikFakeClient(t)
+		ctrl := fixedTraefikController(c)
+
+		require.NoError(t, ctrl.ExposePorts(t.Context(), []types.Exposition{expo}))
+
+		assert.False(t, conditionCalled)
+	})
+
+	t.Run("success condition set after UDP routes created", func(t *testing.T) {
+		var lastStatus bool
+		var conditionCalls int
+		expo := fixedUDPExposition(types.ExposedPorts{udpPort("svc", 53)})
+		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
+			lastStatus = status
+			conditionCalls++
+			return nil
+		}
+		c := newTraefikFakeClient(t)
+		ctrl := fixedTraefikController(c)
+
+		require.NoError(t, ctrl.ExposePorts(t.Context(), []types.Exposition{expo}))
+
+		assert.Equal(t, 1, conditionCalls)
+		assert.True(t, lastStatus)
+	})
+
+	t.Run("failure condition set when UDP CreateOrUpdate fails", func(t *testing.T) {
+		var lastStatus bool
+		expo := fixedUDPExposition(types.ExposedPorts{udpPort("svc", 53)})
+		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
+			lastStatus = status
+			return nil
+		}
+		c := newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
+			Create: func(_ context.Context, _ client.WithWatch, obj client.Object, _ ...client.CreateOption) error {
+				if _, ok := obj.(*traefikapi.IngressRouteUDP); ok {
+					return assert.AnError
+				}
+				return nil
+			},
+		})
+		ctrl := fixedTraefikController(c)
+
+		err := ctrl.ExposePorts(t.Context(), []types.Exposition{expo})
+
+		require.Error(t, err)
+		assert.False(t, lastStatus)
+	})
+
+	t.Run("no condition set when UdpRoutes is empty", func(t *testing.T) {
+		conditionCalled := false
+		expo := fixedUDPExposition(types.ExposedPorts{})
+		expo.SetCondition = func(_ context.Context, _ string, _ bool, _ string, _ string) error {
+			conditionCalled = true
+			return nil
+		}
+		c := newTraefikFakeClient(t)
+		ctrl := fixedTraefikController(c)
+
+		require.NoError(t, ctrl.ExposePorts(t.Context(), []types.Exposition{expo}))
+
+		assert.False(t, conditionCalled)
+	})
+}
+
+// filterLabels extracts only the ownedByLabelKey from a label map for assertion.
+func filterLabels(labels map[string]string) map[string]string {
+	if v, ok := labels[ownedByLabelKey]; ok {
+		return map[string]string{ownedByLabelKey: v}
+	}
+	return nil
 }
