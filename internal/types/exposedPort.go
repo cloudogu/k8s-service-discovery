@@ -143,8 +143,8 @@ func (ep ExposedPort) ToServicePort() corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:       ep.Name,
 		Protocol:   ep.Protocol,
-		Port:       ep.ServicePort,
-		TargetPort: intstr.FromInt32(ep.RequestedExternalPort),
+		Port:       ep.RequestedExternalPort,
+		TargetPort: intstr.FromInt32(ep.ServicePort),
 		NodePort:   ep.nodePort,
 	}
 }
@@ -154,9 +154,9 @@ func (ep ExposedPort) PortString() string {
 	return fmt.Sprintf("%d", ep.ServicePort)
 }
 
-// CreateDefaultPorts create default exposed ports used for the loadbalancer. They include ports for http as well as
+// createDefaultPorts create default exposed ports used for the loadbalancer. They include ports for http as well as
 // https.
-func CreateDefaultPorts() ExposedPorts {
+func createDefaultPorts() ExposedPorts {
 	return []ExposedPort{
 		{
 			Name:                  "http",
