@@ -6,6 +6,7 @@ package controllers
 // other than ServiceReconciler can reuse the mapping.
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,8 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -34,7 +36,7 @@ const (
 // HTTP routes from the ces-services annotation, TCP/UDP routes from the
 // exposed-ports annotation, and a SetOwner that wires the Service as the
 // controller of every generated resource.
-func mapServiceToExposition(service *corev1.Service, scheme *runtime.Scheme) (types.Exposition, error) {
+func mapServiceToExposition(service *corev1.Service, c client.Client) (types.Exposition, error) {
 	httpsRoutes, err := mapCesServicesToHttpRoutes(service)
 	if err != nil {
 		return types.Exposition{}, fmt.Errorf("failed to map ces service to http routes: %w", err)
@@ -52,7 +54,18 @@ func mapServiceToExposition(service *corev1.Service, scheme *runtime.Scheme) (ty
 		TcpRoutes:  exposedPorts.MapTCPPorts(),
 		UdpRoutes:  exposedPorts.MapUDPPorts(),
 		SetOwner: func(targetObject client.Object) error {
-			return ctrl.SetControllerReference(service, targetObject, scheme)
+			return ctrl.SetControllerReference(service, targetObject, c.Scheme())
+		},
+		SetCondition: func(ctx context.Context, conditionType string, conditionStatus bool, reason string, msg string) error {
+			meta.SetStatusCondition(&service.Status.Conditions, metav1.Condition{
+				Type:               conditionType,
+				Status:             mapBoolToConditionStatus(conditionStatus),
+				ObservedGeneration: service.Generation,
+				Reason:             reason,
+				Message:            msg,
+			})
+
+			return c.Status().Update(ctx, service)
 		},
 	}, nil
 }

@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -554,7 +555,7 @@ func Test_mapCesServicesToHttpRoutes(t *testing.T) {
 }
 
 func Test_mapServiceToExposition(t *testing.T) {
-	scheme := getScheme(t)
+	scheme := testclient.NewClientBuilder().WithScheme(getScheme(t)).Build()
 
 	servicesAnnotation := `[{"name":"ldap-ui","port":8080,"location":"/ldap","pass":"/ldap"}]`
 	exposedPortsAnnotation := `[{"protocol":"TCP","port":8080,"targetPort":80},{"protocol":"UDP","port":5000,"targetPort":5000}]`
@@ -641,7 +642,7 @@ func Test_mapServiceToExposition(t *testing.T) {
 }
 
 func Test_mapServiceToExposition_SetOwner(t *testing.T) {
-	scheme := getScheme(t)
+	scheme := testclient.NewClientBuilder().WithScheme(getScheme(t)).Build()
 	owner := &corev1.Service{
 		TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{Name: "ldap", Namespace: testNamespace, UID: "owner-uid"},
