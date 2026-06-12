@@ -30,7 +30,7 @@ type AlternativeFQDNRedirector interface {
 }
 
 type PortExposer interface {
-	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error
+	ExposePorts(ctx context.Context, namespace string, expositions []types.Exposition) error
 }
 
 type IngressControllerSelector interface {
