@@ -121,6 +121,9 @@ func (r *LoadBalancerReconciler) getExpositionCRs(ctx context.Context) ([]exposi
 	return k8sExpositionList.Items, nil
 }
 
+// upsertLoadBalancer creates the LoadBalancer Service if it does not exist,
+// or updates it when the desired state differs from the current state.
+// setOwner wires the owner reference on any created or updated object.
 func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, expositions []types.Exposition, setOwner func(object metav1.Object)) error {
 	lbObj := &corev1.Service{}
 	gErr := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: types.LoadbalancerName}, lbObj)
@@ -246,6 +249,7 @@ func (r *LoadBalancerReconciler) getExpositionsForServices(ctx context.Context) 
 		if mErr != nil {
 			// don't let a single corrupted service block exposing ports from other services
 			logger.Error(mErr, "failed to map service to exposition while exposing ports", "service", service.Name)
+			continue
 		}
 
 		expositions = append(expositions, serviceExposition)
@@ -273,6 +277,7 @@ func (r *LoadBalancerReconciler) getExpositionsForExpositionCRs(ctx context.Cont
 		if mErr != nil {
 			// don't let a single corrupted exposition block exposing ports from other expositions
 			logger.Error(mErr, "failed to map expositionCR to exposition", "exposition", expositionCR.Name)
+			continue
 		}
 
 		expositions = append(expositions, exposition)
@@ -466,6 +471,11 @@ func (e exposedService) HasExposedPorts() bool {
 	return len(e.TcpRoutes)+len(e.UdpRoutes) > 0
 }
 
+// checkPortCollisions detects expositions that claim the same external port.
+// It returns the subset of expositions that have no collisions, and a map from
+// each colliding exposition pointer (into the input slice) to the ports it
+// collides on. Callers must not modify the input slice after this call as long
+// as the returned map is in use.
 func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, map[*types.Exposition][]int32) {
 	portMap := make(map[int32][]*types.Exposition, len(expositions))
 
@@ -500,8 +510,15 @@ func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, ma
 	return filteredList, collisionMap
 }
 
-func setPortsAllocatedConditionError(ctx context.Context, falsyExpositions map[*types.Exposition][]int32) error {
-	for e, ports := range falsyExpositions {
+// setPortsAllocatedConditionError writes a PortCollision condition on every
+// exposition that lost the collision check. Service-based expositions have no
+// SetCondition wired up, so they are silently skipped.
+func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*types.Exposition][]int32) error {
+	for e, ports := range collisionMap {
+		if e.SetCondition == nil {
+			continue
+		}
+
 		if cErr := e.SetCondition(
 			ctx,
 			conditionTypeLBPortAllocation,
@@ -516,8 +533,15 @@ func setPortsAllocatedConditionError(ctx context.Context, falsyExpositions map[*
 	return nil
 }
 
+// setPortsAllocatedCondition writes a PortsAllocated success condition on
+// every exposition that passed the collision check. Service-based expositions
+// have no SetCondition wired up, so they are silently skipped.
 func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposition) error {
 	for _, e := range expositions {
+		if e.SetCondition == nil {
+			continue
+		}
+
 		if cErr := e.SetCondition(
 			ctx,
 			conditionTypeLBPortAllocation,

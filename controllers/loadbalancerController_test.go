@@ -12,14 +12,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	testclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -389,6 +388,8 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 	lbConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: types.LoadBalancerConfigName, Namespace: testLBNamespace}}
 	exposedService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-dogu",
+			Namespace: testLBNamespace,
 			Labels: map[string]string{
 				k8sv2.DoguLabelName: "testDogu",
 			},
@@ -407,13 +408,14 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 		},
 	}
 
+	existingLB := types.CreateLoadBalancer(testLBNamespace, createDefaultLoadbalancerConfig(), []types.Exposition{}, map[string]string{"test": "test"})
+
 	tests := []struct {
 		name                       string
 		expoConfig                 types.ExpositionConfig
 		inClientMock               client.Client
 		setupLoggerMock            func(m *MockLogSink)
 		setupIngressControllerMock func(m *MockIngressController)
-		setupServiceClientMock     func(m *mockServiceClient)
 		expErr                     bool
 		errMsg                     string
 	}{
@@ -422,25 +424,20 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcNewLoadbalancer(false),
 			expErr:                     false,
-			errMsg:                     "",
 		},
 		{
 			name:                       "update loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
+			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService, existingLB.ToK8sService()),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcUpdateLoadbalancer(false),
 			expErr:                     false,
-			errMsg:                     "",
 		},
 		{
 			name:                       "error client get loadbalancer config map",
 			inClientMock:               createDefaultLBClientMock(),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: func(m *MockIngressController) {},
-			setupServiceClientMock:     func(m *mockServiceClient) {},
 			expErr:                     true,
 			errMsg:                     "failed to get config map for loadbalancer",
 		},
@@ -458,7 +455,6 @@ externalTrafficPolicy: Local
 				}}),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: func(m *MockIngressController) {},
-			setupServiceClientMock:     func(m *mockServiceClient) {},
 			expErr:                     true,
 			errMsg:                     "failed to parse loadbalancer config",
 		},
@@ -470,7 +466,6 @@ externalTrafficPolicy: Local
 				Build(),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: func(m *MockIngressController) {},
-			setupServiceClientMock:     func(m *mockServiceClient) {},
 			expErr:                     true,
 			errMsg:                     "failed to list exposed services",
 		},
@@ -487,7 +482,6 @@ externalTrafficPolicy: Local
 			}),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcNewLoadbalancer(false),
 			expErr:                     false,
 		},
 		{
@@ -496,7 +490,6 @@ externalTrafficPolicy: Local
 			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcNewLoadbalancer(false),
 			expErr:                     false,
 		},
 		{
@@ -505,7 +498,6 @@ externalTrafficPolicy: Local
 			inClientMock:               createLBClientWithScheme(t, lbConfigMap, testExposition),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcNewLoadbalancer(false),
 			expErr:                     false,
 		},
 		{
@@ -517,49 +509,76 @@ externalTrafficPolicy: Local
 				Build(),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: func(m *MockIngressController) {},
-			setupServiceClientMock:     func(m *mockServiceClient) {},
 			expErr:                     true,
 			errMsg:                     "failed to list expositions",
 		},
 		{
-			name:                       "error upserting loadbalancer - get current loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
+			name: "error upserting loadbalancer - get current loadbalancer",
+			inClientMock: testclient.NewClientBuilder().
+				WithObjects(lbConfigMap, exposedService).
+				WithIndex(&corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
+					return []string{"true"}
+				}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*corev1.Service); ok {
+							return assert.AnError
+						}
+						return c.Get(ctx, key, obj, opts...)
+					},
+				}).
+				Build(),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock: func(m *mockServiceClient) {
-				m.EXPECT().Get(mock.Anything, types.LoadbalancerName, mock.Anything).Return(nil, assert.AnError)
-			},
-			expErr: true,
-			errMsg: "failed to get service for loadbalancer",
+			expErr:                     true,
+			errMsg:                     "failed to get service for loadbalancer",
 		},
 		{
-			name:                       "error upserting loadbalancer - create loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
+			name: "error upserting loadbalancer - create loadbalancer",
+			inClientMock: testclient.NewClientBuilder().
+				WithObjects(lbConfigMap, exposedService).
+				WithIndex(&corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
+					return []string{"true"}
+				}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						return assert.AnError
+					},
+				}).
+				Build(),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcNewLoadbalancer(true),
 			expErr:                     true,
 			errMsg:                     "failed to create new loadbalancer service",
 		},
 		{
-			name:                       "error upserting loadbalancer - update loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
+			name: "error upserting loadbalancer - update loadbalancer",
+			inClientMock: testclient.NewClientBuilder().
+				WithObjects(lbConfigMap, exposedService, existingLB.ToK8sService()).
+				WithIndex(&corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
+					return []string{"true"}
+				}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+						return assert.AnError
+					},
+				}).
+				Build(),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock:     createSvcUpdateLoadbalancer(true),
 			expErr:                     true,
 			errMsg:                     "failed to update existing loadbalancer",
 		},
 		{
-			name:                       "error upserting loadbalancer - parsing existing loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
+			// pre-seed with a plain Service (no LoadBalancer type) at the LB name — ParseLoadBalancer returns !ok
+			name: "error upserting loadbalancer - parsing existing loadbalancer",
+			inClientMock: createDefaultLBClientMock(lbConfigMap, exposedService, &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: types.LoadbalancerName, Namespace: testLBNamespace},
+			}),
 			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
 			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock: func(m *mockServiceClient) {
-				m.EXPECT().Get(mock.Anything, types.LoadbalancerName, mock.Anything).Return(&corev1.Service{}, nil)
-			},
-			expErr: true,
-			errMsg: "could not parse existing service to LoadBalancer",
+			expErr:                     true,
+			errMsg:                     "could not parse existing service to LoadBalancer",
 		},
 		{
 			name:            "error exposing ports in ingress controller",
@@ -571,25 +590,23 @@ externalTrafficPolicy: Local
 				})
 				m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything).Return(assert.AnError)
 			},
-			setupServiceClientMock: createSvcNewLoadbalancer(false),
-			expErr:                 true,
-			errMsg:                 "failed to update exposed ports in ingress controller",
+			expErr: true,
+			errMsg: "failed to update exposed ports in ingress controller",
 		},
 		{
-			name:                       "skip update when loadbalancer already in desired state",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			setupServiceClientMock: func(m *mockServiceClient) {
+			// pre-seed the desired LB so lb.Equals(desired) is true and no Update is called
+			name: "skip update when loadbalancer already in desired state",
+			inClientMock: func() client.Client {
 				selector := map[string]string{"service.name": "service"}
 				desiredLB := types.CreateLoadBalancer(testLBNamespace, types.LoadbalancerConfig{
-					ExternalTrafficPolicy: "Local",
-					InternalTrafficPolicy: "Cluster",
-				}, types.CreateDefaultPorts(), selector)
-				m.EXPECT().Get(mock.Anything, types.LoadbalancerName, mock.Anything).Return(desiredLB.ToK8sService(), nil)
-				// Update must NOT be called
-			},
-			expErr: false,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: corev1.ServiceInternalTrafficPolicyCluster,
+				}, []types.Exposition{}, selector)
+				return createDefaultLBClientMock(lbConfigMap, desiredLB.ToK8sService())
+			}(),
+			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
+			setupIngressControllerMock: createNoErrorExposePorts(),
+			expErr:                     false,
 		},
 	}
 
@@ -608,14 +625,10 @@ externalTrafficPolicy: Local
 			ingressControllerMock := NewMockIngressController(t)
 			tt.setupIngressControllerMock(ingressControllerMock)
 
-			serviceClientMock := newMockServiceClient(t)
-			tt.setupServiceClientMock(serviceClientMock)
-
 			lbReconciler := &LoadBalancerReconciler{
 				ExpositionConfig:  tt.expoConfig,
 				Client:            tt.inClientMock,
 				IngressController: ingressControllerMock,
-				SvcClient:         serviceClientMock,
 			}
 
 			request := ctrl.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testLBNamespace, Name: types.LoadBalancerConfigName}}
@@ -654,46 +667,10 @@ func createNoErrorExposePorts() func(m *MockIngressController) {
 	}
 }
 
-func createSvcNewLoadbalancer(returnErr bool) func(m *mockServiceClient) {
-	return func(m *mockServiceClient) {
-		m.EXPECT().Get(mock.Anything, types.LoadbalancerName, mock.Anything).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "error"))
-
-		if returnErr {
-			m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
-		} else {
-			m.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(&corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      types.LoadbalancerName,
-					Namespace: testLBNamespace,
-					UID:       types.LoadbalancerName,
-				}}, nil)
-		}
-	}
-}
-
-func createSvcUpdateLoadbalancer(returnErr bool) func(m *mockServiceClient) {
-	return func(m *mockServiceClient) {
-		defaultLB := types.CreateLoadBalancer(testLBNamespace, createDefaultLoadbalancerConfig(), types.ExposedPorts{}, map[string]string{"test": "test"})
-
-		m.EXPECT().Get(mock.Anything, types.LoadbalancerName, mock.Anything).Return(defaultLB.ToK8sService(), nil)
-
-		if returnErr {
-			m.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
-		} else {
-			m.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(&corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      types.LoadbalancerName,
-					Namespace: testLBNamespace,
-					UID:       types.LoadbalancerName,
-				}}, nil)
-		}
-
-	}
-}
-
 func createDefaultLBClientMock(obj ...client.Object) client.Client {
 	return testclient.NewClientBuilder().
 		WithObjects(obj...).
+		WithStatusSubresource(&corev1.Service{}).
 		WithIndex(&corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
 			return []string{"true"}
 		}).
@@ -714,6 +691,7 @@ func createLBClientWithScheme(t *testing.T, obj ...client.Object) client.Client 
 	return testclient.NewClientBuilder().
 		WithScheme(getScheme(t)).
 		WithObjects(obj...).
+		WithStatusSubresource(&corev1.Service{}, &expositionv1.Exposition{}).
 		WithIndex(&corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
 			return []string{"true"}
 		}).
@@ -868,12 +846,12 @@ func Test_exposedPortExpositionPredicate(t *testing.T) {
 func Test_createLoadBalancerExposedPorts(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    types.ExposedPorts
+		input    []types.Exposition
 		expected types.ExposedPorts
 	}{
 		{
 			name:  "empty input returns defaults only",
-			input: types.ExposedPorts{},
+			input: []types.Exposition{},
 			expected: types.ExposedPorts{
 				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
 				{Name: "https", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
@@ -881,8 +859,8 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 		},
 		{
 			name: "custom port added alongside defaults",
-			input: types.ExposedPorts{
-				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+			input: []types.Exposition{
+				{TcpRoutes: types.ExposedPorts{{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000}}},
 			},
 			expected: types.ExposedPorts{
 				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
@@ -892,8 +870,8 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 		},
 		{
 			name: "port 80 in input is stripped and replaced by default",
-			input: types.ExposedPorts{
-				{Name: "myhttp", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+			input: []types.Exposition{
+				{TcpRoutes: types.ExposedPorts{{Name: "myhttp", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80}}},
 			},
 			expected: types.ExposedPorts{
 				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
@@ -902,8 +880,8 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 		},
 		{
 			name: "port 443 in input is stripped and replaced by default",
-			input: types.ExposedPorts{
-				{Name: "myhttps", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
+			input: []types.Exposition{
+				{TcpRoutes: types.ExposedPorts{{Name: "myhttps", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443}}},
 			},
 			expected: types.ExposedPorts{
 				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
@@ -912,9 +890,11 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 		},
 		{
 			name: "both 80 and 443 in input are stripped",
-			input: types.ExposedPorts{
-				{Name: "p80", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
-				{Name: "p443", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
+			input: []types.Exposition{
+				{TcpRoutes: types.ExposedPorts{
+					{Name: "p80", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+					{Name: "p443", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
+				}},
 			},
 			expected: types.ExposedPorts{
 				{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
@@ -923,10 +903,12 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 		},
 		{
 			name: "80, 443, and custom port: 80+443 stripped, custom kept with defaults",
-			input: types.ExposedPorts{
-				{Name: "p80", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
-				{Name: "p443", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
-				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+			input: []types.Exposition{
+				{TcpRoutes: types.ExposedPorts{
+					{Name: "p80", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80},
+					{Name: "p443", Protocol: corev1.ProtocolTCP, ServicePort: 443, RequestedExternalPort: 443},
+					{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+				}},
 			},
 			expected: types.ExposedPorts{
 				{Name: "custom", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
@@ -938,179 +920,135 @@ func Test_createLoadBalancerExposedPorts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := createLoadBalancerExposedPorts(tt.input)
+			result := types.CreateLoadBalancerExposedPorts(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerReconciler_getExposedPortsForServices(t *testing.T) {
+func TestLoadBalancerReconciler_getExpositionsForServices(t *testing.T) {
 	const expPortAnnotation = "k8s-dogu-operator.cloudogu.com/ces-exposed-ports"
 
 	lbConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: types.LoadBalancerConfigName, Namespace: testLBNamespace}}
 
-	tests := []struct {
-		name        string
-		expoConfig  types.ExpositionConfig
-		clientFn    func(t *testing.T) client.Client
-		expected    types.ExposedPorts
-		expErr      bool
-		errSubstStr string
-	}{
-		{
-			name:       "returns empty when DiscoverServices is disabled",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: false},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				return createDefaultLBClientMock(lbConfigMap)
-			},
-			expected: types.ExposedPorts{},
-		},
-		{
-			name:       "returns ports from indexed services",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				svc := &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "dogu-svc",
-						Namespace: testLBNamespace,
-						Labels:    map[string]string{k8sv2.DoguLabelName: "dogu"},
-						Annotations: map[string]string{
-							expPortAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000}]`,
-						},
-					},
-					Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, Ports: []corev1.ServicePort{
-						{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)},
-					}},
-				}
-				return createDefaultLBClientMock(lbConfigMap, svc)
-			},
-			expected: types.ExposedPorts{
-				{Name: "dogu-svc-expose-50000-50000", ServiceName: "dogu-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
-			},
-		},
-		{
-			name:       "logs and skips service with invalid annotation",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				badSvc := &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:        "bad-svc",
-						Namespace:   testLBNamespace,
-						Labels:      map[string]string{k8sv2.DoguLabelName: "bad"},
-						Annotations: map[string]string{expPortAnnotation: `INVALID`},
-					},
-					Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
-				}
-				return createDefaultLBClientMock(lbConfigMap, badSvc)
-			},
-			expected: types.ExposedPorts{},
-		},
-		{
-			name:       "returns error when list fails (no index registered)",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				return testclient.NewClientBuilder().WithObjects(lbConfigMap).Build()
-			},
-			expErr:      true,
-			errSubstStr: "failed to list exposed services",
-		},
-	}
+	t.Run("returns empty when DiscoverServices is disabled", func(t *testing.T) {
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: false},
+			Client:           createDefaultLBClientMock(lbConfigMap),
+		}
+		result, err := r.getExpositionsForServices(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &LoadBalancerReconciler{
-				ExpositionConfig: tt.expoConfig,
-				Client:           tt.clientFn(t),
-			}
+	t.Run("returns exposition with TCP routes from indexed service", func(t *testing.T) {
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dogu-svc",
+				Namespace: testLBNamespace,
+				Labels:    map[string]string{k8sv2.DoguLabelName: "dogu"},
+				Annotations: map[string]string{
+					expPortAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000}]`,
+				},
+			},
+			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, Ports: []corev1.ServicePort{
+				{Protocol: corev1.ProtocolTCP, Port: 50000, TargetPort: intstr.FromInt32(50000)},
+			}},
+		}
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			Client:           createDefaultLBClientMock(lbConfigMap, svc),
+		}
+		result, err := r.getExpositionsForServices(t.Context())
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, "dogu-svc", result[0].Name)
+		assert.Equal(t, testLBNamespace, result[0].Namespace)
+		assert.Equal(t, types.ExposedPorts{
+			{Name: "dogu-svc-expose-50000-50000", ServiceName: "dogu-svc", Protocol: corev1.ProtocolTCP, ServicePort: 50000, RequestedExternalPort: 50000},
+		}, result[0].TcpRoutes)
+		assert.NotNil(t, result[0].SetOwner)
+	})
 
-			result, err := r.getExposedPortsForServices(t.Context())
+	t.Run("logs and skips service with invalid annotation", func(t *testing.T) {
+		badSvc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "bad-svc",
+				Namespace:   testLBNamespace,
+				Labels:      map[string]string{k8sv2.DoguLabelName: "bad"},
+				Annotations: map[string]string{expPortAnnotation: `INVALID`},
+			},
+			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
+		}
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			Client:           createDefaultLBClientMock(lbConfigMap, badSvc),
+		}
+		result, err := r.getExpositionsForServices(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
 
-			if tt.expErr {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, tt.errSubstStr)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	t.Run("returns error when list fails (no index registered)", func(t *testing.T) {
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			Client:           testclient.NewClientBuilder().WithObjects(lbConfigMap).Build(),
+		}
+		_, err := r.getExpositionsForServices(t.Context())
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to list exposed services")
+	})
 }
 
-func TestLoadBalancerReconciler_getExposedPortsForExpositions(t *testing.T) {
+func TestLoadBalancerReconciler_getExpositionsForExpositionCRs(t *testing.T) {
 	lbConfigMap := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: types.LoadBalancerConfigName, Namespace: testLBNamespace}}
 
-	tests := []struct {
-		name        string
-		expoConfig  types.ExpositionConfig
-		clientFn    func(t *testing.T) client.Client
-		expected    types.ExposedPorts
-		expErr      bool
-		errSubstStr string
-	}{
-		{
-			name:       "returns empty when DiscoverExpositions is disabled",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: false},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				return createLBClientWithScheme(t, lbConfigMap)
-			},
-			expected: types.ExposedPorts{},
-		},
-		{
-			name:       "returns TCP and UDP ports from indexed expositions",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				exp := &expositionv1.Exposition{
-					ObjectMeta: metav1.ObjectMeta{Name: "ssh-exp", Namespace: testLBNamespace},
-					Spec: expositionv1.ExpositionSpec{
-						TCP: []expositionv1.TCPEntry{{Name: "ssh", Service: "svc", Port: 22}},
-						UDP: []expositionv1.UDPEntry{{Name: "dns", Service: "svc", Port: 53}},
-					},
-				}
-				return createLBClientWithScheme(t, lbConfigMap, exp)
-			},
-			expected: types.ExposedPorts{
-				{Name: "ssh-exp-ssh", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
-				{Name: "ssh-exp-dns", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
-			},
-		},
-		{
-			name:       "returns error when list fails (no index registered)",
-			expoConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
-			clientFn: func(t *testing.T) client.Client {
-				t.Helper()
-				return testclient.NewClientBuilder().WithScheme(getScheme(t)).WithObjects(lbConfigMap).Build()
-			},
-			expErr:      true,
-			errSubstStr: "failed to list expositions",
-		},
-	}
+	t.Run("returns empty when DiscoverExpositions is disabled", func(t *testing.T) {
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: false},
+			Client:           createLBClientWithScheme(t, lbConfigMap),
+		}
+		result, err := r.getExpositionsForExpositionCRs(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &LoadBalancerReconciler{
-				ExpositionConfig: tt.expoConfig,
-				Client:           tt.clientFn(t),
-			}
+	t.Run("returns exposition with TCP and UDP routes from indexed CR", func(t *testing.T) {
+		exp := &expositionv1.Exposition{
+			ObjectMeta: metav1.ObjectMeta{Name: "ssh-exp", Namespace: testLBNamespace},
+			Spec: expositionv1.ExpositionSpec{
+				TCP: []expositionv1.TCPEntry{{Name: "ssh", Service: "svc", Port: 22}},
+				UDP: []expositionv1.UDPEntry{{Name: "dns", Service: "svc", Port: 53}},
+			},
+		}
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			Client:           createLBClientWithScheme(t, lbConfigMap, exp),
+		}
+		result, err := r.getExpositionsForExpositionCRs(t.Context())
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, "ssh-exp", result[0].Name)
+		assert.Equal(t, testLBNamespace, result[0].Namespace)
+		assert.Equal(t, types.ExposedPorts{
+			{Name: "ssh-exp-ssh", ServiceName: "svc", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22},
+		}, result[0].TcpRoutes)
+		assert.Equal(t, types.ExposedPorts{
+			{Name: "ssh-exp-dns", ServiceName: "svc", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53},
+		}, result[0].UdpRoutes)
+		assert.NotNil(t, result[0].SetOwner)
+		assert.NotNil(t, result[0].SetCondition)
+	})
 
-			result, err := r.getExposedPortsForExpositions(t.Context())
-
-			if tt.expErr {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, tt.errSubstStr)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	t.Run("returns error when list fails (no index registered)", func(t *testing.T) {
+		r := &LoadBalancerReconciler{
+			ExpositionConfig: types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			Client:           testclient.NewClientBuilder().WithScheme(getScheme(t)).WithObjects(lbConfigMap).Build(),
+		}
+		_, err := r.getExpositionsForExpositionCRs(t.Context())
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to list expositions")
+	})
 }
 
 func Test_exposedService(t *testing.T) {
