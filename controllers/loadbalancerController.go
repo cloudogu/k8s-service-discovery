@@ -87,6 +87,7 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
+	setPortsAllocatedCondition(ctx, validExpositions)
 	logger.Info("Successfully applied new state to loadbalancer.")
 
 	if eErr := r.PortExposer.ExposePorts(ctx, validExpositions); eErr != nil {
@@ -94,8 +95,6 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	logger.Info("Successfully exposed ports in IngressController.")
-
-	setPortsAllocatedCondition(ctx, validExpositions)
 
 	return ctrl.Result{}, nil
 }
@@ -570,7 +569,7 @@ func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposit
 			conditionTypeLBPortAllocation,
 			true,
 			conditionReasonPortAllocated,
-			fmt.Sprintf("All requested ports %v were successfully allocated.", slices.Concat(e.TcpRoutes, e.UdpRoutes)),
+			fmt.Sprint("All requested ports were successfully allocated."),
 		); cErr != nil {
 			logger.Error(cErr, "failed to set condition", "type", conditionTypeLBPortAllocation, "exposition", e.Name)
 		}

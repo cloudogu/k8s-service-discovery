@@ -411,35 +411,35 @@ func TestLoadBalancerReconciler_Reconcile(t *testing.T) {
 	existingLB := types.CreateLoadBalancer(testLBNamespace, createDefaultLoadbalancerConfig(), []types.Exposition{}, map[string]string{"test": "test"})
 
 	tests := []struct {
-		name                       string
-		expoConfig                 types.ExpositionConfig
-		inClientMock               client.Client
-		setupLoggerMock            func(m *MockLogSink)
-		setupIngressControllerMock func(m *MockIngressController)
-		expErr                     bool
-		errMsg                     string
+		name                 string
+		expoConfig           types.ExpositionConfig
+		inClientMock         client.Client
+		setupLoggerMock      func(m *MockLogSink)
+		setupPortExposerMock func(m *MockPortExposer)
+		expErr               bool
+		errMsg               string
 	}{
 		{
-			name:                       "create new loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     false,
+			name:                 "create new loadbalancer",
+			inClientMock:         createDefaultLBClientMock(lbConfigMap, exposedService),
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               false,
 		},
 		{
-			name:                       "update loadbalancer",
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService, existingLB.ToK8sService()),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     false,
+			name:                 "update loadbalancer",
+			inClientMock:         createDefaultLBClientMock(lbConfigMap, exposedService, existingLB.ToK8sService()),
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               false,
 		},
 		{
-			name:                       "error client get loadbalancer config map",
-			inClientMock:               createDefaultLBClientMock(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: func(m *MockIngressController) {},
-			expErr:                     true,
-			errMsg:                     "failed to get config map for loadbalancer",
+			name:                 "error client get loadbalancer config map",
+			inClientMock:         createDefaultLBClientMock(),
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: func(m *MockPortExposer) {},
+			expErr:               true,
+			errMsg:               "failed to get config map for loadbalancer",
 		},
 		{
 			name: "error parsing loadbalancer config map",
@@ -453,10 +453,10 @@ internalTrafficPolicy: invalid
 externalTrafficPolicy: Local
 `,
 				}}),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: func(m *MockIngressController) {},
-			expErr:                     true,
-			errMsg:                     "failed to parse loadbalancer config",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: func(m *MockPortExposer) {},
+			expErr:               true,
+			errMsg:               "failed to parse loadbalancer config",
 		},
 		{
 			name:       "error fetching exposed services",
@@ -464,10 +464,10 @@ externalTrafficPolicy: Local
 			inClientMock: testclient.NewClientBuilder().
 				WithObjects(lbConfigMap).
 				Build(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: func(m *MockIngressController) {},
-			expErr:                     true,
-			errMsg:                     "failed to list exposed services",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: func(m *MockPortExposer) {},
+			expErr:               true,
+			errMsg:               "failed to list exposed services",
 		},
 		{
 			// services with corrupted annotations are logged and skipped, not fatal
@@ -480,25 +480,25 @@ externalTrafficPolicy: Local
 				},
 				Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
 			}),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     false,
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               false,
 		},
 		{
-			name:                       "success with ExpositionConfig enabled and services",
-			expoConfig:                 types.ExpositionConfig{Enabled: true, DiscoverServices: true},
-			inClientMock:               createDefaultLBClientMock(lbConfigMap, exposedService),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     false,
+			name:                 "success with ExpositionConfig enabled and services",
+			expoConfig:           types.ExpositionConfig{Enabled: true, DiscoverServices: true},
+			inClientMock:         createDefaultLBClientMock(lbConfigMap, exposedService),
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               false,
 		},
 		{
-			name:                       "success with ExpositionConfig enabled and expositions",
-			expoConfig:                 types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
-			inClientMock:               createLBClientWithScheme(t, lbConfigMap, testExposition),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     false,
+			name:                 "success with ExpositionConfig enabled and expositions",
+			expoConfig:           types.ExpositionConfig{Enabled: true, DiscoverExpositions: true},
+			inClientMock:         createLBClientWithScheme(t, lbConfigMap, testExposition),
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               false,
 		},
 		{
 			name:       "error fetching expositions",
@@ -507,10 +507,10 @@ externalTrafficPolicy: Local
 				WithScheme(getScheme(t)).
 				WithObjects(lbConfigMap).
 				Build(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: func(m *MockIngressController) {},
-			expErr:                     true,
-			errMsg:                     "failed to list expositions",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: func(m *MockPortExposer) {},
+			expErr:               true,
+			errMsg:               "failed to list expositions",
 		},
 		{
 			name: "error upserting loadbalancer - get current loadbalancer",
@@ -528,10 +528,10 @@ externalTrafficPolicy: Local
 					},
 				}).
 				Build(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     true,
-			errMsg:                     "failed to get service for loadbalancer",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               true,
+			errMsg:               "failed to get service for loadbalancer",
 		},
 		{
 			name: "error upserting loadbalancer - create loadbalancer",
@@ -546,10 +546,10 @@ externalTrafficPolicy: Local
 					},
 				}).
 				Build(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     true,
-			errMsg:                     "failed to create new loadbalancer service",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               true,
+			errMsg:               "failed to create new loadbalancer service",
 		},
 		{
 			name: "error upserting loadbalancer - update loadbalancer",
@@ -564,10 +564,10 @@ externalTrafficPolicy: Local
 					},
 				}).
 				Build(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     true,
-			errMsg:                     "failed to update existing loadbalancer",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               true,
+			errMsg:               "failed to update existing loadbalancer",
 		},
 		{
 			// pre-seed with a plain Service (no LoadBalancer type) at the LB name — ParseLoadBalancer returns !ok
@@ -575,23 +575,20 @@ externalTrafficPolicy: Local
 			inClientMock: createDefaultLBClientMock(lbConfigMap, exposedService, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: types.LoadbalancerName, Namespace: testLBNamespace},
 			}),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     true,
-			errMsg:                     "could not parse existing service to LoadBalancer",
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               true,
+			errMsg:               "could not parse existing service to LoadBalancer",
 		},
 		{
 			name:            "error exposing ports in ingress controller",
 			inClientMock:    createDefaultLBClientMock(lbConfigMap, exposedService),
 			setupLoggerMock: createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: func(m *MockIngressController) {
-				m.EXPECT().GetSelector().Return(map[string]string{
-					"service.name": "service",
-				})
-				m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything).Return(assert.AnError)
+			setupPortExposerMock: func(m *MockPortExposer) {
+				m.EXPECT().ExposePorts(mock.Anything, mock.Anything).Return(assert.AnError)
 			},
 			expErr: true,
-			errMsg: "failed to update exposed ports in ingress controller",
+			errMsg: "failed to expose ports in ingress controller",
 		},
 		{
 			// pre-seed the desired LB so lb.Equals(desired) is true and no Update is called
@@ -604,9 +601,9 @@ externalTrafficPolicy: Local
 				}, []types.Exposition{}, selector)
 				return createDefaultLBClientMock(lbConfigMap, desiredLB.ToK8sService())
 			}(),
-			setupLoggerMock:            createDefaultLoadbalancerLoggerMock(),
-			setupIngressControllerMock: createNoErrorExposePorts(),
-			expErr:                     false,
+			setupLoggerMock:      createDefaultLoadbalancerLoggerMock(),
+			setupPortExposerMock: createNoErrorExposePorts(),
+			expErr:               false,
 		},
 	}
 
@@ -622,13 +619,14 @@ externalTrafficPolicy: Local
 			// inject logger into context this way because the context search key is private to the logging framework
 			valuedTestCtx := log.IntoContext(t.Context(), logger)
 
-			ingressControllerMock := NewMockIngressController(t)
-			tt.setupIngressControllerMock(ingressControllerMock)
+			portExposerMock := NewMockPortExposer(t)
+			tt.setupPortExposerMock(portExposerMock)
 
 			lbReconciler := &LoadBalancerReconciler{
-				ExpositionConfig:  tt.expoConfig,
-				Client:            tt.inClientMock,
-				IngressController: ingressControllerMock,
+				ExpositionConfig: tt.expoConfig,
+				IngressSelector:  map[string]string{"service.name": "service"},
+				Client:           tt.inClientMock,
+				PortExposer:      portExposerMock,
 			}
 
 			request := ctrl.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testLBNamespace, Name: types.LoadBalancerConfigName}}
@@ -658,12 +656,9 @@ func createDefaultLoadbalancerConfig() types.LoadbalancerConfig {
 	}
 }
 
-func createNoErrorExposePorts() func(m *MockIngressController) {
-	return func(m *MockIngressController) {
-		m.EXPECT().GetSelector().Return(map[string]string{
-			"service.name": "service",
-		}).Maybe()
-		m.EXPECT().ExposePorts(mock.Anything, testLBNamespace, mock.Anything).Return(nil).Maybe()
+func createNoErrorExposePorts() func(m *MockPortExposer) {
+	return func(m *MockPortExposer) {
+		m.EXPECT().ExposePorts(mock.Anything, mock.Anything).Return(nil).Maybe()
 	}
 }
 
@@ -1105,5 +1100,177 @@ func Test_exposedService(t *testing.T) {
 				assert.Equal(t, tt.expected, tt.es.GetExposedPorts())
 			})
 		}
+	})
+}
+
+func Test_checkPortCollisions(t *testing.T) {
+	tcpPort22 := types.ExposedPort{Name: "ssh", Protocol: corev1.ProtocolTCP, ServicePort: 22, RequestedExternalPort: 22}
+	tcpPort53 := types.ExposedPort{Name: "dns-tcp", Protocol: corev1.ProtocolTCP, ServicePort: 53, RequestedExternalPort: 53}
+	udpPort53 := types.ExposedPort{Name: "dns-udp", Protocol: corev1.ProtocolUDP, ServicePort: 53, RequestedExternalPort: 53}
+	tcpPort80 := types.ExposedPort{Name: "http", Protocol: corev1.ProtocolTCP, ServicePort: 80, RequestedExternalPort: 80}
+
+	t.Run("empty input returns empty valid list and empty collision map", func(t *testing.T) {
+		valid, collisions := checkPortCollisions([]types.Exposition{})
+		assert.Empty(t, valid)
+		assert.Empty(t, collisions)
+	})
+
+	t.Run("no collisions returns all expositions and empty collision map", func(t *testing.T) {
+		input := []types.Exposition{
+			{Name: "a", TcpRoutes: types.ExposedPorts{tcpPort22}},
+			{Name: "b", TcpRoutes: types.ExposedPorts{tcpPort80}},
+			{Name: "c", UdpRoutes: types.ExposedPorts{udpPort53}},
+		}
+		valid, collisions := checkPortCollisions(input)
+		assert.Len(t, valid, 3)
+		assert.Empty(t, collisions)
+	})
+
+	t.Run("two expositions claiming same TCP port are both excluded", func(t *testing.T) {
+		input := []types.Exposition{
+			{Name: "a", TcpRoutes: types.ExposedPorts{tcpPort22}},
+			{Name: "b", TcpRoutes: types.ExposedPorts{tcpPort22}},
+		}
+		valid, collisions := checkPortCollisions(input)
+		assert.Empty(t, valid)
+		assert.Len(t, collisions, 2)
+	})
+
+	t.Run("same port number with different protocols is not a collision", func(t *testing.T) {
+		input := []types.Exposition{
+			{Name: "a", TcpRoutes: types.ExposedPorts{tcpPort53}},
+			{Name: "b", UdpRoutes: types.ExposedPorts{udpPort53}},
+		}
+		valid, collisions := checkPortCollisions(input)
+		assert.Len(t, valid, 2)
+		assert.Empty(t, collisions)
+	})
+
+	t.Run("partial collision: colliders excluded, non-collider returned", func(t *testing.T) {
+		input := []types.Exposition{
+			{Name: "a", TcpRoutes: types.ExposedPorts{tcpPort22}},
+			{Name: "b", TcpRoutes: types.ExposedPorts{tcpPort22}},
+			{Name: "c", TcpRoutes: types.ExposedPorts{tcpPort80}},
+		}
+		valid, collisions := checkPortCollisions(input)
+		require.Len(t, valid, 1)
+		assert.Equal(t, "c", valid[0].Name)
+		assert.Len(t, collisions, 2)
+	})
+}
+
+func Test_collisionMessage(t *testing.T) {
+	t.Run("single key", func(t *testing.T) {
+		msg := collisionMessage([]portProtocolKey{{port: 22, protocol: corev1.ProtocolTCP}})
+		assert.Equal(t, "port collision for: TCP/22", msg)
+	})
+
+	t.Run("multiple keys contain all port/protocol pairs", func(t *testing.T) {
+		msg := collisionMessage([]portProtocolKey{
+			{port: 22, protocol: corev1.ProtocolTCP},
+			{port: 53, protocol: corev1.ProtocolUDP},
+		})
+		assert.Contains(t, msg, "port collision for:")
+		assert.Contains(t, msg, "TCP/22")
+		assert.Contains(t, msg, "UDP/53")
+	})
+}
+
+func Test_setPortsAllocatedConditionError(t *testing.T) {
+	newLoggerCtx := func(t *testing.T, setup func(m *MockLogSink)) context.Context {
+		t.Helper()
+		mockLogSink := NewMockLogSink(t)
+		setup(mockLogSink)
+		logger := logr.Logger{}.WithSink(mockLogSink)
+		return log.IntoContext(t.Context(), logger)
+	}
+
+	t.Run("empty collision map is a no-op", func(t *testing.T) {
+		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{})
+	})
+
+	t.Run("exposition with nil SetCondition is skipped", func(t *testing.T) {
+		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+		e := &types.Exposition{Name: "no-setter"}
+		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{
+			e: {{port: 22, protocol: corev1.ProtocolTCP}},
+		})
+	})
+
+	t.Run("SetCondition success does not log an error", func(t *testing.T) {
+		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+		e := &types.Exposition{
+			Name: "has-setter",
+			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
+				return nil
+			},
+		}
+		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{
+			e: {{port: 22, protocol: corev1.ProtocolTCP}},
+		})
+	})
+
+	t.Run("SetCondition failure is logged", func(t *testing.T) {
+		ctx := newLoggerCtx(t, func(m *MockLogSink) {
+			m.EXPECT().WithValues().Return(m)
+			m.EXPECT().Enabled(mock.Anything).Return(true).Maybe()
+			m.EXPECT().Info(0, mock.Anything).Return().Maybe()
+			m.EXPECT().Error(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+		})
+		e := &types.Exposition{
+			Name: "error-setter",
+			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
+				return assert.AnError
+			},
+		}
+		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{
+			e: {{port: 22, protocol: corev1.ProtocolTCP}},
+		})
+	})
+}
+
+func Test_setPortsAllocatedCondition(t *testing.T) {
+	newLoggerCtx := func(t *testing.T, setup func(m *MockLogSink)) context.Context {
+		t.Helper()
+		mockLogSink := NewMockLogSink(t)
+		setup(mockLogSink)
+		logger := logr.Logger{}.WithSink(mockLogSink)
+		return log.IntoContext(t.Context(), logger)
+	}
+
+	t.Run("empty list is a no-op", func(t *testing.T) {
+		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+		setPortsAllocatedCondition(ctx, []types.Exposition{})
+	})
+
+	t.Run("exposition with nil SetCondition is skipped", func(t *testing.T) {
+		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+		setPortsAllocatedCondition(ctx, []types.Exposition{{Name: "no-setter"}})
+	})
+
+	t.Run("SetCondition success does not log an error", func(t *testing.T) {
+		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+		setPortsAllocatedCondition(ctx, []types.Exposition{{
+			Name: "has-setter",
+			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
+				return nil
+			},
+		}})
+	})
+
+	t.Run("SetCondition failure is logged", func(t *testing.T) {
+		ctx := newLoggerCtx(t, func(m *MockLogSink) {
+			m.EXPECT().WithValues().Return(m)
+			m.EXPECT().Enabled(mock.Anything).Return(true).Maybe()
+			m.EXPECT().Info(0, mock.Anything).Return().Maybe()
+			m.EXPECT().Error(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+		})
+		setPortsAllocatedCondition(ctx, []types.Exposition{{
+			Name: "error-setter",
+			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
+				return assert.AnError
+			},
+		}})
 	})
 }

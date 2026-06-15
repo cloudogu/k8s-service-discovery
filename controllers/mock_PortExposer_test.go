@@ -22,17 +22,17 @@ func (_m *MockPortExposer) EXPECT() *MockPortExposer_Expecter {
 	return &MockPortExposer_Expecter{mock: &_m.Mock}
 }
 
-// ExposePorts provides a mock function with given fields: ctx, namespace, exposedPorts
-func (_m *MockPortExposer) ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error {
-	ret := _m.Called(ctx, namespace, exposedPorts)
+// ExposePorts provides a mock function with given fields: ctx, expositions
+func (_m *MockPortExposer) ExposePorts(ctx context.Context, expositions []types.Exposition) error {
+	ret := _m.Called(ctx, expositions)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExposePorts")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ExposedPorts) error); ok {
-		r0 = rf(ctx, namespace, exposedPorts)
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Exposition) error); ok {
+		r0 = rf(ctx, expositions)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -47,15 +47,14 @@ type MockPortExposer_ExposePorts_Call struct {
 
 // ExposePorts is a helper method to define mock.On call
 //   - ctx context.Context
-//   - namespace string
-//   - exposedPorts types.ExposedPorts
-func (_e *MockPortExposer_Expecter) ExposePorts(ctx interface{}, namespace interface{}, exposedPorts interface{}) *MockPortExposer_ExposePorts_Call {
-	return &MockPortExposer_ExposePorts_Call{Call: _e.mock.On("ExposePorts", ctx, namespace, exposedPorts)}
+//   - expositions []types.Exposition
+func (_e *MockPortExposer_Expecter) ExposePorts(ctx interface{}, expositions interface{}) *MockPortExposer_ExposePorts_Call {
+	return &MockPortExposer_ExposePorts_Call{Call: _e.mock.On("ExposePorts", ctx, expositions)}
 }
 
-func (_c *MockPortExposer_ExposePorts_Call) Run(run func(ctx context.Context, namespace string, exposedPorts types.ExposedPorts)) *MockPortExposer_ExposePorts_Call {
+func (_c *MockPortExposer_ExposePorts_Call) Run(run func(ctx context.Context, expositions []types.Exposition)) *MockPortExposer_ExposePorts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(types.ExposedPorts))
+		run(args[0].(context.Context), args[1].([]types.Exposition))
 	})
 	return _c
 }
@@ -65,7 +64,7 @@ func (_c *MockPortExposer_ExposePorts_Call) Return(_a0 error) *MockPortExposer_E
 	return _c
 }
 
-func (_c *MockPortExposer_ExposePorts_Call) RunAndReturn(run func(context.Context, string, types.ExposedPorts) error) *MockPortExposer_ExposePorts_Call {
+func (_c *MockPortExposer_ExposePorts_Call) RunAndReturn(run func(context.Context, []types.Exposition) error) *MockPortExposer_ExposePorts_Call {
 	_c.Call.Return(run)
 	return _c
 }
