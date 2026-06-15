@@ -163,7 +163,7 @@ func startManager() error {
 
 	if err = configureManager(
 		serviceDiscManager,
-		clientSet,
+		ingressControllerAdapter,
 		globalConfigRepo,
 		watchNamespace,
 		controller,
@@ -212,10 +212,10 @@ type certificateSynchronizer interface {
 	Synchronize(ctx context.Context) error
 }
 
-func configureManager(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig types.ExpositionConfig, certSync certificateSynchronizer) error {
+func configureManager(k8sManager k8sManager, traefikController *adapter.TraefikIngressController, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig types.ExpositionConfig, certSync certificateSynchronizer) error {
 	if err := configureReconciler(
 		k8sManager,
-		k8sClients,
+		traefikController,
 		globalConfigRepo,
 		namespace,
 		ingressController,
@@ -285,7 +285,7 @@ func handleSelfsignedCertificateUpdates(k8sManager k8sManager, namespace string,
 	return nil
 }
 
-func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig types.ExpositionConfig, certSync certificateSynchronizer) error {
+func configureReconciler(k8sManager k8sManager, traefikController *adapter.TraefikIngressController, globalConfigRepo controllers.GlobalConfigRepository, namespace string, ingressController controllers.IngressController, expositionService controllers.ExpositionService, expositionConfig types.ExpositionConfig, certSync certificateSynchronizer) error {
 	if expositionConfig.DiscoverServices {
 		serviceReconciler := &controllers.ServiceReconciler{
 			Client:            k8sManager.GetClient(),
@@ -322,10 +322,10 @@ func configureReconciler(k8sManager k8sManager, k8sClients k8sClientSet, globalC
 	}
 
 	loadbalancerReconciler := &controllers.LoadBalancerReconciler{
-		ExpositionConfig:  expositionConfig,
-		Client:            k8sManager.GetClient(),
-		IngressController: ingressController,
-		SvcClient:         k8sClients.serviceClient,
+		IngressSelector:  ingressController.GetSelector(),
+		ExpositionConfig: expositionConfig,
+		Client:           k8sManager.GetClient(),
+		PortExposer:      traefikController,
 	}
 	if err := loadbalancerReconciler.SetupWithManager(k8sManager); err != nil {
 		return fmt.Errorf("failed to setup loadbalancer reconciler with the manager: %w", err)

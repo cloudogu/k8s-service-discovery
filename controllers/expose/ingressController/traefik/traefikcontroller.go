@@ -37,7 +37,6 @@ var selectorMap = map[controllerType]map[string]string{
 
 type IngressController struct {
 	controllerType
-	*PortExposer
 	*IngressRedirector
 }
 
@@ -51,11 +50,6 @@ type IngressControllerDependencies struct {
 
 func NewTraefikController(deps IngressControllerDependencies) *IngressController {
 	return &IngressController{
-		PortExposer: &PortExposer{
-			traefikInterface: deps.TraefikInterface,
-			ingressInterface: deps.IngressInterface,
-			namespace:        deps.Namespace,
-		},
 		IngressRedirector: &IngressRedirector{
 			ingressClassName: deps.IngressClassName,
 			ingressInterface: deps.IngressInterface,

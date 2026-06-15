@@ -40,7 +40,6 @@ type IngressControllerSelector interface {
 type IngressController interface {
 	AlternativeFQDNRedirector
 	IngressControllerSelector
-	PortExposer
 }
 
 type secretClient interface {

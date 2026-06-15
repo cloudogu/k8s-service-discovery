@@ -5,9 +5,9 @@ package controllers
 import (
 	context "context"
 
-	types "github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	mock "github.com/stretchr/testify/mock"
 
+	types "github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,54 +22,6 @@ type MockIngressController_Expecter struct {
 
 func (_m *MockIngressController) EXPECT() *MockIngressController_Expecter {
 	return &MockIngressController_Expecter{mock: &_m.Mock}
-}
-
-// ExposePorts provides a mock function with given fields: ctx, namespace, expositions
-func (_m *MockIngressController) ExposePorts(ctx context.Context, namespace string, expositions []types.Exposition) error {
-	ret := _m.Called(ctx, namespace, expositions)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ExposePorts")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []types.Exposition) error); ok {
-		r0 = rf(ctx, namespace, expositions)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockIngressController_ExposePorts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExposePorts'
-type MockIngressController_ExposePorts_Call struct {
-	*mock.Call
-}
-
-// ExposePorts is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-//   - expositions []types.Exposition
-func (_e *MockIngressController_Expecter) ExposePorts(ctx interface{}, namespace interface{}, expositions interface{}) *MockIngressController_ExposePorts_Call {
-	return &MockIngressController_ExposePorts_Call{Call: _e.mock.On("ExposePorts", ctx, namespace, expositions)}
-}
-
-func (_c *MockIngressController_ExposePorts_Call) Run(run func(ctx context.Context, namespace string, expositions []types.Exposition)) *MockIngressController_ExposePorts_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]types.Exposition))
-	})
-	return _c
-}
-
-func (_c *MockIngressController_ExposePorts_Call) Return(_a0 error) *MockIngressController_ExposePorts_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockIngressController_ExposePorts_Call) RunAndReturn(run func(context.Context, string, []types.Exposition) error) *MockIngressController_ExposePorts_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // GetSelector provides a mock function with no fields
