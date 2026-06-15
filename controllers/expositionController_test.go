@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
+	"github.com/cloudogu/k8s-service-discovery/v2/internal/adapter"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,9 +27,12 @@ func int32Ptr(v int32) *int32 { return &v }
 func stringPtr(v string) *string { return &v }
 
 type assertingStatusWriter struct {
-	t          *testing.T
-	assertFunc func(t *testing.T, obj client.Object)
-	updateErr  error
+	t           *testing.T
+	assertFunc  func(t *testing.T, obj client.Object)
+	assertFuncs []func(t *testing.T, obj client.Object)
+	updateErr   error
+	updateErrs  []error
+	calls       int
 }
 
 func (w *assertingStatusWriter) Create(context.Context, client.Object, client.Object, ...client.SubResourceCreateOption) error {
@@ -37,7 +41,18 @@ func (w *assertingStatusWriter) Create(context.Context, client.Object, client.Ob
 }
 
 func (w *assertingStatusWriter) Update(_ context.Context, obj client.Object, _ ...client.SubResourceUpdateOption) error {
-	w.assertFunc(w.t, obj)
+	callIndex := w.calls
+	if len(w.assertFuncs) > 0 {
+		require.Less(w.t, callIndex, len(w.assertFuncs))
+		w.assertFuncs[callIndex](w.t, obj)
+		w.calls++
+	} else {
+		w.assertFunc(w.t, obj)
+	}
+	if len(w.updateErrs) > 0 {
+		require.Less(w.t, callIndex, len(w.updateErrs))
+		return w.updateErrs[callIndex]
+	}
 	return w.updateErr
 }
 
@@ -54,6 +69,7 @@ func (w *assertingStatusWriter) Apply(context.Context, runtime.ApplyConfiguratio
 func assertReadyCondition(
 	t *testing.T,
 	obj client.Object,
+	conditionType string,
 	status metav1.ConditionStatus,
 	reason string,
 	message string,
@@ -64,12 +80,20 @@ func assertReadyCondition(
 	cr, ok := obj.(*expositionv1.Exposition)
 	require.True(t, ok)
 
-	condition := meta.FindStatusCondition(cr.Status.Conditions, ReadyConditionType)
+	condition := meta.FindStatusCondition(cr.Status.Conditions, conditionType)
 	require.NotNil(t, condition)
 	assert.Equal(t, status, condition.Status)
 	assert.Equal(t, reason, condition.Reason)
 	assert.Equal(t, message, condition.Message)
 	assert.Equal(t, observedGeneration, condition.ObservedGeneration)
+}
+
+func assertInitializedConditions(t *testing.T, obj client.Object, observedGeneration int64) {
+	t.Helper()
+
+	assertReadyCondition(t, obj, validConditionType, metav1.ConditionUnknown, "", "", observedGeneration)
+	assertReadyCondition(t, obj, adapter.IngressesConditionType, metav1.ConditionUnknown, "", "", observedGeneration)
+	assertReadyCondition(t, obj, adapter.NetworkPolicyConditionType, metav1.ConditionUnknown, "", "", observedGeneration)
 }
 
 func TestExpositionReconciler_Reconcile(t *testing.T) {
@@ -136,18 +160,23 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr.Generation = 2
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					m.EXPECT().Status().Return(&assertingStatusWriter{
 						t: t,
-						assertFunc: func(t *testing.T, obj client.Object) {
-							assertReadyCondition(
-								t,
-								obj,
-								metav1.ConditionFalse,
-								ProcessingFailedConditionReason,
-								"failed to process exposition from exposition CR: assert.AnError general error for testing",
-								2,
-							)
+						assertFuncs: []func(t *testing.T, obj client.Object){
+							func(t *testing.T, obj client.Object) {
+								assertInitializedConditions(t, obj, 2)
+							},
+							func(t *testing.T, obj client.Object) {
+								assertReadyCondition(
+									t,
+									obj,
+									validConditionType,
+									metav1.ConditionTrue,
+									mappingSuccessfulConditionReason,
+									mappingSuccessfulConditionMessage,
+									2,
+								)
+							},
 						},
 					})
 					return m
@@ -182,18 +211,23 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr.Generation = 3
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					m.EXPECT().Status().Return(&assertingStatusWriter{
 						t: t,
-						assertFunc: func(t *testing.T, obj client.Object) {
-							assertReadyCondition(
-								t,
-								obj,
-								metav1.ConditionTrue,
-								RoutesCreatedConditionReason,
-								RoutesCreatedConditionMessage,
-								3,
-							)
+						assertFuncs: []func(t *testing.T, obj client.Object){
+							func(t *testing.T, obj client.Object) {
+								assertInitializedConditions(t, obj, 3)
+							},
+							func(t *testing.T, obj client.Object) {
+								assertReadyCondition(
+									t,
+									obj,
+									validConditionType,
+									metav1.ConditionTrue,
+									mappingSuccessfulConditionReason,
+									mappingSuccessfulConditionMessage,
+									3,
+								)
+							},
 						},
 					})
 					return m
@@ -202,7 +236,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 					m := NewMockExpositionService(t)
 					m.EXPECT().
 						ProcessExposition(t.Context(), mock.MatchedBy(func(e types.Exposition) bool {
-							return e.Name == "test" && e.Namespace == testNamespace && e.SetOwner != nil
+							return e.Name == "test" && e.Namespace == testNamespace && e.SetOwner != nil && e.SetCondition != nil
 						})).
 						Return(nil)
 					return m
@@ -212,7 +246,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "fail to update success status",
+			name: "fail to update validation status",
 			fields: fields{
 				ClientFn: func(t *testing.T) client.Client {
 					m := newMockK8sClient(t)
@@ -225,37 +259,35 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 							cr.Generation = 4
 						}).
 						Return(nil)
-					m.EXPECT().Scheme().Return(getScheme(t)).Maybe()
 					m.EXPECT().Status().Return(&assertingStatusWriter{
 						t: t,
-						assertFunc: func(t *testing.T, obj client.Object) {
-							assertReadyCondition(
-								t,
-								obj,
-								metav1.ConditionTrue,
-								RoutesCreatedConditionReason,
-								RoutesCreatedConditionMessage,
-								4,
-							)
+						assertFuncs: []func(t *testing.T, obj client.Object){
+							func(t *testing.T, obj client.Object) {
+								assertInitializedConditions(t, obj, 4)
+							},
+							func(t *testing.T, obj client.Object) {
+								assertReadyCondition(
+									t,
+									obj,
+									validConditionType,
+									metav1.ConditionTrue,
+									mappingSuccessfulConditionReason,
+									mappingSuccessfulConditionMessage,
+									4,
+								)
+							},
 						},
-						updateErr: assert.AnError,
+						updateErrs: []error{nil, assert.AnError},
 					})
 					return m
 				},
 				ExpositionServiceFn: func(t *testing.T) ExpositionService {
-					m := NewMockExpositionService(t)
-					m.EXPECT().
-						ProcessExposition(t.Context(), mock.MatchedBy(func(e types.Exposition) bool {
-							return e.Name == "test" && e.Namespace == testNamespace && e.SetOwner != nil
-						})).
-						Return(nil)
-					return m
+					return NewMockExpositionService(t)
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testNamespace, Name: "test"}},
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorIs(t, err, assert.AnError, i...) &&
-					assert.ErrorContains(t, err, "failed to update exposition status", i...)
+				return assert.ErrorIs(t, err, assert.AnError, i...)
 			},
 		},
 	}
@@ -438,7 +470,8 @@ func Test_mapExpositionCRToUDPExposedPorts(t *testing.T) {
 }
 
 func Test_mapExpositionCRToExposition(t *testing.T) {
-	scheme := testclient.NewClientBuilder().WithScheme(getScheme(t)).Build()
+	scheme := getScheme(t)
+	c := newMockK8sClient(t)
 	cr := &expositionv1.Exposition{
 		ObjectMeta: metav1.ObjectMeta{Name: "ldap", Namespace: testNamespace, UID: "owner-uid"},
 		Spec: expositionv1.ExpositionSpec{
@@ -449,7 +482,7 @@ func Test_mapExpositionCRToExposition(t *testing.T) {
 	}
 
 	t.Run("happy path populates every section", func(t *testing.T) {
-		got, err := mapExpositionCRToExposition(cr, scheme)
+		got, err := mapExpositionCRToExposition(cr, c)
 		require.NoError(t, err)
 		assert.Equal(t, "ldap", got.Name)
 		assert.Equal(t, testNamespace, got.Namespace)
@@ -457,10 +490,13 @@ func Test_mapExpositionCRToExposition(t *testing.T) {
 		assert.Len(t, got.TcpRoutes, 1)
 		assert.Len(t, got.UdpRoutes, 1)
 		assert.NotNil(t, got.SetOwner)
+		assert.NotNil(t, got.SetCondition)
 	})
 
 	t.Run("SetOwner wires the CR as controller", func(t *testing.T) {
-		got, err := mapExpositionCRToExposition(cr, scheme)
+		c := newMockK8sClient(t)
+		c.EXPECT().Scheme().Return(scheme)
+		got, err := mapExpositionCRToExposition(cr, c)
 		require.NoError(t, err)
 
 		target := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "tgt", Namespace: testNamespace}}

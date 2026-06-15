@@ -2,11 +2,34 @@ package adapter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	IngressesConditionType = "IngressesReady"
+
+	ingressesCreatedConditionReason  = "Created"
+	ingressesCreatedConditionMessage = "Normal ingresses have been created."
+
+	ingressesMaintenanceModeActiveConditionReason  = "MaintenanceMode"
+	ingressesMaintenanceModeActiveConditionMessage = "Ingresses for maintenance mode have been created."
+
+	ingressesDoguStoppedConditionReason  = "DoguStopped"
+	ingressesDoguStoppedConditionMessage = "Ingresses for stopped dogu have been handled."
+
+	ingressesDoguStartingConditionReason  = "DoguStarting"
+	ingressesDoguStartingConditionMessage = "Ingresses for starting dogu have been created."
+
+	ingressesGetStatusFailedConditionReason       = "GetStatusFailed"
+	ingressesCreateOrUpdateFailedConditionReason  = "CreateOrUpdateFailed"
+	ingressesMaintenanceModeFailedConditionReason = "MaintenanceModeFailed"
+	ingressesDoguStoppedFailedConditionReason     = "DoguStoppedFailed"
+	ingressesDoguStartingFailedConditionReason    = "DoguStartingFailed"
 )
 
 // Service name and port of the static-content backend that serves
@@ -61,12 +84,16 @@ func (i Ingress) GetOwnableTypes() []client.Object {
 func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
 	doguApplicationState, err := i.Dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
 	if err != nil {
-		return fmt.Errorf("failed to get status of dogu: %w", err)
+		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, ingressesGetStatusFailedConditionReason,
+			fmt.Errorf("failed to get status of dogu: %w", err))
 	}
 
 	_, maintenanceMode, err := i.Maintenance.GetStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get status of global maintenance mode: %w", err)
+		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, ingressesGetStatusFailedConditionReason,
+			fmt.Errorf("failed to get status of global maintenance mode: %w", err))
 	}
 
 	if maintenanceMode {
@@ -78,10 +105,44 @@ func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposit
 	}
 
 	if lErr := i.Controller.ProcessExposition(ctx, doguApplicationState, exposition); lErr != nil {
-		return fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr)
+		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, appStateToIngressConditionErrorReason(doguApplicationState),
+			fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr))
 	}
 
-	return nil
+	conditionReason, conditionMessage := appStateToIngressConditionReasonMessage(doguApplicationState)
+	return exposition.SetCondition(ctx, IngressesConditionType, true, conditionReason, conditionMessage)
+}
+
+func handleErrorCondition(ctx context.Context, exposition types.Exposition, conditionType, reason string, err error) error {
+	conditionErr := exposition.SetCondition(ctx, conditionType, false, reason, err.Error())
+	return errors.Join(err, conditionErr)
+}
+
+func appStateToIngressConditionErrorReason(state types.ApplicationState) string {
+	switch state {
+	case types.ApplicationStopped:
+		return ingressesDoguStoppedFailedConditionReason
+	case types.ApplicationIsStarting:
+		return ingressesDoguStartingFailedConditionReason
+	case types.ApplicationMaintenance:
+		return ingressesMaintenanceModeFailedConditionReason
+	default:
+		return ingressesCreateOrUpdateFailedConditionReason
+	}
+}
+
+func appStateToIngressConditionReasonMessage(state types.ApplicationState) (string, string) {
+	switch state {
+	case types.ApplicationStopped:
+		return ingressesDoguStoppedConditionReason, ingressesDoguStoppedConditionMessage
+	case types.ApplicationIsStarting:
+		return ingressesDoguStartingConditionReason, ingressesDoguStartingConditionMessage
+	case types.ApplicationMaintenance:
+		return ingressesMaintenanceModeActiveConditionReason, ingressesMaintenanceModeActiveConditionMessage
+	default:
+		return ingressesCreatedConditionReason, ingressesCreatedConditionMessage
+	}
 }
 
 // redirectHttpRoutesToStaticBackend returns a copy of httpRoutes in

@@ -211,7 +211,7 @@ func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
 				UdpRoutes: tt.udp,
 				SetOwner:  tt.setOwner,
 			}
-			got, err := n.createNetworkPolicy(exposition)
+			got, err := n.generateNetworkPolicy(exposition)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -228,13 +228,14 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 	policyKey := client.ObjectKey{Namespace: testNamespace, Name: "ldap-exposed-ports"}
 
 	tests := []struct {
-		name      string
-		clientFn  func(t *testing.T) client.Client
-		tcp       []types.ExposedPort
-		udp       []types.ExposedPort
-		setOwner  types.SetOwnerFunc
-		wantErr   assert.ErrorAssertionFunc
-		postCheck func(t *testing.T, c client.Client)
+		name          string
+		clientFn      func(t *testing.T) client.Client
+		tcp           []types.ExposedPort
+		udp           []types.ExposedPort
+		setOwner      types.SetOwnerFunc
+		wantErr       assert.ErrorAssertionFunc
+		wantCondition *conditionCall
+		postCheck     func(t *testing.T, c client.Client)
 	}{
 		{
 			name:     "no ports, no existing policy => no-op",
@@ -280,6 +281,12 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to delete network policy", i...)
 			},
+			wantCondition: &conditionCall{
+				conditionType: NetworkPolicyConditionType,
+				status:        false,
+				reason:        networkPolicyDeletionFailedConditionReason,
+				message:       "failed to delete network policy \"ldap-exposed-ports\": assert.AnError general error for testing",
+			},
 		},
 		{
 			name:     "ports present, SetOwner errors => wrapped error",
@@ -288,7 +295,13 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			setOwner: errOwner,
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
-					assert.ErrorContains(t, err, "failed to create network policy", i...)
+					assert.ErrorContains(t, err, "failed to generate network policy", i...)
+			},
+			wantCondition: &conditionCall{
+				conditionType: NetworkPolicyConditionType,
+				status:        false,
+				reason:        networkPolicyGenerationFailedConditionReason,
+				message:       "failed to generate network policy: failed to set owner for network policy: assert.AnError general error for testing",
 			},
 		},
 		{
@@ -297,6 +310,12 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			tcp:      tcpPorts,
 			setOwner: okOwner,
 			wantErr:  assert.NoError,
+			wantCondition: &conditionCall{
+				conditionType: NetworkPolicyConditionType,
+				status:        true,
+				reason:        networkPolicyCreatedConditionReason,
+				message:       networkPolicyCreatedConditionMessage,
+			},
 			postCheck: func(t *testing.T, c client.Client) {
 				got := &networkingv1.NetworkPolicy{}
 				require.NoError(t, c.Get(t.Context(), policyKey, got))
@@ -322,6 +341,12 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			tcp:      tcpPorts,
 			setOwner: okOwner,
 			wantErr:  assert.NoError,
+			wantCondition: &conditionCall{
+				conditionType: NetworkPolicyConditionType,
+				status:        true,
+				reason:        networkPolicyCreatedConditionReason,
+				message:       networkPolicyCreatedConditionMessage,
+			},
 			postCheck: func(t *testing.T, c client.Client) {
 				got := &networkingv1.NetworkPolicy{}
 				require.NoError(t, c.Get(t.Context(), policyKey, got))
@@ -345,22 +370,46 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to create or update network policy", i...)
 			},
+			wantCondition: &conditionCall{
+				conditionType: NetworkPolicyConditionType,
+				status:        false,
+				reason:        networkPolicyCreateOrUpdateFailedConditionReason,
+				message:       "failed to create or update network policy \"ldap-exposed-ports\": assert.AnError general error for testing",
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := tt.clientFn(t)
 			n := fixedNetworkPolicy(t, c)
+			gotCondition := conditionCall{}
+			conditionSet := false
 			exposition := types.Exposition{
 				Name:      "ldap",
 				Namespace: testNamespace,
 				TcpRoutes: tt.tcp,
 				UdpRoutes: tt.udp,
 				SetOwner:  tt.setOwner,
+				SetCondition: func(_ context.Context, conditionType string, conditionStatus bool, reason string, msg string) error {
+					conditionSet = true
+					gotCondition = conditionCall{
+						conditionType: conditionType,
+						status:        conditionStatus,
+						reason:        reason,
+						message:       msg,
+					}
+					return nil
+				},
 			}
 			err := n.ProcessExposition(t.Context(), exposition)
 			if !tt.wantErr(t, err) {
 				return
+			}
+			if tt.wantCondition == nil {
+				assert.False(t, conditionSet)
+			} else {
+				require.True(t, conditionSet)
+				assert.Equal(t, *tt.wantCondition, gotCondition)
 			}
 			if tt.postCheck != nil {
 				tt.postCheck(t, c)
