@@ -620,9 +620,9 @@ func TestLoadBalancer_UpdateExposedPorts(t *testing.T) {
 				{"b", corev1.ProtocolUDP, nil, 5, intstr.FromInt32(6), 666},
 			},
 			exp: []corev1.ServicePort{
-				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(1), 99},
-				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(5), 666},
-				{"c", corev1.ProtocolUDP, nil, 7, intstr.FromInt32(10), 0}},
+				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(2), 99},
+				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(6), 666},
+				{"c", corev1.ProtocolUDP, nil, 7, intstr.FromInt32(7), 0}},
 		},
 	}
 

@@ -44,7 +44,7 @@ func TestExposedPort_ToServicePort(t *testing.T) {
 		Name:       "test",
 		Protocol:   corev1.ProtocolUDP,
 		Port:       67890,
-		TargetPort: intstr.FromInt32(12345),
+		TargetPort: intstr.FromInt32(67890),
 		NodePort:   400,
 	}
 
@@ -210,8 +210,8 @@ func TestExposedPorts_ToServicePorts(t *testing.T) {
 				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
 			},
 			exp: []corev1.ServicePort{
-				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(1), 3},
-				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(5), 7},
+				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(2), 3},
+				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(6), 7},
 			},
 		},
 		{
@@ -221,8 +221,8 @@ func TestExposedPorts_ToServicePorts(t *testing.T) {
 				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
 			},
 			exp: []corev1.ServicePort{
-				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(1), 3},
-				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(5), 7},
+				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(2), 3},
+				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(6), 7},
 			},
 		},
 	}

@@ -35,6 +35,7 @@ type conditionCall struct {
 func fixedExposition(routes []types.HttpRoute, condition *conditionCall) types.Exposition {
 	return types.Exposition{
 		Name:       "ldap",
+		DoguName:   "ldap",
 		Namespace:  "ns",
 		HttpRoutes: routes,
 		SetCondition: func(_ context.Context, conditionType string, conditionStatus bool, reason string, msg string) error {
