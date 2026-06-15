@@ -30,6 +30,7 @@ type AlternativeFQDNRedirector interface {
 }
 
 type PortExposer interface {
+	GetExposedPortOwnableTypes() []client.Object
 	ExposePorts(ctx context.Context, expositions []types.Exposition) error
 }
 

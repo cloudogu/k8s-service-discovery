@@ -185,6 +185,13 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return ctrlBuilder.Complete(r)
 	}
 
+	for _, res := range r.PortExposer.GetExposedPortOwnableTypes() {
+		ctrlBuilder.Watches(
+			res,
+			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
+		)
+	}
+
 	if r.ExpositionConfig.DiscoverServices {
 		if iErr := r.createExposedServiceIndex(mgr); iErr != nil {
 			return fmt.Errorf("failed to create index for services with exposed ports: %w", iErr)
@@ -207,6 +214,7 @@ func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
 			builder.WithPredicates(exposedPortExpositionPredicate()),
 		)
+
 	}
 
 	return ctrlBuilder.Complete(r)

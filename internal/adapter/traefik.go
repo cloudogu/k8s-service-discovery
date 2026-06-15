@@ -53,6 +53,15 @@ func (t *TraefikIngressController) GetOwnableTypes() []client.Object {
 	}
 }
 
+// GetExposedPortOwnableTypes returns the TCP/UDP route types managed by ExposePorts,
+// so the LoadBalancerReconciler can watch only port-related resources.
+func (t *TraefikIngressController) GetExposedPortOwnableTypes() []client.Object {
+	return []client.Object{
+		&traefikapi.IngressRouteTCP{},
+		&traefikapi.IngressRouteUDP{},
+	}
+}
+
 // ProcessExposition reconciles HTTP routing for a single Exposition by generating the
 // corresponding Ingress and Middleware objects and applying them via create-or-update.
 // State-specific rewrites (maintenance, starting) override any route-level rewrite config.
