@@ -1177,100 +1177,83 @@ func Test_collisionMessage(t *testing.T) {
 }
 
 func Test_setPortsAllocatedConditionError(t *testing.T) {
-	newLoggerCtx := func(t *testing.T, setup func(m *MockLogSink)) context.Context {
-		t.Helper()
-		mockLogSink := NewMockLogSink(t)
-		setup(mockLogSink)
-		logger := logr.Logger{}.WithSink(mockLogSink)
-		return log.IntoContext(t.Context(), logger)
-	}
+	testCtx := context.TODO()
 
 	t.Run("empty collision map is a no-op", func(t *testing.T) {
-		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
-		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{})
+		err := setPortsAllocatedConditionError(testCtx, map[*types.Exposition][]portProtocolKey{})
+		assert.NoError(t, err)
 	})
 
 	t.Run("exposition with nil SetCondition is skipped", func(t *testing.T) {
-		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
 		e := &types.Exposition{Name: "no-setter"}
-		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{
+		err := setPortsAllocatedConditionError(testCtx, map[*types.Exposition][]portProtocolKey{
 			e: {{port: 22, protocol: corev1.ProtocolTCP}},
 		})
+
+		assert.NoError(t, err)
 	})
 
-	t.Run("SetCondition success does not log an error", func(t *testing.T) {
-		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
+	t.Run("SetCondition success does not return an error", func(t *testing.T) {
 		e := &types.Exposition{
 			Name: "has-setter",
 			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
 				return nil
 			},
 		}
-		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{
+		err := setPortsAllocatedConditionError(testCtx, map[*types.Exposition][]portProtocolKey{
 			e: {{port: 22, protocol: corev1.ProtocolTCP}},
 		})
+
+		assert.NoError(t, err)
 	})
 
-	t.Run("SetCondition failure is logged", func(t *testing.T) {
-		ctx := newLoggerCtx(t, func(m *MockLogSink) {
-			m.EXPECT().WithValues().Return(m)
-			m.EXPECT().Enabled(mock.Anything).Return(true).Maybe()
-			m.EXPECT().Info(0, mock.Anything).Return().Maybe()
-			m.EXPECT().Error(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
-		})
+	t.Run("SetCondition failure is returned", func(t *testing.T) {
 		e := &types.Exposition{
 			Name: "error-setter",
 			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
 				return assert.AnError
 			},
 		}
-		setPortsAllocatedConditionError(ctx, map[*types.Exposition][]portProtocolKey{
+		err := setPortsAllocatedConditionError(testCtx, map[*types.Exposition][]portProtocolKey{
 			e: {{port: 22, protocol: corev1.ProtocolTCP}},
 		})
+
+		assert.Error(t, err)
 	})
 }
 
 func Test_setPortsAllocatedCondition(t *testing.T) {
-	newLoggerCtx := func(t *testing.T, setup func(m *MockLogSink)) context.Context {
-		t.Helper()
-		mockLogSink := NewMockLogSink(t)
-		setup(mockLogSink)
-		logger := logr.Logger{}.WithSink(mockLogSink)
-		return log.IntoContext(t.Context(), logger)
-	}
+	ctx := context.TODO()
 
 	t.Run("empty list is a no-op", func(t *testing.T) {
-		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
-		setPortsAllocatedCondition(ctx, []types.Exposition{})
+		err := setPortsAllocatedCondition(ctx, []types.Exposition{})
+		assert.NoError(t, err)
 	})
 
 	t.Run("exposition with nil SetCondition is skipped", func(t *testing.T) {
-		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
-		setPortsAllocatedCondition(ctx, []types.Exposition{{Name: "no-setter"}})
+		err := setPortsAllocatedCondition(ctx, []types.Exposition{{Name: "no-setter"}})
+		assert.NoError(t, err)
 	})
 
-	t.Run("SetCondition success does not log an error", func(t *testing.T) {
-		ctx := newLoggerCtx(t, createDefaultLoadbalancerLoggerMock())
-		setPortsAllocatedCondition(ctx, []types.Exposition{{
+	t.Run("SetCondition success does return an error", func(t *testing.T) {
+		err := setPortsAllocatedCondition(ctx, []types.Exposition{{
 			Name: "has-setter",
 			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
 				return nil
 			},
 		}})
+
+		assert.NoError(t, err)
 	})
 
 	t.Run("SetCondition failure is logged", func(t *testing.T) {
-		ctx := newLoggerCtx(t, func(m *MockLogSink) {
-			m.EXPECT().WithValues().Return(m)
-			m.EXPECT().Enabled(mock.Anything).Return(true).Maybe()
-			m.EXPECT().Info(0, mock.Anything).Return().Maybe()
-			m.EXPECT().Error(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
-		})
-		setPortsAllocatedCondition(ctx, []types.Exposition{{
+		err := setPortsAllocatedCondition(ctx, []types.Exposition{{
 			Name: "error-setter",
 			SetCondition: func(_ context.Context, _ string, _ bool, _, _ string) error {
 				return assert.AnError
 			},
 		}})
+
+		assert.Error(t, err)
 	})
 }

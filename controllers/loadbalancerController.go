@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -79,15 +80,22 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to get expositions: %w", err)
 	}
 
+	var cErrs []error
+
 	validExpositions, collisionMap := checkPortCollisions(expositions)
-	setPortsAllocatedConditionError(ctx, collisionMap)
+	if lErr := setPortsAllocatedConditionError(ctx, collisionMap); lErr != nil {
+		cErrs = append(cErrs, fmt.Errorf("failed to set condition error for PortsAllocated: %w", lErr))
+	}
 
 	uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, validExpositions, setOwnerReference)
 	if uErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
-	setPortsAllocatedCondition(ctx, validExpositions)
+	if lErr := setPortsAllocatedCondition(ctx, validExpositions); lErr != nil {
+		cErrs = append(cErrs, fmt.Errorf("failed to set successful condition for PortsAllocated: %w", lErr))
+	}
+
 	logger.Info("Successfully applied new state to loadbalancer.")
 
 	if eErr := r.PortExposer.ExposePorts(ctx, validExpositions); eErr != nil {
@@ -95,6 +103,10 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	logger.Info("Successfully exposed ports in IngressController.")
+
+	if cErr := errors.Join(cErrs...); cErr != nil {
+		return ctrl.Result{}, cErr
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -528,9 +540,8 @@ func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, ma
 // setPortsAllocatedConditionError writes a PortCollision condition on every
 // exposition that lost the collision check. Service-based expositions have no
 // SetCondition wired up, so they are silently skipped.
-func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*types.Exposition][]portProtocolKey) {
-	logger := ctrl.LoggerFrom(ctx)
-
+func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*types.Exposition][]portProtocolKey) error {
+	var errs []error
 	for e, keys := range collisionMap {
 		if e.SetCondition == nil {
 			continue
@@ -544,9 +555,11 @@ func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*type
 			conditionReasonPortCollision,
 			msg,
 		); cErr != nil {
-			logger.Error(cErr, "failed to set condition", "type", conditionTypeLBPortAllocation, "exposition", e.Name)
+			errs = append(errs, fmt.Errorf("failed to set condition %s with reason %s for %s", conditionTypeLBPortAllocation, conditionReasonPortCollision, e.Name))
 		}
 	}
+
+	return errors.Join(errs...)
 }
 
 // collisionMessage builds a human-readable description of the colliding
@@ -564,9 +577,8 @@ func collisionMessage(keys []portProtocolKey) string {
 // not returned — condition writes are best-effort and must not block the
 // primary reconcile work. Service-based expositions have no SetCondition
 // wired up, so they are silently skipped.
-func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposition) {
-	logger := ctrl.LoggerFrom(ctx)
-
+func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposition) error {
+	var errs []error
 	for _, e := range expositions {
 		if e.SetCondition == nil {
 			continue
@@ -577,9 +589,11 @@ func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposit
 			conditionTypeLBPortAllocation,
 			true,
 			conditionReasonPortAllocated,
-			fmt.Sprint("All requested ports were successfully allocated."),
+			"All requested ports were successfully allocated.",
 		); cErr != nil {
-			logger.Error(cErr, "failed to set condition", "type", conditionTypeLBPortAllocation, "exposition", e.Name)
+			errs = append(errs, fmt.Errorf("failed to set condition %s with reason %s for %s", conditionTypeLBPortAllocation, conditionReasonPortAllocated, e.Name))
 		}
 	}
+
+	return errors.Join(errs...)
 }
