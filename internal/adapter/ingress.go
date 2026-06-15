@@ -82,36 +82,49 @@ func (i Ingress) GetOwnableTypes() []client.Object {
 // active, and forwards the (possibly modified) Exposition to the
 // ingressController.
 func (i Ingress) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
-	doguApplicationState, err := i.Dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
+	applicationState, err := i.getApplicationState(ctx, exposition)
 	if err != nil {
+		return err
+	}
+
+	if applicationState == types.ApplicationIsStarting || applicationState == types.ApplicationMaintenance {
+		exposition.HttpRoutes = i.redirectHttpRoutesToStaticBackend(exposition.HttpRoutes)
+	}
+
+	if lErr := i.Controller.ProcessExposition(ctx, applicationState, exposition); lErr != nil {
 		return handleErrorCondition(ctx, exposition,
+			IngressesConditionType, appStateToIngressConditionErrorReason(applicationState),
+			fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, applicationState, lErr))
+	}
+
+	conditionReason, conditionMessage := appStateToIngressConditionReasonMessage(applicationState)
+	return exposition.SetCondition(ctx, IngressesConditionType, true, conditionReason, conditionMessage)
+}
+
+func (i Ingress) getApplicationState(ctx context.Context, exposition types.Exposition) (types.ApplicationState, error) {
+	if exposition.DoguName == "" {
+		return types.ApplicationRunning, nil
+	}
+
+	applicationState, err := i.Dogu.GetStatus(ctx, exposition.Namespace, exposition.Name)
+	if err != nil {
+		return 0, handleErrorCondition(ctx, exposition,
 			IngressesConditionType, ingressesGetStatusFailedConditionReason,
 			fmt.Errorf("failed to get status of dogu: %w", err))
 	}
 
 	_, maintenanceMode, err := i.Maintenance.GetStatus(ctx)
 	if err != nil {
-		return handleErrorCondition(ctx, exposition,
+		return 0, handleErrorCondition(ctx, exposition,
 			IngressesConditionType, ingressesGetStatusFailedConditionReason,
 			fmt.Errorf("failed to get status of global maintenance mode: %w", err))
 	}
 
 	if maintenanceMode {
-		doguApplicationState = types.ApplicationMaintenance
+		applicationState = types.ApplicationMaintenance
 	}
 
-	if doguApplicationState == types.ApplicationIsStarting || doguApplicationState == types.ApplicationMaintenance {
-		exposition.HttpRoutes = i.redirectHttpRoutesToStaticBackend(exposition.HttpRoutes)
-	}
-
-	if lErr := i.Controller.ProcessExposition(ctx, doguApplicationState, exposition); lErr != nil {
-		return handleErrorCondition(ctx, exposition,
-			IngressesConditionType, appStateToIngressConditionErrorReason(doguApplicationState),
-			fmt.Errorf("failed to process exposition from %T while dogu is in state %s: %w", i.Controller, doguApplicationState, lErr))
-	}
-
-	conditionReason, conditionMessage := appStateToIngressConditionReasonMessage(doguApplicationState)
-	return exposition.SetCondition(ctx, IngressesConditionType, true, conditionReason, conditionMessage)
+	return applicationState, nil
 }
 
 func handleErrorCondition(ctx context.Context, exposition types.Exposition, conditionType, reason string, err error) error {

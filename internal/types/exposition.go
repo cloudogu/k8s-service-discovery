@@ -77,6 +77,10 @@ type Exposition struct {
 	// Name is the unique identifier for this exposition configuration.
 	Name string
 
+	// DoguName is the name of the Dogu that owns this exposition.
+	// If DoguName is empty, the exposition is not owned by a Dogu.
+	DoguName string
+
 	// Namespace is the Kubernetes namespace in which the exposition is defined.
 	Namespace string
 
