@@ -55,7 +55,7 @@ func (r *ExpositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	initializeErr := r.initializeUnknownConditions(ctx, expositionCR)
 	if initializeErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to initialize conditions with unknown: %w", initializeErr)
+		initializeErr = fmt.Errorf("failed to initialize conditions with unknown: %w", initializeErr)
 	}
 
 	exposition, err := mapExpositionCRToExposition(expositionCR, r.Client)
@@ -70,7 +70,7 @@ func (r *ExpositionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	logger.Info("Successfully processed exposition from exposition CR.", "expositionCR", expositionCR.Name)
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, initializeErr
 }
 
 func (r *ExpositionReconciler) handleValidationErr(ctx context.Context, err error, expositionCR *expositionv1.Exposition) error {
