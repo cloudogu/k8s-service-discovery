@@ -152,6 +152,7 @@ func (r *ExpositionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func mapExpositionCRToExposition(cr *expositionv1.Exposition, c client.Client) (types.Exposition, error) {
 	return types.Exposition{
 		Name:       cr.Name,
+		DoguName:   cr.GetLabels()[doguv2.DoguLabelName],
 		Namespace:  cr.Namespace,
 		HttpRoutes: mapExpositionCRToHttpRoutes(cr),
 		TcpRoutes:  mapExpositionCRToTCPExposedPorts(cr),

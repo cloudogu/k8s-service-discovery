@@ -47,6 +47,7 @@ func mapServiceToExposition(service *corev1.Service, c client.Client) (types.Exp
 
 	return types.Exposition{
 		Name:       service.Name,
+		DoguName:   service.GetLabels()[doguv2.DoguLabelName],
 		Namespace:  service.Namespace,
 		HttpRoutes: httpsRoutes,
 		TcpRoutes:  exposedPorts.MapTCPPorts(),
