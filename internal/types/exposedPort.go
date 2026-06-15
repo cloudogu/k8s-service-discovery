@@ -141,10 +141,12 @@ type ExposedPort struct {
 // ToServicePort maps the ExposedPort to a Kubernetes ServicePort
 func (ep ExposedPort) ToServicePort() corev1.ServicePort {
 	return corev1.ServicePort{
-		Name:       ep.Name,
-		Protocol:   ep.Protocol,
-		Port:       ep.RequestedExternalPort,
-		TargetPort: intstr.FromInt32(ep.ServicePort),
+		Name:     ep.Name,
+		Protocol: ep.Protocol,
+		Port:     ep.RequestedExternalPort,
+		// This is a loadbalancer and k8s-ces-gateway listens on the external port as well,
+		// so we specify the same port here.
+		TargetPort: intstr.FromInt32(ep.RequestedExternalPort),
 		NodePort:   ep.nodePort,
 	}
 }

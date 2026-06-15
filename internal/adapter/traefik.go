@@ -457,7 +457,7 @@ func createIngressRouteTCP(name string, namespace string, port types.ExposedPort
 						{
 							Name:      port.ServiceName,
 							Namespace: namespace,
-							Port:      intstr.FromInt32(port.RequestedExternalPort),
+							Port:      intstr.FromInt32(port.ServicePort),
 						},
 					},
 				},
@@ -490,7 +490,7 @@ func createIngressRouteUDP(name string, namespace string, port types.ExposedPort
 						{
 							Name:      port.ServiceName,
 							Namespace: namespace,
-							Port:      intstr.FromInt32(port.RequestedExternalPort),
+							Port:      intstr.FromInt32(port.ServicePort),
 						},
 					},
 				},
