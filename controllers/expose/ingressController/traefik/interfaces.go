@@ -13,14 +13,6 @@ type traefikInterface interface {
 	traefikv1alpha1.TraefikV1alpha1Interface
 }
 
-type ingressrouteTcpInterface interface {
-	traefikv1alpha1.IngressRouteTCPInterface
-}
-
-type ingressrouteUdpInterface interface {
-	traefikv1alpha1.IngressRouteUDPInterface
-}
-
 //nolint:unused
 //goland:noinspection GoUnusedType
 type middlewareInterface interface {

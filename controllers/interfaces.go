@@ -30,7 +30,7 @@ type AlternativeFQDNRedirector interface {
 }
 
 type PortExposer interface {
-	ExposePorts(ctx context.Context, namespace string, expositions []types.Exposition) error
+	ExposePorts(ctx context.Context, expositions []types.Exposition) error
 }
 
 type IngressControllerSelector interface {
@@ -45,14 +45,6 @@ type IngressController interface {
 
 type secretClient interface {
 	corev1client.SecretInterface
-}
-
-type serviceClient interface {
-	corev1client.ServiceInterface
-}
-
-type k8sClient interface {
-	client.Client
 }
 
 type ExpositionService interface {
