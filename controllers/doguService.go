@@ -18,8 +18,6 @@ import (
 	"github.com/cloudogu/k8s-dogu-operator/v3/controllers/annotation"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -57,15 +55,7 @@ func mapServiceToExposition(service *corev1.Service, c client.Client) (types.Exp
 			return ctrl.SetControllerReference(service, targetObject, c.Scheme())
 		},
 		SetCondition: func(ctx context.Context, conditionType string, conditionStatus bool, reason string, msg string) error {
-			meta.SetStatusCondition(&service.Status.Conditions, metav1.Condition{
-				Type:               conditionType,
-				Status:             mapBoolToConditionStatus(conditionStatus),
-				ObservedGeneration: service.Generation,
-				Reason:             reason,
-				Message:            msg,
-			})
-
-			return c.Status().Update(ctx, service)
+			return nil
 		},
 	}, nil
 }
