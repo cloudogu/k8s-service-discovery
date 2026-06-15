@@ -22,6 +22,7 @@ import (
 
 const (
 	validConditionType                = "Valid"
+	initializingConditionReason       = "Initializing"
 	mappingFailedConditionReason      = "MappingFailed"
 	mappingSuccessfulConditionReason  = "MappingSuccessful"
 	mappingSuccessfulConditionMessage = "The exposition has been successfully mapped to the domain."
@@ -94,12 +95,13 @@ func (r *ExpositionReconciler) handleValidationErr(ctx context.Context, err erro
 }
 
 func (r *ExpositionReconciler) initializeUnknownConditions(ctx context.Context, cr *expositionv1.Exposition) error {
-	// TODO extend
-	conditionTypes := []string{validConditionType, adapter.IngressesConditionType, adapter.NetworkPolicyConditionType}
+	conditionTypes := []string{validConditionType, adapter.IngressesConditionType, adapter.NetworkPolicyConditionType,
+		adapter.ConditionTypeIngressTCPRoutesCreated, adapter.ConditionTypeIngressUDPRoutesCreated}
 	for _, conditionType := range conditionTypes {
 		if meta.FindStatusCondition(cr.Status.Conditions, conditionType) == nil {
 			meta.SetStatusCondition(&cr.Status.Conditions, metav1.Condition{
 				Type:               conditionType,
+				Reason:             initializingConditionReason,
 				Status:             metav1.ConditionUnknown,
 				ObservedGeneration: cr.Generation,
 			})

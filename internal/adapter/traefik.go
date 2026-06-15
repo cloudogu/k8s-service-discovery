@@ -29,8 +29,8 @@ const (
 )
 
 const (
-	conditionTypeIngressTCPRoutesCreated = "IngressTCPRoutesCreated"
-	conditionTypeIngressUDPRoutesCreated = "IngressUDPRoutesCreated"
+	ConditionTypeIngressTCPRoutesCreated = "IngressTCPRoutesCreated"
+	ConditionTypeIngressUDPRoutesCreated = "IngressUDPRoutesCreated"
 )
 
 // TraefikIngressController implements the IngressController interface using Traefik-specific
@@ -120,7 +120,7 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 
 		if err := exposition.SetOwner(tcpRoute); err != nil {
 			wErr := fmt.Errorf("failed to set owner reference for IngressTCPRoute from exposition %s: %w", exposition.Name, err)
-			_ = exposition.SetCondition(ctx, conditionTypeIngressTCPRoutesCreated, false, "OwnerReferenceFailed", wErr.Error())
+			_ = exposition.SetCondition(ctx, ConditionTypeIngressTCPRoutesCreated, false, "OwnerReferenceFailed", wErr.Error())
 			errs = append(errs, wErr)
 			continue
 		}
@@ -134,7 +134,7 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 			return nil
 		}); err != nil {
 			wErr := fmt.Errorf("failed to create or update ingress tcp route %q: %w", tcpRoute.Name, err)
-			_ = exposition.SetCondition(ctx, conditionTypeIngressTCPRoutesCreated, false, "TCPUpdateFailed", wErr.Error())
+			_ = exposition.SetCondition(ctx, ConditionTypeIngressTCPRoutesCreated, false, "TCPUpdateFailed", wErr.Error())
 			errs = append(errs, wErr)
 			continue
 		}
@@ -155,12 +155,12 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 
 	if err := exposition.SetCondition(
 		ctx,
-		conditionTypeIngressTCPRoutesCreated,
+		ConditionTypeIngressTCPRoutesCreated,
 		true,
 		"IngressRouteTCPReady",
 		"Routes for TCP were successfully created.",
 	); err != nil {
-		return fmt.Errorf("failed to set condition for %s: %w", conditionTypeIngressTCPRoutesCreated, err)
+		return fmt.Errorf("failed to set condition for %s: %w", ConditionTypeIngressTCPRoutesCreated, err)
 	}
 
 	return nil
@@ -188,7 +188,7 @@ func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, expositi
 
 		if err := exposition.SetOwner(udpRoute); err != nil {
 			wErr := fmt.Errorf("failed to set owner reference for IngressUDPRoute from exposition %s: %w", exposition.Name, err)
-			_ = exposition.SetCondition(ctx, conditionTypeIngressUDPRoutesCreated, false, "OwnerReferenceFailed", wErr.Error())
+			_ = exposition.SetCondition(ctx, ConditionTypeIngressUDPRoutesCreated, false, "OwnerReferenceFailed", wErr.Error())
 			errs = append(errs, wErr)
 			continue
 		}
@@ -202,7 +202,7 @@ func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, expositi
 			return nil
 		}); err != nil {
 			wErr := fmt.Errorf("failed to create or update ingress udp route %q: %w", udpRoute.Name, err)
-			_ = exposition.SetCondition(ctx, conditionTypeIngressUDPRoutesCreated, false, "UDPUpdateFailed", wErr.Error())
+			_ = exposition.SetCondition(ctx, ConditionTypeIngressUDPRoutesCreated, false, "UDPUpdateFailed", wErr.Error())
 			errs = append(errs, wErr)
 			continue
 		}
@@ -223,12 +223,12 @@ func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, expositi
 
 	if err := exposition.SetCondition(
 		ctx,
-		conditionTypeIngressUDPRoutesCreated,
+		ConditionTypeIngressUDPRoutesCreated,
 		true,
 		"IngressRouteUDPReady",
 		"Routes for UDP were successfully created.",
 	); err != nil {
-		return fmt.Errorf("failed to set condition for %s: %w", conditionTypeIngressUDPRoutesCreated, err)
+		return fmt.Errorf("failed to set condition for %s: %w", ConditionTypeIngressUDPRoutesCreated, err)
 	}
 
 	return nil
