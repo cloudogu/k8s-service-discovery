@@ -12,6 +12,7 @@ import (
 	"github.com/traefik/traefik/v3/pkg/config/dynamic"
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -141,7 +142,7 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 	}
 
 	for _, stale := range existingMap {
-		if err := t.Client.Delete(ctx, &stale); err != nil {
+		if err := t.Client.Delete(ctx, &stale); err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete outdated tcp route %q: %w", stale.Name, err))
 		}
 	}
@@ -209,7 +210,7 @@ func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, expositi
 	}
 
 	for _, stale := range existingMap {
-		if err := t.Client.Delete(ctx, &stale); err != nil {
+		if err := t.Client.Delete(ctx, &stale); err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete outdated udp route %q: %w", stale.Name, err))
 		}
 	}
