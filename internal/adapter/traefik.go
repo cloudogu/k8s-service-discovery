@@ -380,7 +380,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 	// delete objects not in desired state
 	for _, existingObject := range existingMap {
 		err := t.Client.Delete(ctx, &existingObject)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete outdated ingress %q: %w", existingObject.Name, err))
 		}
 	}
@@ -423,7 +423,7 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 	// delete objects not in desired state
 	for _, existingObject := range existingMap {
 		err := t.Client.Delete(ctx, &existingObject)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete outdated middleware %q: %w", existingObject.Name, err))
 		}
 	}
