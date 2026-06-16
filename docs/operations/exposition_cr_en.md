@@ -28,6 +28,9 @@ Each entry in `spec.tcp` exposes a Kubernetes Service on a raw TCP port on the L
 - `requestedExternalPort` *(optional)* — desired external port number
 - `protocol` *(optional)* — free-text protocol hint for documentation or firewall rules (e.g. `"ssh"`, `"ldap"`)
 
+The following figure shows the port mappings and creation of TCP routes from an Exposition-CR:
+![Exposition TCP-Routes](figures/exposition_port-mappings_en.drawio.svg)
+
 ## UDP Routes (`spec.udp`)
 
 `spec.udp` has the same structure as `spec.tcp`.
