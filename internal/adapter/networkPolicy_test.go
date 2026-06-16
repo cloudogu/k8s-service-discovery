@@ -85,14 +85,14 @@ func Test_NetworkPolicy_mapExposedPorts(t *testing.T) {
 		},
 		{
 			name: "single TCP port",
-			in:   []types.ExposedPort{{Protocol: corev1.ProtocolTCP, ServicePort: 80}},
+			in:   []types.ExposedPort{{Protocol: corev1.ProtocolTCP, RequestedExternalPort: 80}},
 			want: []networkingv1.NetworkPolicyPort{
 				{Protocol: new(corev1.ProtocolTCP), Port: new(intstr.FromInt32(80))},
 			},
 		},
 		{
 			name: "single UDP port",
-			in:   []types.ExposedPort{{Protocol: corev1.ProtocolUDP, ServicePort: 53}},
+			in:   []types.ExposedPort{{Protocol: corev1.ProtocolUDP, RequestedExternalPort: 53}},
 			want: []networkingv1.NetworkPolicyPort{
 				{Protocol: new(corev1.ProtocolUDP), Port: new(intstr.FromInt32(53))},
 			},
@@ -100,8 +100,8 @@ func Test_NetworkPolicy_mapExposedPorts(t *testing.T) {
 		{
 			name: "mixed TCP+UDP preserves order and protocols",
 			in: []types.ExposedPort{
-				{Protocol: corev1.ProtocolTCP, ServicePort: 80},
-				{Protocol: corev1.ProtocolUDP, ServicePort: 53},
+				{Protocol: corev1.ProtocolTCP, RequestedExternalPort: 80},
+				{Protocol: corev1.ProtocolUDP, RequestedExternalPort: 53},
 			},
 			want: []networkingv1.NetworkPolicyPort{
 				{Protocol: new(corev1.ProtocolTCP), Port: new(intstr.FromInt32(80))},
@@ -118,8 +118,8 @@ func Test_NetworkPolicy_mapExposedPorts(t *testing.T) {
 }
 
 func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
-	tcpPorts := []types.ExposedPort{{Protocol: corev1.ProtocolTCP, ServicePort: 80}}
-	udpPorts := []types.ExposedPort{{Protocol: corev1.ProtocolUDP, ServicePort: 53}}
+	tcpPorts := []types.ExposedPort{{Protocol: corev1.ProtocolTCP, RequestedExternalPort: 80}}
+	udpPorts := []types.ExposedPort{{Protocol: corev1.ProtocolUDP, RequestedExternalPort: 53}}
 
 	tests := []struct {
 		name     string
@@ -223,7 +223,7 @@ func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
 }
 
 func TestNetworkPolicy_ProcessExposition(t *testing.T) {
-	tcpPorts := []types.ExposedPort{{Protocol: corev1.ProtocolTCP, ServicePort: 80}}
+	tcpPorts := []types.ExposedPort{{Protocol: corev1.ProtocolTCP, RequestedExternalPort: 80}}
 	policyKey := client.ObjectKey{Namespace: testNamespace, Name: "ldap-exposed-ports"}
 
 	tests := []struct {

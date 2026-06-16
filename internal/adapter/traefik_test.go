@@ -779,9 +779,11 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 		var lastStatus bool
 		var conditionCalls int
 		expo := fixedTCPExposition(types.ExposedPorts{sshTCP})
-		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
-			lastStatus = status
-			conditionCalls++
+		expo.SetCondition = func(_ context.Context, typ string, status bool, _ string, _ string) error {
+			if typ == ConditionTypeIngressTCPRoutesCreated {
+				lastStatus = status
+				conditionCalls++
+			}
 			return nil
 		}
 		c := newTraefikFakeClient(t)
@@ -796,8 +798,10 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 	t.Run("failure condition set when CreateOrUpdate fails", func(t *testing.T) {
 		var lastStatus bool
 		expo := fixedTCPExposition(types.ExposedPorts{sshTCP})
-		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
-			lastStatus = status
+		expo.SetCondition = func(_ context.Context, typ string, status bool, _ string, _ string) error {
+			if typ == ConditionTypeIngressTCPRoutesCreated {
+				lastStatus = status
+			}
 			return nil
 		}
 		c := newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
@@ -816,11 +820,13 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 		assert.False(t, lastStatus)
 	})
 
-	t.Run("no condition set when TcpRoutes is empty", func(t *testing.T) {
+	t.Run("condition set when TcpRoutes is empty", func(t *testing.T) {
 		conditionCalled := false
 		expo := fixedTCPExposition(types.ExposedPorts{})
-		expo.SetCondition = func(_ context.Context, _ string, _ bool, _ string, _ string) error {
-			conditionCalled = true
+		expo.SetCondition = func(_ context.Context, typ string, _ bool, _ string, _ string) error {
+			if typ == ConditionTypeIngressTCPRoutesCreated {
+				conditionCalled = true
+			}
 			return nil
 		}
 		c := newTraefikFakeClient(t)
@@ -828,16 +834,18 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 
 		require.NoError(t, ctrl.ExposePorts(t.Context(), []types.Exposition{expo}))
 
-		assert.False(t, conditionCalled)
+		assert.True(t, conditionCalled)
 	})
 
 	t.Run("success condition set after UDP routes created", func(t *testing.T) {
 		var lastStatus bool
 		var conditionCalls int
 		expo := fixedUDPExposition(types.ExposedPorts{udpPort("svc", 53)})
-		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
-			lastStatus = status
-			conditionCalls++
+		expo.SetCondition = func(_ context.Context, typ string, status bool, _ string, _ string) error {
+			if typ == ConditionTypeIngressUDPRoutesCreated {
+				lastStatus = status
+				conditionCalls++
+			}
 			return nil
 		}
 		c := newTraefikFakeClient(t)
@@ -852,8 +860,10 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 	t.Run("failure condition set when UDP CreateOrUpdate fails", func(t *testing.T) {
 		var lastStatus bool
 		expo := fixedUDPExposition(types.ExposedPorts{udpPort("svc", 53)})
-		expo.SetCondition = func(_ context.Context, _ string, status bool, _ string, _ string) error {
-			lastStatus = status
+		expo.SetCondition = func(_ context.Context, typ string, status bool, _ string, _ string) error {
+			if typ == ConditionTypeIngressUDPRoutesCreated {
+				lastStatus = status
+			}
 			return nil
 		}
 		c := newTraefikFakeClientWithInterceptor(t, interceptor.Funcs{
@@ -872,11 +882,13 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 		assert.False(t, lastStatus)
 	})
 
-	t.Run("no condition set when UdpRoutes is empty", func(t *testing.T) {
+	t.Run("condition set when UdpRoutes is empty", func(t *testing.T) {
 		conditionCalled := false
 		expo := fixedUDPExposition(types.ExposedPorts{})
-		expo.SetCondition = func(_ context.Context, _ string, _ bool, _ string, _ string) error {
-			conditionCalled = true
+		expo.SetCondition = func(_ context.Context, typ string, status bool, _ string, _ string) error {
+			if typ == ConditionTypeIngressUDPRoutesCreated {
+				conditionCalled = true
+			}
 			return nil
 		}
 		c := newTraefikFakeClient(t)
@@ -884,7 +896,7 @@ func TestTraefikIngressController_ExposePorts_conditionTracking(t *testing.T) {
 
 		require.NoError(t, ctrl.ExposePorts(t.Context(), []types.Exposition{expo}))
 
-		assert.False(t, conditionCalled)
+		assert.True(t, conditionCalled)
 	})
 }
 
