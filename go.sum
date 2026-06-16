@@ -26,7 +26,7 @@ github.com/cloudogu/ces-commons-lib v0.3.0 h1:HPf18pTLHGmAZpJb/H6pBrqxKcAUH6KhFr
 github.com/cloudogu/ces-commons-lib v0.3.0/go.mod h1:4rvR2RTDDaz5a6OZ1fW27G0MOnl5I3ackeiHxt4gn3o=
 github.com/cloudogu/cesapp-lib v0.18.2 h1:S89A8WrDi51iYutCnMdIZ24lMrDmIBCbYUIHhsz69X0=
 github.com/cloudogu/cesapp-lib v0.18.2/go.mod h1:8EIoGAI5WcwQH803FGjwF0I4sNPPcyTW8YPDtwdi+FM=
-github.com/cloudogu/k8s-dogu-lib/v2 v2.13.0 h1:F1/AsSMJN1/hM2ucog1r2+yhSDHK1zsScQGqjxdBHPg=
+github.com/cloudogu/k8s-dogu-lib/v2 v2.13.0 h1:As1MZ1adsFPZdjETA16JYEMD7l7idMYe+GIPIRNfiCc=
 github.com/cloudogu/k8s-dogu-lib/v2 v2.13.0/go.mod h1:IgA9mxjv/dKkLJ4e7n7+AyFbHvtO5sjxpZKN3GEoX44=
 github.com/cloudogu/k8s-dogu-operator/v3 v3.25.0 h1:5N+78J3yYylUfCk0+33i/LUDSwJkZlg7F5ZZvxv+AB0=
 github.com/cloudogu/k8s-dogu-operator/v3 v3.25.0/go.mod h1:xekJyCCAeArEJ0p4qvnjgVbCAI/1Ido2vGNXNTB/7Z8=
