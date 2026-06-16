@@ -10,7 +10,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -119,8 +118,8 @@ func (n NetworkPolicy) mapExposedPorts(exposedPorts []types.ExposedPort) []netwo
 
 	for _, e := range exposedPorts {
 		networkPolicyPorts = append(networkPolicyPorts, networkingv1.NetworkPolicyPort{
-			Protocol: ptr.To(e.Protocol),
-			Port:     ptr.To(intstr.FromInt32(e.ServicePort)),
+			Protocol: new(e.Protocol),
+			Port:     new(intstr.FromInt32(e.RequestedExternalPort)),
 		})
 	}
 
