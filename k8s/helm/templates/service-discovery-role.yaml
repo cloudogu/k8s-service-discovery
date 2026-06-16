@@ -36,6 +36,12 @@ rules:
       - watch
       - update
   - apiGroups:
+      - k8s.cloudogu.com
+    resources:
+      - expositions/status
+    verbs:
+      - update
+  - apiGroups:
       - apps
     resources:
       - deployments
