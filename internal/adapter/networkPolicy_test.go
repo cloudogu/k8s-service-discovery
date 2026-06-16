@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -88,14 +87,14 @@ func Test_NetworkPolicy_mapExposedPorts(t *testing.T) {
 			name: "single TCP port",
 			in:   []types.ExposedPort{{Protocol: corev1.ProtocolTCP, ServicePort: 80}},
 			want: []networkingv1.NetworkPolicyPort{
-				{Protocol: ptr.To(corev1.ProtocolTCP), Port: ptr.To(intstr.FromInt32(80))},
+				{Protocol: new(corev1.ProtocolTCP), Port: new(intstr.FromInt32(80))},
 			},
 		},
 		{
 			name: "single UDP port",
 			in:   []types.ExposedPort{{Protocol: corev1.ProtocolUDP, ServicePort: 53}},
 			want: []networkingv1.NetworkPolicyPort{
-				{Protocol: ptr.To(corev1.ProtocolUDP), Port: ptr.To(intstr.FromInt32(53))},
+				{Protocol: new(corev1.ProtocolUDP), Port: new(intstr.FromInt32(53))},
 			},
 		},
 		{
@@ -105,8 +104,8 @@ func Test_NetworkPolicy_mapExposedPorts(t *testing.T) {
 				{Protocol: corev1.ProtocolUDP, ServicePort: 53},
 			},
 			want: []networkingv1.NetworkPolicyPort{
-				{Protocol: ptr.To(corev1.ProtocolTCP), Port: ptr.To(intstr.FromInt32(80))},
-				{Protocol: ptr.To(corev1.ProtocolUDP), Port: ptr.To(intstr.FromInt32(53))},
+				{Protocol: new(corev1.ProtocolTCP), Port: new(intstr.FromInt32(80))},
+				{Protocol: new(corev1.ProtocolUDP), Port: new(intstr.FromInt32(53))},
 			},
 		},
 	}

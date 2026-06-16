@@ -96,8 +96,7 @@ func (lb *LoadBalancer) ToK8sService() *corev1.Service {
 		return nil
 	}
 
-	svc := corev1.Service(*lb)
-	return &svc
+	return new(corev1.Service(*lb))
 }
 
 // Equals reports whether the current LoadBalancer and the given LoadBalancer
@@ -188,7 +187,7 @@ func (lb *LoadBalancer) GetOwnerReference(scheme *runtime.Scheme) (*metav1.Owner
 		Kind:       gvk.Kind,
 		Name:       lb.Name,
 		UID:        lb.UID,
-		Controller: ptr.To(false),
+		Controller: new(false),
 	}, nil
 }
 

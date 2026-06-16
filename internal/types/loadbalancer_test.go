@@ -14,12 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 )
 
 var (
 	defaultExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
-	defaultInternalTrafficPolicy = ptr.To(corev1.ServiceInternalTrafficPolicyCluster)
+	defaultInternalTrafficPolicy = new(corev1.ServiceInternalTrafficPolicyCluster)
 )
 
 func createManagedKeyCfg(s ...string) string {
@@ -284,11 +283,11 @@ func TestCreateLoadBalancer(t *testing.T) {
 	assert.Equal(t, "testNamespace", lb.Namespace)
 	assert.Equal(t, util.GetAppLabel(), lb.Labels)
 	assert.Equal(t, []corev1.IPFamily{corev1.IPv4Protocol}, lb.Spec.IPFamilies)
-	assert.Equal(t, ptr.To(corev1.IPFamilyPolicySingleStack), lb.Spec.IPFamilyPolicy)
+	assert.Equal(t, new(corev1.IPFamilyPolicySingleStack), lb.Spec.IPFamilyPolicy)
 
 	// assert spec config
 	assert.Equal(t, corev1.ServiceExternalTrafficPolicyCluster, lb.Spec.ExternalTrafficPolicy)
-	assert.Equal(t, ptr.To(corev1.ServiceInternalTrafficPolicyCluster), lb.Spec.InternalTrafficPolicy)
+	assert.Equal(t, new(corev1.ServiceInternalTrafficPolicyCluster), lb.Spec.InternalTrafficPolicy)
 
 	// asser annotations
 	require.NotNil(t, lb.Annotations)
@@ -358,7 +357,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyCluster),
 				},
 			},
 			newCfg: LoadbalancerConfig{
@@ -379,7 +378,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyCluster,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 		},
@@ -396,7 +395,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyCluster),
 				},
 			},
 			newCfg: LoadbalancerConfig{
@@ -418,7 +417,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyCluster,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 		},
@@ -434,7 +433,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyCluster),
 				},
 			},
 			newCfg: LoadbalancerConfig{
@@ -453,7 +452,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyCluster,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 		},
@@ -469,7 +468,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyCluster),
 				},
 			},
 			newCfg: LoadbalancerConfig{
@@ -485,7 +484,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyCluster,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 		},
@@ -502,7 +501,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyCluster),
 				},
 			},
 			newCfg: LoadbalancerConfig{
@@ -519,7 +518,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyCluster,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 		},
@@ -533,7 +532,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyCluster),
 				},
 			},
 			newCfg: LoadbalancerConfig{
@@ -550,7 +549,7 @@ func TestLoadBalancer_ApplyConfig(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyCluster,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 		},
@@ -1036,7 +1035,7 @@ func TestLoadBalancer_Equals(t *testing.T) {
 			other: LoadBalancer{
 				Spec: corev1.ServiceSpec{
 					ExternalTrafficPolicy: defaultExternalTrafficPolicy,
-					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
+					InternalTrafficPolicy: new(corev1.ServiceInternalTrafficPolicyLocal),
 				},
 			},
 			exp: false,
