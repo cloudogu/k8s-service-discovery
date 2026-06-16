@@ -159,10 +159,6 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 		return err
 	}
 
-	if len(exposition.TcpRoutes) == 0 {
-		return nil
-	}
-
 	if err := exposition.SetCondition(
 		ctx,
 		ConditionTypeIngressTCPRoutesCreated,
@@ -225,10 +221,6 @@ func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, expositi
 	}
 	if err := errors.Join(errs...); err != nil {
 		return err
-	}
-
-	if len(exposition.UdpRoutes) == 0 {
-		return nil
 	}
 
 	if err := exposition.SetCondition(
