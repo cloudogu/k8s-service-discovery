@@ -112,7 +112,7 @@ func TestDogu_GetStatus(t *testing.T) {
 				return newDoguFakeClient(t) // no objects pre-loaded
 			},
 			want: 0,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "failed to get dogu", i...) &&
 					assert.True(t, apierrors.IsNotFound(errors.Unwrap(err)), "expected NotFound underneath, got %v", err)
 			},
@@ -127,7 +127,7 @@ func TestDogu_GetStatus(t *testing.T) {
 				})
 			},
 			want: 0,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get dogu", i...)
 			},

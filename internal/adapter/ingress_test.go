@@ -16,14 +16,12 @@ import (
 )
 
 var (
-	originalRewrite = &types.HttpRewrite{StripPrefix: stringPtr("/ldap")}
+	originalRewrite = &types.HttpRewrite{StripPrefix: new("/ldap")}
 	originalRoutes  = []types.HttpRoute{
 		{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: originalRewrite},
 	}
 	redirectedRoutes = Ingress{}.redirectHttpRoutesToStaticBackend(originalRoutes)
 )
-
-func stringPtr(s string) *string { return &s }
 
 type conditionCall struct {
 	conditionType string
@@ -206,7 +204,7 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				maintenanceFn: noMaintenance,
 				controllerFn:  noController,
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get status of dogu", i...)
 			},
@@ -228,7 +226,7 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				},
 				controllerFn: noController,
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get status of global maintenance mode", i...)
 			},
@@ -246,7 +244,7 @@ func TestIngress_ProcessExposition(t *testing.T) {
 				maintenanceFn: okMaintenance(false),
 				controllerFn:  expectController(types.ApplicationRunning, originalRoutes, assert.AnError),
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to process exposition from", i...) &&
 					assert.ErrorContains(t, err, "while dogu is in state Running", i...)
@@ -289,7 +287,7 @@ func Test_Ingress_redirectHttpRoutesToStaticBackend(t *testing.T) {
 		{
 			name: "single route is redirected, Path preserved, Rewrite cleared",
 			in: []types.HttpRoute{
-				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{StripPrefix: stringPtr("/ldap")}},
+				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{StripPrefix: new("/ldap")}},
 			},
 			want: []types.HttpRoute{
 				{Name: "ui", Service: staticContentBackendName, Port: staticContentBackendPort, Path: "/ldap", Rewrite: nil},

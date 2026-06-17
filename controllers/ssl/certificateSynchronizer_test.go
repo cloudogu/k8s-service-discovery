@@ -37,7 +37,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					return m
 				},
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i) &&
 					assert.ErrorContains(t, err, "failed to get ecosystem certificate secret", i)
 			},
@@ -70,7 +70,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					return m
 				},
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "could not find certificate in ecosystem certificate secret", i)
 			},
 		},
@@ -88,7 +88,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					return m
 				},
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i) &&
 					assert.ErrorContains(t, err, "failed to get global config", i) &&
 					assert.ErrorContains(t, err, "failed to update ecosystem certificate in global config", i)
@@ -109,7 +109,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					return m
 				},
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "failed to set ecosystem certificate in global config object", i) &&
 					assert.ErrorContains(t, err, "failed to update ecosystem certificate in global config", i)
 			},
@@ -133,7 +133,7 @@ func Test_certificateSynchronizer_Synchronize(t *testing.T) {
 					return m
 				},
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError) &&
 					assert.ErrorContains(t, err, "failed write global config object", i) &&
 					assert.ErrorContains(t, err, "failed to update ecosystem certificate in global config", i)

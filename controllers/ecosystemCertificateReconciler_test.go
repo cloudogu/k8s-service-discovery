@@ -58,7 +58,7 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 				return m
 			},
 			want: controllerruntime.Result{},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError)
 			},
 		},

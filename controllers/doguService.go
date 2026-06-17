@@ -363,9 +363,5 @@ func isDoguService(object client.Object) bool {
 	}
 
 	_, ok = serviceLabels[doguv2.DoguLabelName]
-	if !ok {
-		return false
-	}
-
-	return true
+	return ok
 }

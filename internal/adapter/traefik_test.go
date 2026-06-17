@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"errors"
+	"maps"
 	"testing"
 
 	"github.com/cloudogu/k8s-service-discovery/v2/controllers/util"
@@ -211,7 +212,7 @@ func TestTraefikIngressController_ProcessExposition(t *testing.T) {
 				HttpRoutes: []types.HttpRoute{baseRoute},
 				SetOwner:   errOwner,
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to generate ingresses or middlewares", i...)
 			},
@@ -233,7 +234,7 @@ func TestTraefikIngressController_ProcessExposition(t *testing.T) {
 			},
 			appState:   types.ApplicationRunning,
 			exposition: fixedTraefikExposition([]types.HttpRoute{baseRoute}),
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, `failed to upsert ingresses or middlewares for "ldap"`, i...) &&
 					assert.ErrorContains(t, err, "failed to list existing ingresses", i...)
@@ -253,7 +254,7 @@ func TestTraefikIngressController_ProcessExposition(t *testing.T) {
 			},
 			appState:   types.ApplicationRunning,
 			exposition: fixedTraefikExposition([]types.HttpRoute{baseRoute}),
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, `failed to upsert ingresses or middlewares for "ldap"`, i...) &&
 					assert.ErrorContains(t, err, "failed to list existing middlewares", i...)
@@ -282,9 +283,7 @@ func assertExpectedTraefikLabels(t *testing.T, got map[string]string) {
 	t.Helper()
 
 	want := map[string]string{ownedByLabelKey: "ldap"}
-	for k, v := range util.K8sCesServiceDiscoveryLabels {
-		want[k] = v
-	}
+	maps.Copy(want, util.K8sCesServiceDiscoveryLabels)
 	assert.Equal(t, want, got)
 }
 
@@ -470,16 +469,6 @@ func foreignTCPRoute(name string) *traefikapi.IngressRouteTCP {
 	}
 }
 
-func foreignUDPRoute(name string) *traefikapi.IngressRouteUDP {
-	return &traefikapi.IngressRouteUDP{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-			Labels:    map[string]string{ownedByLabelKey: "foreign"},
-		},
-	}
-}
-
 func getTCPRoute(t *testing.T, c client.Client, name string) *traefikapi.IngressRouteTCP {
 	t.Helper()
 	route := &traefikapi.IngressRouteTCP{}
@@ -609,7 +598,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 				})
 			},
 			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to list existing tcp routes", i...)
 			},
@@ -627,7 +616,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 				})
 			},
 			expositions: []types.Exposition{fixedUDPExposition(types.ExposedPorts{dnsPort})},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to list existing udp routes", i...)
 			},
@@ -642,7 +631,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 				SetOwner:     errOwner,
 				SetCondition: okCondition,
 			}},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to set owner reference for IngressTCPRoute", i...)
 			},
@@ -663,7 +652,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 				)
 			},
 			expositions: []types.Exposition{fixedTCPExposition(types.ExposedPorts{sshPort})},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to create or update ingress tcp route", i...)
 			},
@@ -693,7 +682,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 					SetCondition: okCondition,
 				},
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to expose tcp routes for exposition ldap", i...) &&
 					assert.ErrorContains(t, err, "failed to expose tcp routes for exposition other", i...)
@@ -709,7 +698,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 				SetOwner:     errOwner,
 				SetCondition: okCondition,
 			}},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to set owner reference for IngressUDPRoute", i...)
 			},
@@ -730,7 +719,7 @@ func TestTraefikIngressController_ExposePorts(t *testing.T) {
 				)
 			},
 			expositions: []types.Exposition{fixedUDPExposition(types.ExposedPorts{dnsPort})},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to create or update ingress udp route", i...)
 			},

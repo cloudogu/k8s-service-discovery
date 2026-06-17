@@ -193,7 +193,7 @@ func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
 			name:     "SetOwner failure surfaces wrapped error",
 			tcp:      tcpPorts,
 			setOwner: errOwner,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to set owner for network policy", i...)
 			},
@@ -276,7 +276,7 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			tcp:      nil,
 			udp:      nil,
 			setOwner: okOwner,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to delete network policy", i...)
 			},
@@ -292,7 +292,7 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			clientFn: func(t *testing.T) client.Client { return newFakeClient(t) },
 			tcp:      tcpPorts,
 			setOwner: errOwner,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to generate network policy", i...)
 			},
@@ -365,7 +365,7 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			},
 			tcp:      tcpPorts,
 			setOwner: okOwner,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to create or update network policy", i...)
 			},

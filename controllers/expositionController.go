@@ -149,6 +149,8 @@ func (r *ExpositionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // and a SetOwner closure that wires the CR as the controller of every
 // generated resource. The current implementation cannot fail; the error
 // return is preserved for symmetry with mapServiceToExposition.
+//
+//nolint:unparam
 func mapExpositionCRToExposition(cr *expositionv1.Exposition, c client.Client) (types.Exposition, error) {
 	return types.Exposition{
 		Name:       cr.Name,

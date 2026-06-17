@@ -140,7 +140,7 @@ func TestExpositionService_ProcessExposition(t *testing.T) {
 			processorsFn: func(t *testing.T) []Processor {
 				return []Processor{expectProc(t, true, assert.AnError)}
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "failed to process exposition with *services.MockProcessor", i...)
 			},
 		},
@@ -164,7 +164,7 @@ func TestExpositionService_ProcessExposition(t *testing.T) {
 					expectProc(t, false, nil), // must not be invoked
 				}
 			},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "failed to process exposition with", i...)
 			},
 		},

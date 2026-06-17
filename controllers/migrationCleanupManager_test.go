@@ -20,7 +20,7 @@ func TestMigrationCleanupManager_Start(t *testing.T) {
 		{
 			name:   "should fail",
 			client: fake.NewClientBuilder().Build(),
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "failed to cleanup old objects from version 6.0.2 and earlier", i...)
 			},
 		},

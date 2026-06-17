@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,8 +32,8 @@ const (
 	defaultExpireDays = 365 * 24 * time.Hour
 )
 
-// selfsignedCertificateUpdater is responsible to update the sslLib certificate of the ecosystem.
-type selfsignedCertificateUpdater struct {
+// SelfsignedCertificateUpdater is responsible to update the sslLib certificate of the ecosystem.
+type SelfsignedCertificateUpdater struct {
 	namespace          string
 	globalConfigRepo   GlobalConfigRepository
 	certificateCreator selfSignedCertificateCreator
@@ -45,8 +46,8 @@ type selfSignedCertificateCreator interface {
 }
 
 // NewSelfsignedCertificateUpdater creates a new updater.
-func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalConfigRepository, secretClient secretClient) *selfsignedCertificateUpdater {
-	return &selfsignedCertificateUpdater{
+func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalConfigRepository, secretClient secretClient) *SelfsignedCertificateUpdater {
+	return &SelfsignedCertificateUpdater{
 		namespace:          namespace,
 		globalConfigRepo:   globalConfigRepo,
 		certificateCreator: ssl.NewCreator(globalConfigRepo, secretClient, namespace),
@@ -55,7 +56,7 @@ func NewSelfsignedCertificateUpdater(namespace string, globalConfigRepo GlobalCo
 }
 
 // Start starts the update process. This update process runs indefinitely and is designed to be started as goroutine.
-func (scu *selfsignedCertificateUpdater) Start(ctx context.Context) error {
+func (scu *SelfsignedCertificateUpdater) Start(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("Starting selfsigned certificate updater...")
 
@@ -74,7 +75,7 @@ func (scu *selfsignedCertificateUpdater) Start(ctx context.Context) error {
 	return scu.startGlobalConfigWatch(ctx)
 }
 
-func (scu *selfsignedCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
+func (scu *SelfsignedCertificateUpdater) startGlobalConfigWatch(ctx context.Context) error {
 	ctrl.LoggerFrom(ctx).Info("start global config watcher for ssl certificates")
 	fqdnChannel, err := scu.globalConfigRepo.Watch(ctx, config.KeyFilter(globalFqdnPath), config.KeyFilter(alternativeFQDNsPath), config.KeyFilter(globalDomainPath))
 	if err != nil {
@@ -88,7 +89,7 @@ func (scu *selfsignedCertificateUpdater) startGlobalConfigWatch(ctx context.Cont
 	return nil
 }
 
-func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqdnWatchChannel <-chan repository.GlobalConfigWatchResult) {
+func (scu *SelfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqdnWatchChannel <-chan repository.GlobalConfigWatchResult) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -112,7 +113,7 @@ func (scu *selfsignedCertificateUpdater) startFQDNWatch(ctx context.Context, fqd
 	}
 }
 
-func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) error {
+func (scu *SelfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) error {
 	logger := ctrl.LoggerFrom(ctx)
 	logger.Info("FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
 
@@ -158,7 +159,7 @@ func (scu *selfsignedCertificateUpdater) handleFqdnChange(ctx context.Context) e
 	return nil
 }
 
-func (scu *selfsignedCertificateUpdater) isSelfSignedCertificate(globalConfig config.GlobalConfig) (bool, error) {
+func (scu *SelfsignedCertificateUpdater) isSelfSignedCertificate(globalConfig config.GlobalConfig) (bool, error) {
 	certType, typeExists := globalConfig.Get(serverCertificateTypePath)
 	if !typeExists || !util.ContainsChars(certType.String()) {
 		return false, fmt.Errorf("%q is empty or doesn't exists", serverCertificateTypePath)
@@ -167,7 +168,7 @@ func (scu *selfsignedCertificateUpdater) isSelfSignedCertificate(globalConfig co
 	return certType == selfsignedCertificateType, nil
 }
 
-func (scu *selfsignedCertificateUpdater) shouldUpdateCurrentCertificate(ctx context.Context) (bool, error) {
+func (scu *SelfsignedCertificateUpdater) shouldUpdateCurrentCertificate(ctx context.Context) (bool, error) {
 	globalConfig, err := scu.globalConfigRepo.Get(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get global config: %w", err)
@@ -215,7 +216,7 @@ func (scu *selfsignedCertificateUpdater) shouldUpdateCurrentCertificate(ctx cont
 	return false, nil
 }
 
-func (scu *selfsignedCertificateUpdater) getCurrentCertificate(ctx context.Context) (*x509.Certificate, error) {
+func (scu *SelfsignedCertificateUpdater) getCurrentCertificate(ctx context.Context) (*x509.Certificate, error) {
 	secret, err := scu.secretClient.Get(ctx, ecosystemCertificateName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get secret for ssl read: %w", err)
@@ -277,11 +278,5 @@ func certificateHasAllDNSNames(certificate *x509.Certificate, dnsNames []string)
 }
 
 func certificateHasDNSName(certificate *x509.Certificate, dnsName string) bool {
-	for _, certificateDNSName := range certificate.DNSNames {
-		if dnsName == certificateDNSName {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(certificate.DNSNames, dnsName)
 }

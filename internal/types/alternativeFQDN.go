@@ -14,8 +14,8 @@ func (a AlternativeFQDN) HasCertificate() bool {
 func ParseAlternativeFQDNsFromConfigString(configString string) []AlternativeFQDN {
 	altFQDNs := make([]AlternativeFQDN, 0)
 
-	altFQDNCerts := strings.Split(configString, ",")
-	for _, altFQDNCert := range altFQDNCerts {
+	altFQDNCerts := strings.SplitSeq(configString, ",")
+	for altFQDNCert := range altFQDNCerts {
 		fqdnCertTupel := strings.Split(altFQDNCert, ":")
 		if len(fqdnCertTupel) == 2 && fqdnCertTupel[0] != "" {
 			altFQDNs = append(altFQDNs, AlternativeFQDN{strings.TrimSpace(fqdnCertTupel[0]), strings.TrimSpace(fqdnCertTupel[1])})

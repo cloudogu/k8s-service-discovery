@@ -360,7 +360,7 @@ func exposedPortExpositionPredicate() predicate.Funcs {
 			udpOld := slices.SortedFunc(slices.Values(expositionOld.Spec.UDP), udpSortFunc)
 			udpNew := slices.SortedFunc(slices.Values(expositionNew.Spec.UDP), udpSortFunc)
 
-			return !(slices.Equal(tcpOld, tcpNew) && slices.Equal(udpOld, udpNew))
+			return !slices.Equal(tcpOld, tcpNew) || !slices.Equal(udpOld, udpNew)
 		},
 		GenericFunc: func(e event.TypedGenericEvent[client.Object]) bool {
 			return isExposedPortExposition(e.Object)
@@ -446,7 +446,10 @@ func (r *LoadBalancerReconciler) mapToExposedService(obj client.Object) (exposed
 		return exposedService{}, false
 	}
 
-	service := obj.(*corev1.Service)
+	service, ok := obj.(*corev1.Service)
+	if !ok {
+		return exposedService{}, false
+	}
 
 	exposition, err := mapServiceToExposition(service, r.Client)
 	if err != nil {

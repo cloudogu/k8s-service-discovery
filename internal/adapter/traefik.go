@@ -111,6 +111,8 @@ func (t *TraefikIngressController) ExposePorts(ctx context.Context, expositions 
 // exposeTCPRoutes creates or updates one IngressRouteTCP per entry in TcpRoutes, then
 // deletes any previously owned IngressRouteTCP objects that are no longer desired.
 // Per-route errors are collected so the cleanup pass always runs even when some upserts fail.
+//
+//nolint:dupl
 func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, exposition types.Exposition) error {
 	existing := &traefikapi.IngressRouteTCPList{}
 	if err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)}); err != nil {
@@ -175,6 +177,8 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 // exposeUDPRoutes creates or updates one IngressRouteUDP per entry in UdpRoutes, then
 // deletes any previously owned IngressRouteUDP objects that are no longer desired.
 // Per-route errors are collected so the cleanup pass always runs even when some upserts fail.
+//
+//nolint:dupl
 func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, exposition types.Exposition) error {
 	existing := &traefikapi.IngressRouteUDPList{}
 	if err := t.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)}); err != nil {
@@ -348,6 +352,8 @@ func (t *TraefikIngressController) generateMiddleware(exposition types.Expositio
 
 // upsertIngresses applies desiredState by creating or updating each Ingress, then deletes
 // any existing owned Ingresses that are absent from desiredState. All errors are collected.
+//
+//nolint:dupl
 func (t *TraefikIngressController) upsertIngresses(ctx context.Context, exposition types.Exposition, desiredState []*networkingv1.Ingress) error {
 	var errs []error
 	existing := &networkingv1.IngressList{}
@@ -391,6 +397,8 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 
 // upsertMiddlewares applies desiredState by creating or updating each Middleware, then
 // deletes any existing owned Middlewares absent from desiredState. All errors are collected.
+//
+//nolint:dupl
 func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposition types.Exposition, desiredState []*traefikapi.Middleware) error {
 	var errs []error
 	existing := &traefikapi.MiddlewareList{}

@@ -65,7 +65,7 @@ func TestServiceReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: expectedKey},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get dogu service", i...)
 			},
@@ -109,7 +109,7 @@ func TestServiceReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: expectedKey},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorContains(t, err, "failed to map dogu service to exposition", i...)
 			},
 		},
@@ -140,7 +140,7 @@ func TestServiceReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: expectedKey},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to process exposition from dogu service", i...)
 			},

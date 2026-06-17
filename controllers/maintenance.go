@@ -77,7 +77,10 @@ func mapRequestsFromMaintenanceConfigMap(
 
 		requests := make([]reconcile.Request, 0, len(items))
 		for _, item := range items {
-			mo := item.(metav1.Object)
+			mo, ok := item.(metav1.Object)
+			if !ok {
+				continue
+			}
 			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
 				Namespace: mo.GetNamespace(),
 				Name:      mo.GetName(),

@@ -51,7 +51,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockGlobalConfigRepo := NewMockGlobalConfigRepository(t)
 		mockGlobalConfigRepo.EXPECT().Get(t.Context()).Return(certProvidedGlobalConfig, nil)
 		mockGlobalConfigRepo.EXPECT().Watch(t.Context(), mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError)
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 
@@ -69,12 +69,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
 		mockGlobalConfigRepo.EXPECT().Get(t.Context()).Return(certProvidedGlobalConfig, nil)
 		mockGlobalConfigRepo.EXPECT().Watch(t.Context(), mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		mockLogSink := NewMockLogSink(t)
 		oldLogFn := log.FromContext
-		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...any) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
@@ -105,12 +105,12 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockGlobalConfigRepo.EXPECT().Get(ctx).Return(certProvidedGlobalConfig, nil)
 		resultChannel := make(chan repository.GlobalConfigWatchResult)
 		mockGlobalConfigRepo.EXPECT().Watch(ctx, mock.Anything, mock.Anything, mock.Anything).Return(resultChannel, nil)
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
 		mockLogSink := NewMockLogSink(t)
 		oldLogFn := log.FromContext
-		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...any) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
@@ -121,7 +121,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Info(0, "Starting selfsigned certificate updater...")
 		mockLogSink.EXPECT().Info(0, "start global config watcher for ssl certificates")
 		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
-		mockLogSink.EXPECT().Error(assert.AnError, "fqdn watch channel error").Run(func(err error, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Error(assert.AnError, "fqdn watch channel error").Run(func(err error, msg string, keysAndValues ...any) {
 			cancelFunc()
 		})
 
@@ -149,7 +149,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 
 		namespace := "myTestNamespace"
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
 		}
@@ -167,7 +167,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
 		oldLogFn := log.FromContext
-		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...any) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
@@ -179,7 +179,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Info(0, "start global config watcher for ssl certificates")
 		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
 		mockLogSink.EXPECT().Info(0, "FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
-		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...any) {
 			cancelFunc()
 		})
 
@@ -196,7 +196,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockSecretClient := newMockSecretClient(t)
 
 		namespace := "myTestNamespace"
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mockSecretClient,
@@ -220,7 +220,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
 		oldLogFn := log.FromContext
-		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...any) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
@@ -232,7 +232,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockLogSink.EXPECT().Info(0, "start global config watcher for ssl certificates")
 		mockLogSink.EXPECT().Info(0, "context done - stop global config watcher for fqdn changes")
 		mockLogSink.EXPECT().Info(0, "FQDN, alternativeFQDNs or domain changed in registry. Checking for selfsigned certificate...")
-		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...interface{}) {
+		mockLogSink.EXPECT().Error(mock.Anything, "failed to handle fqdn update", mock.Anything).Run(func(err error, msg string, keysAndValues ...any) {
 			cancelFunc()
 		})
 
@@ -245,7 +245,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockSecretClient := newMockSecretClient(t)
 
 		namespace := "myTestNamespace"
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mockSecretClient,
@@ -265,7 +265,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		mockLogSink := NewMockLogSink(t)
 		oldLogFn := log.FromContext
-		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...interface{}) logr.Logger {
+		ctrl.LoggerFrom = func(ctx context.Context, keysAndValues ...any) logr.Logger {
 			return logr.New(mockLogSink)
 		}
 		defer func() {
@@ -289,7 +289,7 @@ func Test_selfsignedCertificateUpdater_Start(t *testing.T) {
 		mockSecretClient := newMockSecretClient(t)
 
 		namespace := "myTestNamespace"
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			namespace:        namespace,
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mockSecretClient,
@@ -323,7 +323,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 			"tls.key": []byte("key"),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
 			secretClient:     mockSecretClient,
@@ -351,7 +351,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 			"tls.crt": []byte(pubPEMData),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
 			secretClient:     mockSecretClient,
@@ -381,7 +381,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo:   mockGlobalConfigRepo,
 			namespace:          testNamespace,
 			certificateCreator: creatorMock,
@@ -407,7 +407,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 		mockSecretClient := newMockSecretClient(t)
 		mockSecretClient.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(&corev1.Secret{}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
 			secretClient:     mockSecretClient,
@@ -434,7 +434,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 			"tls.crt": []byte(""),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			namespace:        testNamespace,
 			secretClient:     mockSecretClient,
@@ -464,7 +464,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo:   mockGlobalConfigRepo,
 			namespace:          testNamespace,
 			certificateCreator: creatorMock,
@@ -495,7 +495,7 @@ func Test_selfsignedCertificateUpdater_handleFqdnChange(t *testing.T) {
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo:   mockGlobalConfigRepo,
 			namespace:          testNamespace,
 			certificateCreator: creatorMock,
@@ -591,7 +591,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -614,7 +614,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 		mSecretClient := newMockSecretClient(t)
 		mSecretClient.EXPECT().Get(t.Context(), "ecosystem-certificate", metav1.GetOptions{}).Return(nil, assert.AnError)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -633,7 +633,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 
 		mSecretClient := newMockSecretClient(t)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -656,7 +656,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 
 		mSecretClient := newMockSecretClient(t)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -681,7 +681,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -706,7 +706,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -732,7 +732,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}
@@ -757,7 +757,7 @@ func Test_selfsignedCertificateUpdater_shouldUpdateCurrentCertificate(t *testing
 			"tls.crt": []byte(serverCert),
 		}}, nil)
 
-		sut := &selfsignedCertificateUpdater{
+		sut := &SelfsignedCertificateUpdater{
 			globalConfigRepo: mockGlobalConfigRepo,
 			secretClient:     mSecretClient,
 		}

@@ -21,9 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func int32Ptr(v int32) *int32 { return &v }
-
-func stringPtr(v string) *string { return &v }
+//go:fix inline
+func int32Ptr(v int32) *int32 { return new(v) }
 
 type assertingStatusWriter struct {
 	t           *testing.T
@@ -123,7 +122,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testNamespace, Name: "test"}},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to get exposition", i...)
 			},
@@ -191,7 +190,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testNamespace, Name: "test"}},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...) &&
 					assert.ErrorContains(t, err, "failed to process exposition from exposition CR", i...)
 			},
@@ -285,7 +284,7 @@ func TestExpositionReconciler_Reconcile(t *testing.T) {
 				},
 			},
 			req: controllerruntime.Request{NamespacedName: k8stypes.NamespacedName{Namespace: testNamespace, Name: "test"}},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError, i...)
 			},
 		},
@@ -329,12 +328,12 @@ func Test_mapExpositionCRToHttpRoutes(t *testing.T) {
 			name: "entry with strip-prefix only",
 			cr: &expositionv1.Exposition{ObjectMeta: metav1.ObjectMeta{Name: "ldap"}, Spec: expositionv1.ExpositionSpec{HTTP: []expositionv1.HTTPEntry{
 				{Name: "ui", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &expositionv1.Rewrite{
-					StripPrefix: stringPtr("/ldap"),
+					StripPrefix: new("/ldap"),
 				}},
 			}}},
 			want: []types.HttpRoute{
 				{Name: "ldap-ui-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: &types.HttpRewrite{
-					StripPrefix: stringPtr("/ldap"),
+					StripPrefix: new("/ldap"),
 					Regex:       nil,
 				}},
 			},
