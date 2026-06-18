@@ -35,13 +35,13 @@ func (m *MigrationCleanupManager) Start(ctx context.Context) error {
 func (m *MigrationCleanupManager) migrateFrom6_0_2(ctx context.Context) error {
 	var errs []error
 	selector := labels.SelectorFromSet(oldServiceDiscoveryLabels)
-	err := m.Client.DeleteAllOf(ctx, &networkingv1.Ingress{}, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{LabelSelector: selector, Namespace: m.Namespace}})
-	errs = append(errs, err)
-	err = m.Client.DeleteAllOf(ctx, &traefikv1alpha1.Middleware{}, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{LabelSelector: selector, Namespace: m.Namespace}})
-	errs = append(errs, err)
-	err = m.Client.DeleteAllOf(ctx, &networkingv1.NetworkPolicy{}, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{LabelSelector: selector, Namespace: m.Namespace}})
-	errs = append(errs, err)
+	typesToCleanup := []client.Object{&networkingv1.Ingress{}, &traefikv1alpha1.Middleware{},
+		&traefikv1alpha1.IngressRouteTCP{}, &traefikv1alpha1.IngressRouteUDP{}, &networkingv1.NetworkPolicy{}}
+	for _, t := range typesToCleanup {
+		err := m.Client.DeleteAllOf(ctx, t,
+			&client.DeleteAllOfOptions{ListOptions: client.ListOptions{LabelSelector: selector, Namespace: m.Namespace}})
+		errs = append(errs, err)
+	}
 
-	err = errors.Join(errs...)
-	return err
+	return errors.Join(errs...)
 }

@@ -30,6 +30,8 @@ func TestMigrationCleanupManager_Start(t *testing.T) {
 				&networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}},
 				&networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}},
 				&traefikv1alpha1.Middleware{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}},
+				&traefikv1alpha1.IngressRouteTCP{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}},
+				&traefikv1alpha1.IngressRouteUDP{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: testNamespace}},
 			).Build(),
 			wantErr: assert.NoError,
 		},
