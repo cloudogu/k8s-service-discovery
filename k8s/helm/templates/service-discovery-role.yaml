@@ -99,3 +99,4 @@ rules:
       - create
       - update
       - delete
+      - deletecollection
