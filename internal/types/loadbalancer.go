@@ -96,8 +96,7 @@ func (lb *LoadBalancer) ToK8sService() *corev1.Service {
 		return nil
 	}
 
-	svc := corev1.Service(*lb)
-	return &svc
+	return new(corev1.Service(*lb))
 }
 
 // Equals reports whether the current LoadBalancer and the given LoadBalancer
@@ -127,7 +126,7 @@ func (lb *LoadBalancer) Equals(o LoadBalancer) bool {
 	}
 
 	if lb.Spec.ExternalTrafficPolicy != o.Spec.ExternalTrafficPolicy ||
-		lb.Spec.InternalTrafficPolicy != o.Spec.InternalTrafficPolicy {
+		ptr.Deref(lb.Spec.InternalTrafficPolicy, "") != ptr.Deref(o.Spec.InternalTrafficPolicy, "") {
 		return false
 	}
 
@@ -188,7 +187,7 @@ func (lb *LoadBalancer) GetOwnerReference(scheme *runtime.Scheme) (*metav1.Owner
 		Kind:       gvk.Kind,
 		Name:       lb.Name,
 		UID:        lb.UID,
-		Controller: ptr.To(false),
+		Controller: new(false),
 	}, nil
 }
 
@@ -237,8 +236,7 @@ func ParseLoadBalancer(obj metav1.Object) (LoadBalancer, bool) {
 }
 
 // CreateLoadBalancer create a LoadBalancer with the config provided.
-func CreateLoadBalancer(namespace string, cfg LoadbalancerConfig, exposedPorts ExposedPorts, selector map[string]string) LoadBalancer {
-	ipSingleStackPolicy := corev1.IPFamilyPolicySingleStack
+func CreateLoadBalancer(namespace string, cfg LoadbalancerConfig, expositions []Exposition, selector map[string]string) LoadBalancer {
 	loadbalancerService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      LoadbalancerName,
@@ -247,7 +245,7 @@ func CreateLoadBalancer(namespace string, cfg LoadbalancerConfig, exposedPorts E
 		},
 		Spec: corev1.ServiceSpec{
 			Type:           corev1.ServiceTypeLoadBalancer,
-			IPFamilyPolicy: &ipSingleStackPolicy,
+			IPFamilyPolicy: new(corev1.IPFamilyPolicySingleStack),
 			IPFamilies:     []corev1.IPFamily{corev1.IPv4Protocol},
 			Selector:       selector,
 		},
@@ -260,13 +258,7 @@ func CreateLoadBalancer(namespace string, cfg LoadbalancerConfig, exposedPorts E
 	// apply loadbalancer
 	loadbalancerService.SetAnnotations(createConfigAnnotations(cfg.Annotations))
 
-	exposedServicePorts := make([]corev1.ServicePort, 0, len(exposedPorts))
-
-	for _, ePort := range exposedPorts {
-		exposedServicePorts = append(exposedServicePorts, ePort.ToServicePort())
-	}
-
-	loadbalancerService.Spec.Ports = exposedServicePorts
+	loadbalancerService.Spec.Ports = CreateLoadBalancerExposedPorts(expositions).ToServicePorts()
 
 	return LoadBalancer(loadbalancerService)
 }
@@ -296,4 +288,26 @@ func getConfigAnnotationKeys(lbAnnotations map[string]string) []string {
 	}
 
 	return strings.Split(keysStr, configManagedAnnotationKeySeparator)
+}
+
+func CreateLoadBalancerExposedPorts(expositions []Exposition) ExposedPorts {
+	exposedPorts := make(ExposedPorts, 0, len(expositions))
+
+	// concat all exposed Ports
+	for _, e := range expositions {
+		ePorts := slices.Concat(e.TcpRoutes, e.UdpRoutes)
+		exposedPorts = append(exposedPorts, ePorts...)
+	}
+
+	// Strip any caller-provided 80/443 entries so the canonical "http"/"https" default ports
+	// added below are always present with consistent names.
+	exposedPorts = slices.DeleteFunc(exposedPorts, func(port ExposedPort) bool {
+		return port.RequestedExternalPort == 80 || port.RequestedExternalPort == 443
+	})
+
+	// add http / https default ports
+	exposedPorts = append(exposedPorts, createDefaultPorts()...)
+	exposedPorts.SortByName()
+
+	return exposedPorts
 }

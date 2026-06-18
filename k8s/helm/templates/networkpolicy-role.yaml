@@ -12,5 +12,8 @@ rules:
     - networkpolicies
     verbs:
     - get
+    - list
+    - watch
     - create
     - update
+    - deletecollection

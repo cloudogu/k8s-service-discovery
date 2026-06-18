@@ -6,41 +6,19 @@ import (
 	libconfig "github.com/cloudogu/k8s-registry-lib/config"
 	"github.com/cloudogu/k8s-registry-lib/repository"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type MaintenanceAdapter interface {
 	GetStatus(ctx context.Context) (repository.MaintenanceModeDescription, bool, error)
 }
 
-type eventRecorder interface {
-	record.EventRecorder
-}
-
-type k8sManager interface {
-	ctrl.Manager
-}
-
 type GlobalConfigRepository interface {
 	Get(context.Context) (libconfig.GlobalConfig, error)
 	Watch(context.Context, ...libconfig.WatchFilter) (<-chan repository.GlobalConfigWatchResult, error)
 	Update(ctx context.Context, globalConfig libconfig.GlobalConfig) (libconfig.GlobalConfig, error)
-}
-
-// IngressUpdater is responsible to create and update the actual ingress objects in the cluster.
-type IngressUpdater interface {
-	// UpsertIngressForService creates or updates the ingress object of the given service.
-	UpsertIngressForService(ctx context.Context, service *corev1.Service) error
-}
-
-type NetworkPolicyUpdater interface {
-	UpsertNetworkPoliciesForService(ctx context.Context, service *corev1.Service) error
-	RemoveExposedPorts(ctx context.Context, serviceName string) error
-	RemoveNetworkPolicy(ctx context.Context) error
 }
 
 type certificateSynchronizer interface {
@@ -52,7 +30,8 @@ type AlternativeFQDNRedirector interface {
 }
 
 type PortExposer interface {
-	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error
+	GetExposedPortOwnableTypes() []client.Object
+	ExposePorts(ctx context.Context, expositions []types.Exposition) error
 }
 
 type IngressControllerSelector interface {
@@ -62,13 +41,13 @@ type IngressControllerSelector interface {
 type IngressController interface {
 	AlternativeFQDNRedirector
 	IngressControllerSelector
-	PortExposer
 }
 
 type secretClient interface {
 	corev1client.SecretInterface
 }
 
-type serviceClient interface {
-	corev1client.ServiceInterface
+type ExpositionService interface {
+	GetOwnableTypes() []client.Object
+	ProcessExposition(ctx context.Context, exposition types.Exposition) error
 }

@@ -12,7 +12,7 @@ github = new GitHub(this, git)
 changelog = new Changelog(this)
 Docker docker = new Docker(this)
 gpg = new Gpg(this, docker)
-goVersion = "1.26.0"
+goVersion = "1.26.3"
 makefile = new Makefile(this)
 
 // Configuration of repository
@@ -106,6 +106,7 @@ node('docker') {
                 withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'harborhelmchartpush', usernameVariable: 'HARBOR_USERNAME', passwordVariable: 'HARBOR_PASSWORD']]) {
                     k3d.helm("registry login ${registry} --username '${HARBOR_USERNAME}' --password '${HARBOR_PASSWORD}'")
                     k3d.helm("install k8s-ces-gateway oci://${registry}/k8s/k8s-ces-gateway")
+                    k3d.helm("install k8s-exposition-crd oci://${registry}/k8s/k8s-exposition-crd")
                     k3d.helm("registry logout ${registry}")
                 }
                 k3d.helm("install ${repositoryName} ${helmChartDir}")

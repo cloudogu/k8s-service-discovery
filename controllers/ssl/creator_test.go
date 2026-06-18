@@ -1,7 +1,6 @@
 package ssl
 
 import (
-	"context"
 	"testing"
 
 	registryconfig "github.com/cloudogu/k8s-registry-lib/config"
@@ -9,13 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testCtx = context.Background()
-
 func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 	t.Run("should return an error if fqdn is not set", func(t *testing.T) {
 		// given
 		globalConfigRepoMock := NewMockGlobalConfigRepository(t)
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(registryconfig.GlobalConfig{}, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(registryconfig.GlobalConfig{}, nil)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -24,7 +21,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.Error(t, err)
@@ -38,7 +35,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 				"fqdn": "",
 			}),
 		}
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -47,7 +44,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.Error(t, err)
@@ -61,7 +58,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 				"fqdn": "192.168.56.2",
 			}),
 		}
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -70,7 +67,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.Error(t, err)
@@ -85,7 +82,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 				"domain": "",
 			}),
 		}
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -94,7 +91,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.Error(t, err)
@@ -110,7 +107,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 				"domain": "ces.local",
 			}),
 		}
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 
 		sslGeneratorMock := newMockCesSelfSignedSSLGenerator(t)
 		sslGeneratorMock.EXPECT().GenerateSelfSignedCert("192.168.56.2", "ces.local", 1,
@@ -123,7 +120,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.Error(t, err)
@@ -139,14 +136,14 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 				"domain": "ces.local",
 			}),
 		}
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 
 		sslGeneratorMock := newMockCesSelfSignedSSLGenerator(t)
 		sslGeneratorMock.EXPECT().GenerateSelfSignedCert("192.168.56.2", "ces.local", 1,
 			"DE", "Lower Saxony", "Brunswick", []string{}).Return("mycert", "mykey", nil)
 
 		sslWriterMock := newMockCesSSLWriter(t)
-		sslWriterMock.EXPECT().WriteCertificate(testCtx, "mycert", "mykey").Return(assert.AnError)
+		sslWriterMock.EXPECT().WriteCertificate(t.Context(), "mycert", "mykey").Return(assert.AnError)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -155,7 +152,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.Error(t, err)
@@ -171,14 +168,14 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 				"domain": "ces.local",
 			}),
 		}
-		globalConfigRepoMock.EXPECT().Get(testCtx).Return(globalConfig, nil)
+		globalConfigRepoMock.EXPECT().Get(t.Context()).Return(globalConfig, nil)
 
 		sslGeneratorMock := newMockCesSelfSignedSSLGenerator(t)
 		sslGeneratorMock.EXPECT().GenerateSelfSignedCert("192.168.56.2", "ces.local", 1,
 			"DE", "Lower Saxony", "Brunswick", []string{}).Return("mycert", "mykey", nil)
 
 		sslWriterMock := newMockCesSSLWriter(t)
-		sslWriterMock.EXPECT().WriteCertificate(testCtx, "mycert", "mykey").Return(nil)
+		sslWriterMock.EXPECT().WriteCertificate(t.Context(), "mycert", "mykey").Return(nil)
 
 		sut := &creator{
 			globalConfigRepo: globalConfigRepoMock,
@@ -187,7 +184,7 @@ func Test_creator_CreateAndSafeCertificate(t *testing.T) {
 		}
 
 		// when
-		err := sut.CreateAndSafeCertificate(testCtx, 1, "DE", "Lower Saxony", "Brunswick", []string{})
+		err := sut.CreateAndSafeCertificate(t.Context(), 1, "DE", "Lower Saxony", "Brunswick", []string{})
 
 		// then
 		require.NoError(t, err)
