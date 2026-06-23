@@ -16,4 +16,5 @@ rules:
     - watch
     - create
     - update
+    - delete
     - deletecollection
