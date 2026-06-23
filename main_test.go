@@ -10,9 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -26,7 +23,7 @@ type FieldIndexerStub struct {
 	mock.Mock
 }
 
-func (f *FieldIndexerStub) IndexField(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+func (f *FieldIndexerStub) IndexField(context.Context, client.Object, string, client.IndexerFunc) error {
 	return nil
 }
 
@@ -60,8 +57,6 @@ func Test_startManager(t *testing.T) {
 	oldSetLoggerDelegate := ctrl.SetLogger
 	defer func() { ctrl.SetLogger = oldSetLoggerDelegate }()
 
-	scheme := runtime.NewScheme()
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	t.Run("Error on missing namespace environment variable", func(t *testing.T) {
@@ -87,6 +82,9 @@ func Test_startManager(t *testing.T) {
 	t.Setenv("WATCH_NAMESPACE", "mynamespace")
 	t.Setenv("NETWORK_POLICIES_CIDR", "0.0.0.0/0")
 	t.Setenv("NETWORK_POLICIES_ENABLED", "true")
+	t.Setenv("EXPOSITION_EXPOSE_PORTS", "true")
+	t.Setenv("EXPOSITION_DISCOVER_SERVICES", "true")
+	t.Setenv("EXPOSITION_DISCOVER_EXPOSITION_CR", "true")
 
 	t.Run("Test with error on manager creation", func(t *testing.T) {
 		// given
@@ -112,7 +110,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
@@ -141,7 +138,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
@@ -171,7 +167,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)
@@ -202,7 +197,6 @@ func Test_startManager(t *testing.T) {
 		k8sManager := newMockK8sManager(t)
 		k8sManager.EXPECT().GetClient().Return(client)
 		k8sManager.EXPECT().Add(mock.Anything).Return(nil)
-		k8sManager.EXPECT().GetEventRecorderFor("k8s-service-discovery-controller-manager").Return(nil)
 		k8sManager.EXPECT().GetControllerOptions().Return(config.Controller{SkipNameValidation: &skipNameValidation})
 		k8sManager.EXPECT().GetScheme().Return(scheme)
 		k8sManager.EXPECT().GetLogger().Return(logger)

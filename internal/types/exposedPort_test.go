@@ -11,20 +11,20 @@ import (
 )
 
 func TestCreateDefaultPorts(t *testing.T) {
-	ports := CreateDefaultPorts()
+	ports := createDefaultPorts()
 
 	expHttpPort := ExposedPort{
-		Name:       "http",
-		Protocol:   corev1.ProtocolTCP,
-		Port:       httpPort,
-		TargetPort: httpPort,
+		Name:                  "http",
+		Protocol:              corev1.ProtocolTCP,
+		ServicePort:           httpPort,
+		RequestedExternalPort: httpPort,
 	}
 
 	expHttpsPort := ExposedPort{
-		Name:       "https",
-		Protocol:   corev1.ProtocolTCP,
-		Port:       httpsPort,
-		TargetPort: httpsPort,
+		Name:                  "https",
+		Protocol:              corev1.ProtocolTCP,
+		ServicePort:           httpsPort,
+		RequestedExternalPort: httpsPort,
 	}
 
 	assert.True(t, slices.Contains(ports, expHttpPort))
@@ -33,17 +33,17 @@ func TestCreateDefaultPorts(t *testing.T) {
 
 func TestExposedPort_ToServicePort(t *testing.T) {
 	exposedPort := ExposedPort{
-		Name:       "test",
-		Protocol:   corev1.ProtocolUDP,
-		Port:       12345,
-		TargetPort: 67890,
-		nodePort:   400,
+		Name:                  "test",
+		Protocol:              corev1.ProtocolUDP,
+		ServicePort:           12345,
+		RequestedExternalPort: 67890,
+		nodePort:              400,
 	}
 
 	expServicePort := corev1.ServicePort{
 		Name:       "test",
 		Protocol:   corev1.ProtocolUDP,
-		Port:       12345,
+		Port:       67890,
 		TargetPort: intstr.FromInt32(67890),
 		NodePort:   400,
 	}
@@ -210,8 +210,8 @@ func TestExposedPorts_ToServicePorts(t *testing.T) {
 				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
 			},
 			exp: []corev1.ServicePort{
-				{"a", corev1.ProtocolTCP, nil, 1, intstr.FromInt32(2), 3},
-				{"b", corev1.ProtocolUDP, nil, 5, intstr.FromInt32(6), 7},
+				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(2), 3},
+				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(6), 7},
 			},
 		},
 		{
@@ -221,8 +221,8 @@ func TestExposedPorts_ToServicePorts(t *testing.T) {
 				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
 			},
 			exp: []corev1.ServicePort{
-				{"a", corev1.ProtocolTCP, nil, 1, intstr.FromInt32(2), 3},
-				{"b", corev1.ProtocolUDP, nil, 5, intstr.FromInt32(6), 7},
+				{"a", corev1.ProtocolTCP, nil, 2, intstr.FromInt32(2), 3},
+				{"b", corev1.ProtocolUDP, nil, 6, intstr.FromInt32(6), 7},
 			},
 		},
 	}
@@ -317,6 +317,110 @@ func TestExposedPorts_SetNodePorts(t *testing.T) {
 }
 
 func TestExposedPort_PortString(t *testing.T) {
-	exPort := ExposedPort{Port: 50000}
+	exPort := ExposedPort{ServicePort: 50000}
 	require.Equal(t, "50000", exPort.PortString())
+}
+
+func TestExposedPorts_MapTCPPorts(t *testing.T) {
+	tests := []struct {
+		name string
+		in   ExposedPorts
+		exp  ExposedPorts
+	}{
+		{
+			name: "return only TCP ports when input mixes protocols",
+			in: ExposedPorts{
+				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
+				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
+				{"c", "", corev1.ProtocolSCTP, 8, 9, 10},
+				{"d", "", corev1.ProtocolTCP, 11, 12, 13},
+			},
+			exp: ExposedPorts{
+				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
+				{"d", "", corev1.ProtocolTCP, 11, 12, 13},
+			},
+		},
+		{
+			name: "return all ports when all are TCP",
+			in: ExposedPorts{
+				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
+				{"b", "", corev1.ProtocolTCP, 5, 6, 7},
+			},
+			exp: ExposedPorts{
+				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
+				{"b", "", corev1.ProtocolTCP, 5, 6, 7},
+			},
+		},
+		{
+			name: "return empty when no TCP ports present",
+			in: ExposedPorts{
+				{"a", "", corev1.ProtocolUDP, 1, 2, 3},
+				{"b", "", corev1.ProtocolSCTP, 5, 6, 7},
+			},
+			exp: ExposedPorts{},
+		},
+		{
+			name: "return empty when input is empty",
+			in:   ExposedPorts{},
+			exp:  ExposedPorts{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.exp, tt.in.MapTCPPorts())
+		})
+	}
+}
+
+func TestExposedPorts_MapUDPPorts(t *testing.T) {
+	tests := []struct {
+		name string
+		in   ExposedPorts
+		exp  ExposedPorts
+	}{
+		{
+			name: "return only UDP ports when input mixes protocols",
+			in: ExposedPorts{
+				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
+				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
+				{"c", "", corev1.ProtocolSCTP, 8, 9, 10},
+				{"d", "", corev1.ProtocolUDP, 11, 12, 13},
+			},
+			exp: ExposedPorts{
+				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
+				{"d", "", corev1.ProtocolUDP, 11, 12, 13},
+			},
+		},
+		{
+			name: "return all ports when all are UDP",
+			in: ExposedPorts{
+				{"a", "", corev1.ProtocolUDP, 1, 2, 3},
+				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
+			},
+			exp: ExposedPorts{
+				{"a", "", corev1.ProtocolUDP, 1, 2, 3},
+				{"b", "", corev1.ProtocolUDP, 5, 6, 7},
+			},
+		},
+		{
+			name: "return empty when no UDP ports present",
+			in: ExposedPorts{
+				{"a", "", corev1.ProtocolTCP, 1, 2, 3},
+				{"b", "", corev1.ProtocolSCTP, 5, 6, 7},
+			},
+			exp: ExposedPorts{},
+		},
+		{
+			name: "return empty when input is empty",
+			in:   ExposedPorts{},
+			exp:  ExposedPorts{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.exp, tt.in.MapUDPPorts())
+		})
+	}
 }

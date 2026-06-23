@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.1.0] - 2026-06-23
+### Changed
+- [#105] Optionally reconcile exposition CRs additionally to services
+  - discovery of exposition CRs or services can be (de)activated via the helm values under `exposition`
+
 ## [v6.0.3] - 2026-06-03
 ### Fixed
 - [#108] Add missing namespace to the redirect ingress for the corresponding middleware otherwise traefik won't use it.

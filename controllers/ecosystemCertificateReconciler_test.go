@@ -54,11 +54,11 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			name: "should fail",
 			certSyncFn: func(t *testing.T) certificateSynchronizer {
 				m := newMockCertificateSynchronizer(t)
-				m.EXPECT().Synchronize(testCtx).Return(assert.AnError)
+				m.EXPECT().Synchronize(t.Context()).Return(assert.AnError)
 				return m
 			},
 			want: controllerruntime.Result{},
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.ErrorIs(t, err, assert.AnError)
 			},
 		},
@@ -66,7 +66,7 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			name: "should succeed",
 			certSyncFn: func(t *testing.T) certificateSynchronizer {
 				m := newMockCertificateSynchronizer(t)
-				m.EXPECT().Synchronize(testCtx).Return(nil)
+				m.EXPECT().Synchronize(t.Context()).Return(nil)
 				return m
 			},
 			want:    controllerruntime.Result{},
@@ -78,11 +78,11 @@ func Test_ecosystemCertificateReconciler_Reconcile(t *testing.T) {
 			r := &ecosystemCertificateReconciler{
 				certSync: tt.certSyncFn(t),
 			}
-			got, err := r.Reconcile(testCtx, request)
-			if !tt.wantErr(t, err, fmt.Sprintf("Reconcile(%v, %v)", testCtx, request)) {
+			got, err := r.Reconcile(t.Context(), request)
+			if !tt.wantErr(t, err, fmt.Sprintf("Reconcile(%v, %v)", t.Context(), request)) {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "Reconcile(%v, %v)", testCtx, request)
+			assert.Equalf(t, tt.want, got, "Reconcile(%v, %v)", t.Context(), request)
 		})
 	}
 }

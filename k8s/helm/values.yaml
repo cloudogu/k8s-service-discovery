@@ -5,7 +5,7 @@ manager:
   image:
     registry: docker.io
     repository: cloudogu/k8s-service-discovery
-    tag: 6.0.3
+    tag: 6.1.0
   env:
     logLevel: info
   resources:
@@ -26,3 +26,11 @@ loadBalancerService:
   annotations: {}
   internalTrafficPolicy: Cluster
   externalTrafficPolicy: Local
+# Configuration for exposing ports and http routes
+exposition:
+  # Enable exposition of ports via the load balancer
+  exposePorts: true
+  # Enable port and http route discovery via Services that are annotated (Legacy)
+  discoverServices: true
+  # Enable port and http route discovery via ExpositionCR
+  discoverExpositionCR: false

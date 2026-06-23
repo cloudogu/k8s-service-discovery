@@ -26,14 +26,9 @@ type AlternativeFQDNRedirector interface {
 	RedirectAlternativeFQDN(ctx context.Context, namespace string, redirectObjectName string, fqdn string, altFQDNList []types.AlternativeFQDN, setOwner func(targetObject metav1.Object) error) error
 }
 
-type PortExposer interface {
-	ExposePorts(ctx context.Context, namespace string, exposedPorts types.ExposedPorts) error
-}
-
 type IngressController interface {
 	GetName() string
 	GetRewriteAnnotationKey() string
 	GetSelector() map[string]string
 	AlternativeFQDNRedirector
-	PortExposer
 }

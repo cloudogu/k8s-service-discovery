@@ -24,14 +24,14 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		// given
 
 		secretClientMock := newMockSecretClient(t)
-		secretClientMock.EXPECT().Update(testCtx, mock.Anything, v1.UpdateOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, assert.AnError.Error()))
+		secretClientMock.EXPECT().Update(t.Context(), mock.Anything, v1.UpdateOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, assert.AnError.Error()))
 
 		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
 
-		secretClientMock.EXPECT().Create(testCtx, writer.createCertificateSecret(cert, key), v1.CreateOptions{}).Return(nil, nil)
+		secretClientMock.EXPECT().Create(t.Context(), writer.createCertificateSecret(cert, key), v1.CreateOptions{}).Return(nil, nil)
 
 		// when
-		err := writer.WriteCertificate(testCtx, cert, key)
+		err := writer.WriteCertificate(t.Context(), cert, key)
 
 		// then
 		require.NoError(t, err)
@@ -43,10 +43,10 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		secretClientMock := newMockSecretClient(t)
 		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
 
-		secretClientMock.EXPECT().Update(testCtx, writer.createCertificateSecret(cert, key), v1.UpdateOptions{}).Return(nil, nil)
+		secretClientMock.EXPECT().Update(t.Context(), writer.createCertificateSecret(cert, key), v1.UpdateOptions{}).Return(nil, nil)
 
 		// when
-		err := writer.WriteCertificate(testCtx, cert, key)
+		err := writer.WriteCertificate(t.Context(), cert, key)
 
 		// then
 		require.NoError(t, err)
@@ -56,14 +56,14 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		// given
 
 		secretClientMock := newMockSecretClient(t)
-		secretClientMock.EXPECT().Update(testCtx, mock.Anything, v1.UpdateOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, assert.AnError.Error()))
+		secretClientMock.EXPECT().Update(t.Context(), mock.Anything, v1.UpdateOptions{}).Return(nil, errors.NewNotFound(schema.GroupResource{}, assert.AnError.Error()))
 
 		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
 
-		secretClientMock.EXPECT().Create(testCtx, writer.createCertificateSecret(cert, key), v1.CreateOptions{}).Return(nil, assert.AnError)
+		secretClientMock.EXPECT().Create(t.Context(), writer.createCertificateSecret(cert, key), v1.CreateOptions{}).Return(nil, assert.AnError)
 
 		// when
-		err := writer.WriteCertificate(testCtx, cert, key)
+		err := writer.WriteCertificate(t.Context(), cert, key)
 
 		// then
 		require.Error(t, err)
@@ -76,10 +76,10 @@ func Test_sslWriter_WriteCertificate(t *testing.T) {
 		secretClientMock := newMockSecretClient(t)
 		writer := NewSSLWriter(secretClientMock, sslWriterNamespace)
 
-		secretClientMock.EXPECT().Update(testCtx, writer.createCertificateSecret(cert, key), v1.UpdateOptions{}).Return(nil, assert.AnError)
+		secretClientMock.EXPECT().Update(t.Context(), writer.createCertificateSecret(cert, key), v1.UpdateOptions{}).Return(nil, assert.AnError)
 
 		// when
-		err := writer.WriteCertificate(testCtx, cert, key)
+		err := writer.WriteCertificate(t.Context(), cert, key)
 
 		// then
 		require.Error(t, err)

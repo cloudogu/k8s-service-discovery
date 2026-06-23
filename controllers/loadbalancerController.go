@@ -2,9 +2,12 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
+	expositionv1 "github.com/cloudogu/k8s-exposition-lib/api/v1"
 	"github.com/cloudogu/k8s-service-discovery/v2/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,14 +25,19 @@ import (
 
 const (
 	exposedPortIndexKey = "k8s-service-discovery.cloudogu.com/exposedPort"
+
+	conditionTypeLBPortAllocation = "LoadBalancerPortsAllocated"
+	conditionReasonPortCollision  = "PortCollision"
+	conditionReasonPortAllocated  = "PortsAllocated"
 )
 
 // LoadBalancerReconciler is responsible for reconciling the ces-loadbalancer configmap and to create / update the corresponding
 // loadbalancer service. For this, it also watches Services to detect changes for exposed ports.
 type LoadBalancerReconciler struct {
-	Client            client.Client
-	IngressController IngressController
-	SvcClient         serviceClient
+	IngressSelector  map[string]string
+	ExpositionConfig types.ExpositionConfig
+	Client           client.Client
+	PortExposer      PortExposer
 }
 
 // Reconcile implements the controller-runtime reconcile loop for the
@@ -67,61 +75,77 @@ func (r *LoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	exposedDoguServices, err := r.getExposedServices(ctx)
+	expositions, err := r.getExpositions(ctx)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get exposed dogu services: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to get expositions: %w", err)
 	}
 
-	exposedDoguPorts, err := getExposedDoguPorts(exposedDoguServices)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get exposed ports from services: %w", err)
+	var cErrs []error
+
+	validExpositions, collisionMap := checkPortCollisions(expositions)
+	if lErr := setPortsAllocatedConditionError(ctx, collisionMap); lErr != nil {
+		cErrs = append(cErrs, fmt.Errorf("failed to set condition error for PortsAllocated: %w", lErr))
 	}
 
-	exposedLoadBalancerPorts := createLoadBalancerExposedPorts(exposedDoguPorts)
-
-	uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, exposedLoadBalancerPorts, setOwnerReference)
+	uErr := r.upsertLoadBalancer(ctx, req.Namespace, lbConfig, validExpositions, setOwnerReference)
 	if uErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update loadbalancer: %w", uErr)
 	}
 
+	if lErr := setPortsAllocatedCondition(ctx, validExpositions); lErr != nil {
+		cErrs = append(cErrs, fmt.Errorf("failed to set successful condition for PortsAllocated: %w", lErr))
+	}
+
 	logger.Info("Successfully applied new state to loadbalancer.")
 
-	if eErr := r.IngressController.ExposePorts(ctx, req.Namespace, exposedDoguPorts); eErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update exposed ports in ingress controller: %w", eErr)
+	if eErr := r.PortExposer.ExposePorts(ctx, validExpositions); eErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to expose ports in ingress controller: %w", eErr)
 	}
 
 	logger.Info("Successfully exposed ports in IngressController.")
 
+	if cErr := errors.Join(cErrs...); cErr != nil {
+		return ctrl.Result{}, cErr
+	}
+
 	return ctrl.Result{}, nil
 }
 
-func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]types.Service, error) {
+func (r *LoadBalancerReconciler) getExposedServices(ctx context.Context) ([]corev1.Service, error) {
 	var k8sServiceList corev1.ServiceList
 	if lErr := r.Client.List(ctx, &k8sServiceList, client.MatchingFields{exposedPortIndexKey: "true"}); lErr != nil {
 		return nil, fmt.Errorf("failed to list exposed services: %w", lErr)
 	}
 
-	serviceList := make([]types.Service, 0, len(k8sServiceList.Items))
-	for _, k8sService := range k8sServiceList.Items {
-		serviceList = append(serviceList, types.Service(k8sService))
-	}
-
-	return serviceList, nil
+	return k8sServiceList.Items, nil
 }
 
-func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, exposedPorts types.ExposedPorts, setOwner func(object metav1.Object)) error {
-	lbObj, err := r.SvcClient.Get(ctx, types.LoadbalancerName, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get service for loadbalancer: %w", err)
+func (r *LoadBalancerReconciler) getExpositionCRs(ctx context.Context) ([]expositionv1.Exposition, error) {
+	var k8sExpositionList expositionv1.ExpositionList
+	if lErr := r.Client.List(ctx, &k8sExpositionList, client.MatchingFields{exposedPortIndexKey: "true"}); lErr != nil {
+		return nil, fmt.Errorf("failed to list expositions: %w", lErr)
 	}
 
-	if apierrors.IsNotFound(err) {
-		newLB := types.CreateLoadBalancer(namespace, cfg, exposedPorts, r.IngressController.GetSelector())
-		newLBService := newLB.ToK8sService()
+	return k8sExpositionList.Items, nil
+}
+
+// upsertLoadBalancer creates the LoadBalancer Service if it does not exist,
+// or updates it when the desired state differs from the current state.
+// setOwner wires the owner reference on any created or updated object.
+func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespace string, cfg types.LoadbalancerConfig, expositions []types.Exposition, setOwner func(object metav1.Object)) error {
+	lbObj := &corev1.Service{}
+	gErr := r.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: types.LoadbalancerName}, lbObj)
+	if gErr != nil && !apierrors.IsNotFound(gErr) {
+		return fmt.Errorf("failed to get service for loadbalancer: %w", gErr)
+	}
+
+	desired := types.CreateLoadBalancer(namespace, cfg, expositions, r.IngressSelector)
+
+	if apierrors.IsNotFound(gErr) {
+		newLBService := desired.ToK8sService()
 		setOwner(newLBService)
 
-		_, cErr := r.SvcClient.Create(ctx, newLBService, metav1.CreateOptions{})
-		if cErr != nil {
+		if cErr := r.Client.Create(ctx, newLBService); cErr != nil {
 			return fmt.Errorf("failed to create new loadbalancer service: %w", cErr)
 		}
 
@@ -130,17 +154,20 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 
 	lb, ok := types.ParseLoadBalancer(lbObj)
 	if !ok {
-		return fmt.Errorf("could not parse existing service to LoadBalancer because of unkown type %T", lbObj)
+		return fmt.Errorf("could not parse existing service to LoadBalancer because of unknown type %T", lbObj)
+	}
+
+	if lb.Equals(desired) {
+		return nil
 	}
 
 	lb.ApplyConfig(cfg)
-	lb.UpdateExposedPorts(exposedPorts)
+	lb.UpdateExposedPorts(types.CreateLoadBalancerExposedPorts(expositions))
 
 	updatedLBService := lb.ToK8sService()
 	setOwner(updatedLBService)
 
-	updatedLBService, uErr := r.SvcClient.Update(ctx, updatedLBService, metav1.UpdateOptions{})
-	if uErr != nil {
+	if uErr := r.Client.Update(ctx, updatedLBService); uErr != nil {
 		return fmt.Errorf("failed to update existing loadbalancer: %w", uErr)
 	}
 
@@ -151,26 +178,132 @@ func (r *LoadBalancerReconciler) upsertLoadBalancer(ctx context.Context, namespa
 // The controller watches for changes to the ces-loadbalancer configmap as well as dogu services.
 // It also reconciles when the load-balancer changes.
 func (r *LoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if iErr := createExposedServiceIndex(mgr); iErr != nil {
-		return fmt.Errorf("failed to create index for service with exposed ports: %w", iErr)
+	if r.IngressSelector == nil {
+		return fmt.Errorf("IngressSelector for LoadBalancer is not set")
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&corev1.ConfigMap{},
 			builder.WithPredicates(loadbalancerConfigPredicate()),
-		).
-		Watches(
-			&corev1.Service{},
-			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
-			builder.WithPredicates(exposedPortServicePredicate()),
 		).
 		Owns(
 			&corev1.Service{},
 			builder.WithPredicates(loadbalancerServicePredicate()),
 		).
-		Named("loadbalancer-configmap").
-		Complete(r)
+		Named("loadbalancer-configmap")
+
+	if !r.ExpositionConfig.Enabled {
+		return ctrlBuilder.Complete(r)
+	}
+
+	for _, res := range r.PortExposer.GetExposedPortOwnableTypes() {
+		ctrlBuilder.Watches(
+			res,
+			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
+		)
+	}
+
+	if r.ExpositionConfig.DiscoverServices {
+		if iErr := r.createExposedServiceIndex(mgr); iErr != nil {
+			return fmt.Errorf("failed to create index for services with exposed ports: %w", iErr)
+		}
+
+		ctrlBuilder.Watches(
+			&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
+			builder.WithPredicates(r.exposedPortServicePredicate()),
+		)
+	}
+
+	if r.ExpositionConfig.DiscoverExpositions {
+		if iErr := createExposedExpositionIndex(mgr); iErr != nil {
+			return fmt.Errorf("failed to create index for exposition: %w", iErr)
+		}
+
+		ctrlBuilder.Watches(
+			&expositionv1.Exposition{},
+			handler.EnqueueRequestsFromMapFunc(enqueueLoadBalancerConfig),
+			builder.WithPredicates(exposedPortExpositionPredicate()),
+		)
+
+	}
+
+	return ctrlBuilder.Complete(r)
+}
+
+func (r *LoadBalancerReconciler) getExpositions(ctx context.Context) ([]types.Exposition, error) {
+	if !r.ExpositionConfig.Enabled {
+		return []types.Exposition{}, nil
+	}
+
+	serviceExpositions, err := r.getExpositionsForServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expositions for services: %w", err)
+	}
+
+	crExpositions, err := r.getExpositionsForExpositionCRs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expositions for exposition CRs: %w", err)
+	}
+
+	return slices.Concat(serviceExpositions, crExpositions), nil
+}
+
+func (r *LoadBalancerReconciler) getExpositionsForServices(ctx context.Context) ([]types.Exposition, error) {
+	if !r.ExpositionConfig.DiscoverServices {
+		return []types.Exposition{}, nil
+	}
+
+	logger := ctrl.LoggerFrom(ctx)
+
+	serviceList, err := r.getExposedServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch services with exposed ports: %w", err)
+	}
+
+	expositions := make([]types.Exposition, 0, len(serviceList))
+
+	for _, service := range serviceList {
+		serviceExposition, mErr := mapServiceToExposition(&service, r.Client)
+		if mErr != nil {
+			// don't let a single corrupted service block exposing ports from other services
+			logger.Error(mErr, "failed to map service to exposition while exposing ports", "service", service.Name)
+			continue
+		}
+
+		expositions = append(expositions, serviceExposition)
+	}
+
+	return expositions, nil
+}
+
+func (r *LoadBalancerReconciler) getExpositionsForExpositionCRs(ctx context.Context) ([]types.Exposition, error) {
+	if !r.ExpositionConfig.DiscoverExpositions {
+		return []types.Exposition{}, nil
+	}
+
+	logger := ctrl.LoggerFrom(ctx)
+
+	expositionList, err := r.getExpositionCRs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch expositions with exposed ports: %w", err)
+	}
+
+	expositions := make([]types.Exposition, 0, len(expositionList))
+
+	for _, expositionCR := range expositionList {
+		exposition, mErr := mapExpositionCRToExposition(&expositionCR, r.Client)
+		if mErr != nil {
+			// don't let a single corrupted exposition block exposing ports from other expositions
+			logger.Error(mErr, "failed to map expositionCR to exposition", "exposition", expositionCR.Name)
+			continue
+		}
+
+		expositions = append(expositions, exposition)
+	}
+
+	return expositions, nil
 }
 
 func enqueueLoadBalancerConfig(_ context.Context, object client.Object) []reconcile.Request {
@@ -180,9 +313,9 @@ func enqueueLoadBalancerConfig(_ context.Context, object client.Object) []reconc
 	}}}
 }
 
-func createExposedServiceIndex(mgr ctrl.Manager) error {
+func (r *LoadBalancerReconciler) createExposedServiceIndex(mgr ctrl.Manager) error {
 	return mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Service{}, exposedPortIndexKey, func(object client.Object) []string {
-		if !isExposedPortService(object) {
+		if !r.isExposedPortService(object) {
 			return nil
 		}
 
@@ -196,32 +329,73 @@ func loadbalancerConfigPredicate() predicate.Funcs {
 	})
 }
 
-func exposedPortServicePredicate() predicate.Funcs {
+func exposedPortExpositionPredicate() predicate.Funcs {
 	return predicate.Funcs{
 		CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
-			return isExposedPortService(e.Object)
+			return isExposedPortExposition(e.Object)
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
-			return isExposedPortService(e.Object)
+			return isExposedPortExposition(e.Object)
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[client.Object]) bool {
-			oldDoguService, oldIsDogu := types.ParseService(e.ObjectOld)
-			newDoguService, newIsDogu := types.ParseService(e.ObjectNew)
+			expositionOld, ok := e.ObjectOld.(*expositionv1.Exposition)
+			if !ok {
+				return false
+			}
+
+			expositionNew, ok := e.ObjectNew.(*expositionv1.Exposition)
+			if !ok {
+				return false
+			}
+
+			tcpSortFunc := func(a, b expositionv1.TCPEntry) int {
+				return strings.Compare(a.Name, b.Name)
+			}
+			tcpOld := slices.SortedFunc(slices.Values(expositionOld.Spec.TCP), tcpSortFunc)
+			tcpNew := slices.SortedFunc(slices.Values(expositionNew.Spec.TCP), tcpSortFunc)
+
+			udpSortFunc := func(a, b expositionv1.UDPEntry) int {
+				return strings.Compare(a.Name, b.Name)
+			}
+			udpOld := slices.SortedFunc(slices.Values(expositionOld.Spec.UDP), udpSortFunc)
+			udpNew := slices.SortedFunc(slices.Values(expositionNew.Spec.UDP), udpSortFunc)
+
+			return !slices.Equal(tcpOld, tcpNew) || !slices.Equal(udpOld, udpNew)
+		},
+		GenericFunc: func(e event.TypedGenericEvent[client.Object]) bool {
+			return isExposedPortExposition(e.Object)
+		},
+	}
+}
+
+func isExposedPortExposition(object metav1.Object) bool {
+	exposition, ok := object.(*expositionv1.Exposition)
+	if !ok {
+		return false
+	}
+
+	return len(exposition.Spec.TCP)+len(exposition.Spec.UDP) > 0
+}
+
+func (r *LoadBalancerReconciler) exposedPortServicePredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
+			return r.isExposedPortService(e.Object)
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
+			return r.isExposedPortService(e.Object)
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[client.Object]) bool {
+			oldDoguService, oldIsDogu := r.mapToExposedService(e.ObjectOld)
+			newDoguService, newIsDogu := r.mapToExposedService(e.ObjectNew)
 
 			if oldIsDogu && newIsDogu {
 				if oldDoguService.HasExposedPorts() != newDoguService.HasExposedPorts() {
 					return true
 				}
 
-				oldExposedPorts, err := oldDoguService.GetExposedPorts()
-				if err != nil {
-					return false
-				}
-
-				newExposedPorts, err := newDoguService.GetExposedPorts()
-				if err != nil {
-					return false
-				}
+				oldExposedPorts := oldDoguService.GetExposedPorts()
+				newExposedPorts := newDoguService.GetExposedPorts()
 
 				return !oldExposedPorts.Equals(newExposedPorts)
 			}
@@ -233,7 +407,7 @@ func exposedPortServicePredicate() predicate.Funcs {
 			return true
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
-			return isExposedPortService(e.Object)
+			return r.isExposedPortService(e.Object)
 		},
 	}
 }
@@ -267,41 +441,162 @@ func loadbalancerServicePredicate() predicate.Funcs {
 	}
 }
 
-func isExposedPortService(obj metav1.Object) bool {
-	doguService, ok := types.ParseService(obj)
+func (r *LoadBalancerReconciler) mapToExposedService(obj client.Object) (exposedService, bool) {
+	if !isDoguService(obj) {
+		return exposedService{}, false
+	}
+
+	service, ok := obj.(*corev1.Service)
+	if !ok {
+		return exposedService{}, false
+	}
+
+	exposition, err := mapServiceToExposition(service, r.Client)
+	if err != nil {
+		return exposedService{}, false
+	}
+
+	return exposedService{Exposition: exposition}, true
+}
+
+func (r *LoadBalancerReconciler) isExposedPortService(obj client.Object) bool {
+	eService, ok := r.mapToExposedService(obj)
 	if !ok {
 		return false
 	}
 
-	return doguService.HasExposedPorts()
+	return eService.HasExposedPorts()
 }
 
-func createLoadBalancerExposedPorts(doguPorts types.ExposedPorts) types.ExposedPorts {
-	// Delete default ports 80 and 443 as they are handled by the loadbalancer
-	doguPorts = slices.DeleteFunc(doguPorts, func(port types.ExposedPort) bool {
-		return port.Port == 80 || port.Port == 443
-	})
+func createExposedExpositionIndex(mgr ctrl.Manager) error {
+	return mgr.GetFieldIndexer().IndexField(context.Background(), &expositionv1.Exposition{}, exposedPortIndexKey, func(object client.Object) []string {
+		if !isExposedPortExposition(object) {
+			return nil
+		}
 
-	exposedPorts := types.CreateDefaultPorts()
-	exposedPorts = append(exposedPorts, doguPorts...)
-	exposedPorts.SortByName()
+		return []string{"true"}
+	})
+}
+
+type exposedService struct {
+	types.Exposition
+}
+
+func (e exposedService) GetExposedPorts() types.ExposedPorts {
+	exposedPorts := make(types.ExposedPorts, 0, len(e.TcpRoutes)+len(e.UdpRoutes))
+	exposedPorts = append(exposedPorts, e.TcpRoutes...)
+	exposedPorts = append(exposedPorts, e.UdpRoutes...)
 
 	return exposedPorts
 }
 
-func getExposedDoguPorts(services []types.Service) (types.ExposedPorts, error) {
-	exposedDoguPorts := make(types.ExposedPorts, 0, len(services))
+func (e exposedService) HasExposedPorts() bool {
+	return len(e.TcpRoutes)+len(e.UdpRoutes) > 0
+}
 
-	for _, service := range services {
-		serviceExposedPorts, err := service.GetExposedPorts()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get exposed ports from service %s: %w", service.Name, err)
+// portProtocolKey is the collision key: two ports only collide when both the
+// external port number and the protocol match, since K8s allows the same port
+// number for TCP and UDP as distinct Service port entries.
+type portProtocolKey struct {
+	port     int32
+	protocol corev1.Protocol
+}
+
+// checkPortCollisions detects expositions that claim the same external port
+// and protocol. It returns the subset of expositions that have no collisions,
+// and a map from each colliding exposition pointer (into the input slice) to
+// the colliding (port, protocol) pairs. Callers must not modify the input
+// slice after this call as long as the returned map is in use.
+func checkPortCollisions(expositions []types.Exposition) ([]types.Exposition, map[*types.Exposition][]portProtocolKey) {
+	portMap := make(map[portProtocolKey][]*types.Exposition, len(expositions))
+
+	for i := range expositions {
+		e := &expositions[i]
+		expositionPorts := slices.Concat(e.TcpRoutes, e.UdpRoutes)
+		for _, port := range expositionPorts {
+			key := portProtocolKey{port: port.RequestedExternalPort, protocol: port.Protocol}
+			portMap[key] = append(portMap[key], e)
 		}
-
-		exposedDoguPorts = append(exposedDoguPorts, serviceExposedPorts...)
 	}
 
-	exposedDoguPorts.SortByName()
+	collisionMap := make(map[*types.Exposition][]portProtocolKey)
 
-	return exposedDoguPorts, nil
+	for key, eList := range portMap {
+		if len(eList) > 1 {
+			for _, e := range eList {
+				collisionMap[e] = append(collisionMap[e], key)
+			}
+		}
+	}
+
+	var filteredList []types.Exposition
+	for i := range expositions {
+		e := &expositions[i]
+		if _, hasCollision := collisionMap[e]; !hasCollision {
+			filteredList = append(filteredList, *e)
+		}
+	}
+
+	return filteredList, collisionMap
+}
+
+// setPortsAllocatedConditionError writes a PortCollision condition on every
+// exposition that lost the collision check. Service-based expositions have no
+// SetCondition wired up, so they are silently skipped.
+func setPortsAllocatedConditionError(ctx context.Context, collisionMap map[*types.Exposition][]portProtocolKey) error {
+	var errs []error
+	for e, keys := range collisionMap {
+		if e.SetCondition == nil {
+			continue
+		}
+
+		msg := collisionMessage(keys)
+		if cErr := e.SetCondition(
+			ctx,
+			conditionTypeLBPortAllocation,
+			false,
+			conditionReasonPortCollision,
+			msg,
+		); cErr != nil {
+			errs = append(errs, fmt.Errorf("failed to set condition %s with reason %s for %s", conditionTypeLBPortAllocation, conditionReasonPortCollision, e.Name))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// collisionMessage builds a human-readable description of the colliding
+// (port, protocol) pairs, e.g. "port collision for: TCP/22, UDP/53".
+func collisionMessage(keys []portProtocolKey) string {
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s/%d", k.protocol, k.port))
+	}
+	return fmt.Sprintf("port collision for: %s", strings.Join(parts, ", "))
+}
+
+// setPortsAllocatedCondition writes a PortsAllocated success condition on
+// every exposition that passed the collision check. Failures are logged and
+// not returned — condition writes are best-effort and must not block the
+// primary reconcile work. Service-based expositions have no SetCondition
+// wired up, so they are silently skipped.
+func setPortsAllocatedCondition(ctx context.Context, expositions []types.Exposition) error {
+	var errs []error
+	for _, e := range expositions {
+		if e.SetCondition == nil {
+			continue
+		}
+
+		if cErr := e.SetCondition(
+			ctx,
+			conditionTypeLBPortAllocation,
+			true,
+			conditionReasonPortAllocated,
+			"All requested ports were successfully allocated.",
+		); cErr != nil {
+			errs = append(errs, fmt.Errorf("failed to set condition %s with reason %s for %s", conditionTypeLBPortAllocation, conditionReasonPortAllocated, e.Name))
+		}
+	}
+
+	return errors.Join(errs...)
 }
