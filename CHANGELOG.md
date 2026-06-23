@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v6.1.0] - 2026-06-23
 ### Changed
 - [#105] Optionally reconcile exposition CRs additionally to services
   - discovery of exposition CRs or services can be (de)activated via the helm values under `exposition`
