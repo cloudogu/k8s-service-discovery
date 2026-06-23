@@ -6,8 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- [#105] Reconcile exposition CRs additionally to services
-  - discovery of exposition CRs or services can be deactivated via the helm values under `exposition`
+- [#105] Optionally reconcile exposition CRs additionally to services
+  - discovery of exposition CRs or services can be (de)activated via the helm values under `exposition`
 
 ## [v6.0.3] - 2026-06-03
 ### Fixed

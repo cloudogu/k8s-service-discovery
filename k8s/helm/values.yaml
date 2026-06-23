@@ -34,4 +34,4 @@ exposition:
   # Enable port and http route discovery via Services that are annotated (Legacy)
   discoverServices: true
   # Enable port and http route discovery via ExpositionCR
-  discoverExpositionCR: true
+  discoverExpositionCR: false
