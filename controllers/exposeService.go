@@ -5,7 +5,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const PortExposerLabel = "k8s.cloudogu.com/port-exposer"
+const PortExposerLabel = "k8s.cloudogu.com/custom-routing"
 
 // isExposerService reports whether the object is a is at least a k8s.cloudogu.com/port-exposer Service: a ClusterIP
 // corev1.Service carrying the port-exposer label. Other Labels such as DoguName can be valid to by passing them as parameters
