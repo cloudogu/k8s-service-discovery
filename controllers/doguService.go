@@ -160,8 +160,8 @@ func createHttpRoutes(name string, services []cesServiceDTO) ([]types.HttpRoute,
 		}
 
 		httpRoutes = append(httpRoutes, types.HttpRoute{
-			Name:    fmt.Sprintf("%s-%d", name, cesService.Port),
-			Service: cesService.Name,
+			Name:    fmt.Sprintf("%s-%s-%d", name, cesService.Name, cesService.Port),
+			Service: name,
 			Port:    cesService.Port,
 			Path:    targetPath,
 			Rewrite: rewrite,
