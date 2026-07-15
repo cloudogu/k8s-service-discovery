@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.1.1] - 2026-07-15
+### Fixed
+- [#114] Create separate Ingress resources when dogu has different exposed services with same port
+
 ## [v6.1.0] - 2026-06-23
 ### Changed
 - [#105] Optionally reconcile exposition CRs additionally to services

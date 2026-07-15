@@ -427,22 +427,22 @@ func Test_createHttpRoutes(t *testing.T) {
 			name:    "no rewrite when Pass equals Location",
 			svcName: "ldap",
 			services: []cesServiceDTO{
-				{Name: "ldap-ui", Port: 8080, Location: "/ldap", Pass: "/ldap"},
+				{Name: "ui", Port: 8080, Location: "/ldap", Pass: "/ldap"},
 			},
 			want: []types.HttpRoute{
-				{Name: "ldap-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-ui-8080", Service: "ldap", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 		},
 		{
 			name:    "implicit regex rewrite when Pass differs from Location",
 			svcName: "ldap",
 			services: []cesServiceDTO{
-				{Name: "ldap-ui", Port: 8080, Location: "/ldap", Pass: "/"},
+				{Name: "ui", Port: 8080, Location: "/ldap", Pass: "/"},
 			},
 			want: []types.HttpRoute{
 				{
-					Name:    "ldap-8080",
-					Service: "ldap-ui",
+					Name:    "ldap-ui-8080",
+					Service: "ldap",
 					Port:    8080,
 					Path:    "/ldap",
 					Rewrite: &types.HttpRewrite{Regex: &types.RegexReplacement{
@@ -456,12 +456,12 @@ func Test_createHttpRoutes(t *testing.T) {
 			name:    "explicit valid rewrite payload",
 			svcName: "ldap",
 			services: []cesServiceDTO{
-				{Name: "ldap-ui", Port: 8080, Location: "/ldap", Pass: "/", Rewrite: `{"pattern":"^/foo","rewrite":"/bar"}`},
+				{Name: "ui", Port: 8080, Location: "/ldap", Pass: "/", Rewrite: `{"pattern":"^/foo","rewrite":"/bar"}`},
 			},
 			want: []types.HttpRoute{
 				{
-					Name:    "ldap-8080",
-					Service: "ldap-ui",
+					Name:    "ldap-ui-8080",
+					Service: "ldap",
 					Port:    8080,
 					Path:    "^/foo",
 					Rewrite: &types.HttpRewrite{Regex: &types.RegexReplacement{
@@ -476,10 +476,10 @@ func Test_createHttpRoutes(t *testing.T) {
 			svcName: "ldap",
 			services: []cesServiceDTO{
 				{Name: "broken", Port: 8081, Location: "/x", Pass: "/x", Rewrite: "not-json"},
-				{Name: "ldap-ui", Port: 8080, Location: "/ldap", Pass: "/ldap"},
+				{Name: "ui", Port: 8080, Location: "/ldap", Pass: "/ldap"},
 			},
 			want: []types.HttpRoute{
-				{Name: "ldap-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-ui-8080", Service: "ldap", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 			wantErr: "failed to get serviceRewrite config for ces service",
 		},
@@ -498,7 +498,7 @@ func Test_createHttpRoutes(t *testing.T) {
 }
 
 func Test_mapCesServicesToHttpRoutes(t *testing.T) {
-	servicesAnnotation := `[{"name":"ldap-ui","port":8080,"location":"/ldap","pass":"/ldap"}]`
+	servicesAnnotation := `[{"name":"ui","port":8080,"location":"/ldap","pass":"/ldap"}]`
 
 	tests := []struct {
 		name    string
@@ -537,7 +537,7 @@ func Test_mapCesServicesToHttpRoutes(t *testing.T) {
 				Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 8080}}},
 			},
 			want: []types.HttpRoute{
-				{Name: "ldap-8080", Service: "ldap-ui", Port: 8080, Path: "/ldap", Rewrite: nil},
+				{Name: "ldap-ui-8080", Service: "ldap", Port: 8080, Path: "/ldap", Rewrite: nil},
 			},
 		},
 	}
