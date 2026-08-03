@@ -1,0 +1,35 @@
+---
+apiVersion: k8s.cloudogu.com/v1
+kind: Exposition
+metadata:
+  name: scm
+  namespace: ecosystem
+  labels:
+    app: ces
+    dogu.name: scm
+spec:
+  # Definition von HTTP-Schnittstellen (Layer 7)
+  http:
+    - name: web
+      # Referenz auf den K8s-Service
+      service: scm
+      # Der Port des referenzierten K8s-Services
+      port: 8080
+      # Der Pfad, unter dem die Anwendung erreichbar sein soll
+      path: /scm
+      # Optionale Rewrite-Regeln (ersetzt die Flexibilität der SERVICE_REWRITE Env-Vars aus v2)
+
+  # Definition von TCP-Schnittstellen (Layer 4)
+  tcp:
+    - name: git-ssh
+      # Hier kann ein anderer Service referenziert werden
+      service: scm
+      port: 2222
+      # Gewünschter externer Port. In Multi-CES-Umgebungen kann dies
+      # vom Operator überschrieben oder dynamisch zugewiesen werden.
+      requestedExternalPort: 2222
+      # Protokoll-Hinweis (z.B. für Dokumentation oder Firewall-Regeln)
+      protocol: ssh
+
+  # Definition von UDP-Schnittstellen (Layer 4)
+  udp: []
