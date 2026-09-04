@@ -19,15 +19,26 @@ import (
 )
 
 func TestMaintenanceConfigMapPredicate(t *testing.T) {
-	maintCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: repository.MaintenanceConfigMapName, Namespace: testNamespace, Generation: 1,
-	}}
-	maintCMBumped := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: repository.MaintenanceConfigMapName, Namespace: testNamespace, Generation: 2,
-	}}
-	otherCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: "other", Namespace: testNamespace, Generation: 1,
-	}}
+	maintCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: repository.MaintenanceConfigMapName, Namespace: testNamespace, ResourceVersion: "1",
+		},
+		Data: map[string]string{"active": "false"},
+	}
+	maintCMToggled := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: repository.MaintenanceConfigMapName, Namespace: testNamespace, ResourceVersion: "2",
+		},
+		Data: map[string]string{"active": "true"},
+	}
+	otherCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "other", Namespace: testNamespace, ResourceVersion: "1"},
+		Data:       map[string]string{"active": "true"},
+	}
+	otherCMToggled := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "other", Namespace: testNamespace, ResourceVersion: "2"},
+		Data:       map[string]string{"active": "false"},
+	}
 
 	p := maintenanceConfigMapPredicate()
 
@@ -37,14 +48,18 @@ func TestMaintenanceConfigMapPredicate(t *testing.T) {
 	t.Run("Create rejects other ConfigMap", func(t *testing.T) {
 		assert.False(t, p.Create(event.CreateEvent{Object: otherCM}))
 	})
-	t.Run("Update accepts maintenance ConfigMap with generation bump", func(t *testing.T) {
-		assert.True(t, p.Update(event.UpdateEvent{ObjectOld: maintCM, ObjectNew: maintCMBumped}))
+	t.Run("Update accepts maintenance ConfigMap when the active flag is toggled", func(t *testing.T) {
+		assert.True(t, p.Update(event.UpdateEvent{ObjectOld: maintCM, ObjectNew: maintCMToggled}))
 	})
-	t.Run("Update rejects maintenance ConfigMap without generation change", func(t *testing.T) {
+	t.Run("Update accepts maintenance ConfigMap when the flag is toggled back", func(t *testing.T) {
+		assert.True(t, p.Update(event.UpdateEvent{ObjectOld: maintCMToggled, ObjectNew: maintCM}))
+	})
+	// The informer resync re-delivers updates with an unchanged resource version.
+	t.Run("Update rejects maintenance ConfigMap without resource version change", func(t *testing.T) {
 		assert.False(t, p.Update(event.UpdateEvent{ObjectOld: maintCM, ObjectNew: maintCM}))
 	})
 	t.Run("Update rejects non-maintenance ConfigMap", func(t *testing.T) {
-		assert.False(t, p.Update(event.UpdateEvent{ObjectOld: otherCM, ObjectNew: otherCM}))
+		assert.False(t, p.Update(event.UpdateEvent{ObjectOld: otherCM, ObjectNew: otherCMToggled}))
 	})
 	t.Run("Delete accepts maintenance ConfigMap", func(t *testing.T) {
 		assert.True(t, p.Delete(event.DeleteEvent{Object: maintCM}))

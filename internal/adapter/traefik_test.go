@@ -164,7 +164,7 @@ func TestTraefikIngressController_ProcessExposition(t *testing.T) {
 			wantErr:    assert.NoError,
 			postCheck: func(t *testing.T, c client.Client) {
 				ingress := getIngress(t, c, "ldap-ui")
-				assert.Equal(t, map[string]string{traefikMiddlewareAnnotationKey: staticContentDoguIsStartingRewrite}, ingress.Annotations)
+				assert.Equal(t, map[string]string{traefikMiddlewareAnnotationKey: "ns-dogu-starting@kubernetescrd"}, ingress.Annotations)
 				assertNoMiddleware(t, c, "ldap-ui-rewrite")
 			},
 		},
@@ -176,7 +176,7 @@ func TestTraefikIngressController_ProcessExposition(t *testing.T) {
 			wantErr:    assert.NoError,
 			postCheck: func(t *testing.T, c client.Client) {
 				ingress := getIngress(t, c, "ldap-ui")
-				assert.Equal(t, map[string]string{traefikMiddlewareAnnotationKey: staticContentMaintenanceRewrite}, ingress.Annotations)
+				assert.Equal(t, map[string]string{traefikMiddlewareAnnotationKey: "ns-maintenance-mode@kubernetescrd"}, ingress.Annotations)
 			},
 		},
 		{
