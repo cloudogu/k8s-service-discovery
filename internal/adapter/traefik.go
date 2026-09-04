@@ -25,8 +25,8 @@ const traefikMiddlewareAnnotationKey = "traefik.ingress.kubernetes.io/router.mid
 const ownedByLabelKey = "k8s-service-discovery.cloudogu.com/owned-by"
 
 const (
-	staticContentMaintenanceRewrite    = "maintenance-mode@kubernetescrd"
-	staticContentDoguIsStartingRewrite = "dogu-starting@kubernetescrd"
+	staticContentMaintenanceRewriteFmt    = "%s-maintenance-mode@kubernetescrd"
+	staticContentDoguIsStartingRewriteFmt = "%s-dogu-starting@kubernetescrd"
 )
 
 const (
@@ -253,9 +253,9 @@ func (t *TraefikIngressController) generate(exposition types.Exposition, appStat
 	for _, route := range exposition.HttpRoutes {
 		var middlewareRef string
 		if appState == types.ApplicationMaintenance {
-			middlewareRef = staticContentMaintenanceRewrite
+			middlewareRef = fmt.Sprintf(staticContentMaintenanceRewriteFmt, exposition.Namespace)
 		} else if appState == types.ApplicationIsStarting {
-			middlewareRef = staticContentDoguIsStartingRewrite
+			middlewareRef = fmt.Sprintf(staticContentDoguIsStartingRewriteFmt, exposition.Namespace)
 		} else if route.Rewrite != nil {
 			middleware := t.generateMiddleware(exposition, route)
 			err := exposition.SetOwner(middleware)
