@@ -32,7 +32,7 @@ RUN make compile-generic
 FROM gcr.io/distroless/static:nonroot
 LABEL maintainer="hello@cloudogu.com" \
       NAME="k8s-service-discovery" \
-      VERSION="6.1.1"
+      VERSION="6.1.2"
 
 WORKDIR /
 
