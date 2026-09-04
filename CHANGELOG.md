@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - [#117] Add missing namespace to the maintenance-mode and dogu-starting middleware.
+- [#117] The watch to react to changes of the maintenance ConfigMap now uses `ResourceVersionChangedPredicate`.
 
 ## [v6.1.1] - 2026-07-15
 ### Fixed
