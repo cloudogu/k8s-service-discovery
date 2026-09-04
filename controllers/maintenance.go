@@ -20,12 +20,11 @@ const (
 	maintenanceConfigMapName = repository.MaintenanceConfigMapName
 )
 
-// maintenanceConfigMapPredicate fires only when the maintenance ConfigMap's
-// generation changes. Combining the name match with GenerationChanged keeps
-// events for other ConfigMaps out of the workqueue.
+// maintenanceConfigMapPredicate fires on every write to the maintenance ConfigMap.
+// Combining the name match with ResourceVersionChanged keeps events for other ConfigMaps and informer resyncs out of the workqueue.
 func maintenanceConfigMapPredicate() predicate.Predicate {
 	return predicate.And(
-		predicate.GenerationChangedPredicate{},
+		predicate.ResourceVersionChangedPredicate{},
 		predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			return obj.GetName() == maintenanceConfigMapName
 		}),

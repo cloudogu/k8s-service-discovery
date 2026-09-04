@@ -8,22 +8,41 @@ returned for each access to a Dogus.
 
 # Activate Maintenance Mode
 
-To put the CES into maintenance mode, the following string in the global configuration must be written to `maintenance`:
+Maintenance mode is controlled by the ConfigMap `maintenance` in the namespace of the EcoSystem:
 
-```json
-{
-  "title": "Dies ist der Titel",
-  "text": "Das ist der Text"
-}
-``` 
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maintenance
+  namespace: ecosystem
+data:
+  active: "true"
+  holder: "k8s-backup-operator"
+  text: "Backup in progress"
+  title: "Service temporary unavailable"
+```
 
-Each request to the CES is then answered with the HTTP code 503 (Service Unavailable) until the key is deleted.
-Thereby the content of `title` and `text` is displayed on the page.
+* `active`: maintenance mode is active as soon as this value is `"true"`. Any other value or a missing ConfigMap means
+  maintenance mode is inactive.
+* `holder`: the component that activated maintenance mode. Another component refuses to activate or deactivate
+  maintenance mode while it is held by someone else (unless it forces the change).
+* `title` and `text` are displayed on the maintenance page.
 
-**Note:** Enabling and disabling maintenance mode will cause the Nginx static dogus to restart. However, this should
-only take a few seconds.
+Every request to a Dogu is then answered with the maintenance page until `active` is set to `"false"` or the ConfigMap
+is deleted.
 
-## Caution
+# How it works
 
-Since the maintenance page is served by nginx, it is not possible to view the maintenance mode page while an upgrade of
-Nginx is in progress.
+The service discovery watches the `maintenance` ConfigMap. When maintenance mode is activated, it rewrites the HTTP
+routes of all Ingresses to the static content backend (`k8s-ces-assets`) and adds the Traefik middleware annotation
+
+```
+traefik.ingress.kubernetes.io/router.middlewares: <namespace>-maintenance-mode@kubernetescrd
+```
+
+to them. The middleware `maintenance-mode` replaces the request path with the path of the maintenance page
+(`/errors/503.html`). When maintenance mode is deactivated, the Ingresses are restored to the services of the Dogus.
+
+**Note:** Enabling and disabling maintenance mode only changes Ingresses and middlewares. No Dogu is restarted, and
+the change takes effect as soon as Traefik has picked up the changed Ingresses.

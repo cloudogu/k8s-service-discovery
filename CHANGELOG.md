@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.1.2] - 2026-09-04
+### Changed
+- Remove docs only relevant for the Exposition-CRD
+
+### Fixed
+- [#117] Add missing namespace to the maintenance-mode and dogu-starting middleware.
+- [#117] The watch to react to changes of the maintenance ConfigMap now uses `ResourceVersionChangedPredicate`.
+
 ## [v6.1.1] - 2026-07-15
 ### Fixed
 - [#114] Create separate Ingress resources when dogu has different exposed services with same port
