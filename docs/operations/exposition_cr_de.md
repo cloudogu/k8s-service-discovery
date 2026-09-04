@@ -1,6 +1,6 @@
 # Exposition Custom Resource
 
-Eine [Exposition-CRD](https://github.com/cloudogu/k8s-exposition-lib/blob/main/docs/operations/exposition_cr_de.md) ist eine Kubernetes-Custom-Resource, die definiert, wie ein Service von außerhalb des Clusters erreichbar gemacht wird.
+Eine [Exposition-CRD](https://github.com/cloudogu/k8s-exposition-lib/blob/develop/docs/operations/exposition_cr_de.md) ist eine Kubernetes-Custom-Resource, die definiert, wie ein Service von außerhalb des Clusters erreichbar gemacht wird.
 Sie unterstützt HTTP-Routen (Layer 7) sowie rohe TCP- und UDP-Ports (Layer 4).
 Für jede Exposition erstellt der Operator die notwendigen Ingress-Objekte und weist für TCP/UDP-Einträge einen Port am LoadBalancer-Service des Clusters zu.
 
