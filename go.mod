@@ -2,8 +2,6 @@ module github.com/cloudogu/k8s-service-discovery/v2
 
 go 1.27.1
 
-toolchain go1.27.1
-
 replace google.golang.org/grpc => google.golang.org/grpc v1.79.3
 
 // We need this replace and the stubs in ./stubs because replace directive from traefik are ignored by the go module system.
