@@ -348,20 +348,5 @@ func doguServicePredicate() predicate.Funcs {
 // isDoguService reports whether the object is a Dogu Service: a ClusterIP
 // corev1.Service carrying the doguv2.DoguLabelName label.
 func isDoguService(object client.Object) bool {
-	doguService, ok := object.(*corev1.Service)
-	if !ok {
-		return false
-	}
-
-	if doguService.Spec.Type != corev1.ServiceTypeClusterIP {
-		return false
-	}
-
-	serviceLabels := doguService.GetLabels()
-	if len(serviceLabels) == 0 {
-		return false
-	}
-
-	_, ok = serviceLabels[doguv2.DoguLabelName]
-	return ok
+	return isExposerService(object, doguv2.DoguLabelName)
 }
