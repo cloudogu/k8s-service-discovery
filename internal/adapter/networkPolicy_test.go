@@ -45,7 +45,7 @@ func errOwner(_ client.Object) error { return assert.AnError }
 
 func fixedNetworkPolicy(t *testing.T, c client.Client) NetworkPolicy {
 	t.Helper()
-	return NetworkPolicy{Client: c, LabelSelector: testLabelSelector, AllowedCIDR: testCIDR}
+	return NetworkPolicy{Client: c, GatewayLabelSelector: testLabelSelector, ExposedAllowedCIDR: testCIDR}
 }
 
 func TestNetworkPolicy_GetOwnableTypes(t *testing.T) {
@@ -67,7 +67,7 @@ func Test_NetworkPolicy_createNetworkPolicyName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			n := NetworkPolicy{}
-			assert.Equal(t, tt.want, n.createNetworkPolicyName(tt.expositionName))
+			assert.Equal(t, tt.want, n.createNameForExposedPorts(tt.expositionName))
 		})
 	}
 }
@@ -210,7 +210,7 @@ func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
 				UdpRoutes: tt.udp,
 				SetOwner:  tt.setOwner,
 			}
-			got, err := n.generateNetworkPolicy(exposition)
+			got, err := n.generateForExposedPorts(exposition)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -252,7 +252,7 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 			name: "no ports, existing policy => policy deleted",
 			clientFn: func(t *testing.T) client.Client {
 				return newFakeClient(t, &networkingv1.NetworkPolicy{
-					ObjectMeta: metav1.ObjectMeta{Name: "ldap-exposed-ports", Namespace: testNamespace},
+					Name: "ldap-exposed-ports", Namespace: testNamespace,
 				})
 			},
 			tcp:      nil,
@@ -300,7 +300,7 @@ func TestNetworkPolicy_ProcessExposition(t *testing.T) {
 				conditionType: NetworkPolicyConditionType,
 				status:        false,
 				reason:        networkPolicyGenerationFailedConditionReason,
-				message:       "failed to generate network policy: failed to set owner for network policy: assert.AnError general error for testing",
+				message:       "failed to generate network policy \"ldap-exposed-ports\": failed to set owner for network policy: assert.AnError general error for testing",
 			},
 		},
 		{

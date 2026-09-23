@@ -148,9 +148,9 @@ func startManager() error {
 
 	if networkPoliciesEnabled {
 		networkPolicyAdapter := adapter.NetworkPolicy{
-			Client:        serviceDiscManager.GetClient(),
-			LabelSelector: metav1.LabelSelector{MatchLabels: controller.GetSelector()},
-			AllowedCIDR:   cidr,
+			Client:               serviceDiscManager.GetClient(),
+			GatewayLabelSelector: metav1.LabelSelector{MatchLabels: controller.GetSelector()},
+			ExposedAllowedCIDR:   cidr,
 		}
 		processors = append(processors, networkPolicyAdapter)
 	}
