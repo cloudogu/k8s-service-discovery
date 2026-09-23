@@ -39,7 +39,7 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 	name := n.createNetworkPolicyName(exposition.Name)
 
 	if len(exposition.TcpRoutes)+len(exposition.UdpRoutes) == 0 {
-		stub := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: exposition.Namespace}}
+		stub := &networkingv1.NetworkPolicy{Name: name, Namespace: exposition.Namespace}
 
 		if err := n.Client.Delete(ctx, stub); err != nil && !apierrors.IsNotFound(err) {
 			return handleErrorCondition(ctx, exposition,
@@ -57,7 +57,7 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 			fmt.Errorf("failed to generate network policy: %w", err))
 	}
 
-	target := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: exposition.Namespace}}
+	target := &networkingv1.NetworkPolicy{Name: name, Namespace: exposition.Namespace}
 	if _, cuErr := controllerutil.CreateOrUpdate(ctx, n.Client, target, func() error {
 		target.Labels = desired.Labels
 		target.Annotations = desired.Annotations
@@ -83,11 +83,9 @@ func (n NetworkPolicy) generateNetworkPolicy(exposition types.Exposition) (*netw
 	exposedPorts = append(exposedPorts, exposition.UdpRoutes...)
 
 	netpol := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      n.createNetworkPolicyName(exposition.Name),
-			Namespace: exposition.Namespace,
-			Labels:    util.K8sCesServiceDiscoveryLabels,
-		},
+		Name:      n.createNetworkPolicyName(exposition.Name),
+		Namespace: exposition.Namespace,
+		Labels:    util.K8sCesServiceDiscoveryLabels,
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: n.LabelSelector,
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
