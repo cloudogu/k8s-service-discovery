@@ -95,7 +95,7 @@ func (r *ExpositionReconciler) handleValidationErr(ctx context.Context, err erro
 }
 
 func (r *ExpositionReconciler) initializeUnknownConditions(ctx context.Context, cr *expositionv1.Exposition) error {
-	conditionTypes := []string{validConditionType, adapter.IngressesConditionType, adapter.NetworkPolicyConditionType,
+	conditionTypes := []string{validConditionType, adapter.IngressesConditionType, adapter.NetworkPoliciesConditionType,
 		adapter.ConditionTypeIngressTCPRoutesCreated, adapter.ConditionTypeIngressUDPRoutesCreated, conditionTypeLBPortAllocation}
 	for _, conditionType := range conditionTypes {
 		if meta.FindStatusCondition(cr.Status.Conditions, conditionType) == nil {
