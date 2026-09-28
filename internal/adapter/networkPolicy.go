@@ -60,7 +60,8 @@ func (n NetworkPolicies) processExternalPortsNetworkPolicy(ctx context.Context, 
 	name := n.createNameForExternalPorts(exposition.Name)
 
 	if len(exposition.TcpRoutes)+len(exposition.UdpRoutes) == 0 || !n.NetworkPoliciesEnabled {
-		return n.deleteByNameIfExists(ctx, exposition, name), true
+		err := n.deleteByNameIfExists(ctx, exposition, name)
+		return err, err != nil
 	}
 
 	desired, err := n.generateForExternalPorts(exposition)
@@ -304,7 +305,7 @@ func (n NetworkPolicies) generateForExposedPort(ctx context.Context, exposition 
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
-					Ports: mapServiceTargetPortsToNetworkPolicyPorts(corev1.ProtocolTCP, service.Spec.Ports),
+					Ports: mapServiceTargetPortsToNetworkPolicyPorts(route.Protocol, service.Spec.Ports),
 					From: []networkingv1.NetworkPolicyPeer{
 						{
 							PodSelector: &n.GatewayLabelSelector,
