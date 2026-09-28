@@ -43,13 +43,13 @@ func newFakeClientWithInterceptor(t *testing.T, ic interceptor.Funcs, objs ...cl
 func okOwner(_ client.Object) error  { return nil }
 func errOwner(_ client.Object) error { return assert.AnError }
 
-func fixedNetworkPolicy(t *testing.T, c client.Client) NetworkPolicy {
+func fixedNetworkPolicy(t *testing.T, c client.Client) NetworkPolicies {
 	t.Helper()
-	return NetworkPolicy{Client: c, GatewayLabelSelector: testLabelSelector, ExposedAllowedCIDR: testCIDR}
+	return NetworkPolicies{Client: c, GatewayLabelSelector: testLabelSelector, ExposedAllowedCIDR: testCIDR}
 }
 
 func TestNetworkPolicy_GetOwnableTypes(t *testing.T) {
-	n := NetworkPolicy{}
+	n := NetworkPolicies{}
 	got := n.GetOwnableTypes()
 	require.Len(t, got, 1)
 	assert.IsType(t, &networkingv1.NetworkPolicy{}, got[0])
@@ -66,7 +66,7 @@ func Test_NetworkPolicy_createNetworkPolicyName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n := NetworkPolicy{}
+			n := NetworkPolicies{}
 			assert.Equal(t, tt.want, n.createNameForExternalPorts(tt.expositionName))
 		})
 	}
@@ -111,7 +111,7 @@ func Test_NetworkPolicy_mapExposedPorts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n := NetworkPolicy{}
+			n := NetworkPolicies{}
 			assert.Equal(t, tt.want, n.mapExternalPorts(tt.in))
 		})
 	}

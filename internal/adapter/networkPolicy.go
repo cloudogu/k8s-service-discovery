@@ -30,17 +30,18 @@ const (
 	networkPoliciesCreateOrUpdateFailedConditionReason = "CreateOrUpdateFailed"
 )
 
-type NetworkPolicy struct {
-	Client               client.Client
-	GatewayLabelSelector metav1.LabelSelector
-	ExposedAllowedCIDR   string
+type NetworkPolicies struct {
+	Client                 client.Client
+	GatewayLabelSelector   metav1.LabelSelector
+	ExposedAllowedCIDR     string
+	NetworkPoliciesEnabled bool
 }
 
-func (n NetworkPolicy) GetOwnableTypes() []client.Object {
+func (n NetworkPolicies) GetOwnableTypes() []client.Object {
 	return []client.Object{&networkingv1.NetworkPolicy{}}
 }
 
-func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
+func (n NetworkPolicies) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
 	err, done := n.processExternalPortsNetworkPolicy(ctx, exposition)
 	if done {
 		return err
@@ -55,10 +56,10 @@ func (n NetworkPolicy) ProcessExposition(ctx context.Context, exposition types.E
 		networkPoliciesCreatedConditionReason, networkPoliciesCreatedConditionMessage)
 }
 
-func (n NetworkPolicy) processExternalPortsNetworkPolicy(ctx context.Context, exposition types.Exposition) (error, bool) {
+func (n NetworkPolicies) processExternalPortsNetworkPolicy(ctx context.Context, exposition types.Exposition) (error, bool) {
 	name := n.createNameForExternalPorts(exposition.Name)
 
-	if len(exposition.TcpRoutes)+len(exposition.UdpRoutes) == 0 {
+	if len(exposition.TcpRoutes)+len(exposition.UdpRoutes) == 0 || !n.NetworkPoliciesEnabled {
 		return n.deleteByNameIfExists(ctx, exposition, name), true
 	}
 
@@ -79,35 +80,38 @@ func (n NetworkPolicy) processExternalPortsNetworkPolicy(ctx context.Context, ex
 	return nil, false
 }
 
-func (n NetworkPolicy) processInternalRoutesNetworkPolicies(ctx context.Context, exposition types.Exposition) error {
-	var errs []error
-	desiredForHttpRoutes, err := n.generateForHttpRoutes(ctx, exposition)
-	if err != nil {
-		errs = append(errs, err)
+func (n NetworkPolicies) processInternalRoutesNetworkPolicies(ctx context.Context, exposition types.Exposition) error {
+	var desired []*networkingv1.NetworkPolicy
+	if n.NetworkPoliciesEnabled {
+		var errs []error
+		desiredForHttpRoutes, err := n.generateForHttpRoutes(ctx, exposition)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		desiredForTcpPorts, err := n.generateForExposedPorts(ctx, corev1.ProtocolTCP, exposition, exposition.TcpRoutes)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		desiredForUdpPorts, err := n.generateForExposedPorts(ctx, corev1.ProtocolUDP, exposition, exposition.UdpRoutes)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		if len(errs) > 0 {
+			return handleErrorCondition(ctx, exposition,
+				NetworkPoliciesConditionType, networkPoliciesGenerationFailedConditionReason,
+				fmt.Errorf("failed to generate network policies for internal routes: %w", errors.Join(errs...)))
+		}
+
+		desired = make([]*networkingv1.NetworkPolicy, 0, len(desiredForHttpRoutes)+len(desiredForTcpPorts)+len(desiredForUdpPorts))
+		desired = append(desired, desiredForHttpRoutes...)
+		desired = append(desired, desiredForTcpPorts...)
+		desired = append(desired, desiredForUdpPorts...)
 	}
 
-	desiredForTcpPorts, err := n.generateForExposedPorts(ctx, corev1.ProtocolTCP, exposition, exposition.TcpRoutes)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	desiredForUdpPorts, err := n.generateForExposedPorts(ctx, corev1.ProtocolUDP, exposition, exposition.UdpRoutes)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	if len(errs) > 0 {
-		return handleErrorCondition(ctx, exposition,
-			NetworkPoliciesConditionType, networkPoliciesGenerationFailedConditionReason,
-			fmt.Errorf("failed to generate network policies for internal routes: %w", errors.Join(errs...)))
-	}
-
-	desired := make([]*networkingv1.NetworkPolicy, 0, len(desiredForHttpRoutes)+len(desiredForTcpPorts)+len(desiredForUdpPorts))
-	desired = append(desired, desiredForHttpRoutes...)
-	desired = append(desired, desiredForTcpPorts...)
-	desired = append(desired, desiredForUdpPorts...)
-
-	err = n.upsertMultiple(ctx, exposition, desired)
+	err := n.upsertMultiple(ctx, exposition, desired)
 	if err != nil {
 		return err
 	}
@@ -115,7 +119,7 @@ func (n NetworkPolicy) processInternalRoutesNetworkPolicies(ctx context.Context,
 	return nil
 }
 
-func (n NetworkPolicy) upsertSingle(ctx context.Context, exposition types.Exposition, name string, desired *networkingv1.NetworkPolicy) error {
+func (n NetworkPolicies) upsertSingle(ctx context.Context, exposition types.Exposition, name string, desired *networkingv1.NetworkPolicy) error {
 	target := &networkingv1.NetworkPolicy{Name: name, Namespace: exposition.Namespace}
 	_, cuErr := controllerutil.CreateOrUpdate(ctx, n.Client, target, func() error {
 		target.Labels = desired.Labels
@@ -129,7 +133,7 @@ func (n NetworkPolicy) upsertSingle(ctx context.Context, exposition types.Exposi
 	return cuErr
 }
 
-func (n NetworkPolicy) deleteByNameIfExists(ctx context.Context, exposition types.Exposition, name string) error {
+func (n NetworkPolicies) deleteByNameIfExists(ctx context.Context, exposition types.Exposition, name string) error {
 	stub := &networkingv1.NetworkPolicy{Name: name, Namespace: exposition.Namespace}
 
 	if err := n.Client.Delete(ctx, stub); err != nil && !apierrors.IsNotFound(err) {
@@ -141,7 +145,7 @@ func (n NetworkPolicy) deleteByNameIfExists(ctx context.Context, exposition type
 	return nil
 }
 
-func (n NetworkPolicy) generateForExternalPorts(exposition types.Exposition) (*networkingv1.NetworkPolicy, error) {
+func (n NetworkPolicies) generateForExternalPorts(exposition types.Exposition) (*networkingv1.NetworkPolicy, error) {
 	totalPortSize := len(exposition.TcpRoutes) + len(exposition.UdpRoutes)
 	exposedPorts := make([]types.ExposedPort, 0, totalPortSize)
 
@@ -177,7 +181,7 @@ func (n NetworkPolicy) generateForExternalPorts(exposition types.Exposition) (*n
 	return netpol, nil
 }
 
-func (n NetworkPolicy) mapExternalPorts(exposedPorts []types.ExposedPort) []networkingv1.NetworkPolicyPort {
+func (n NetworkPolicies) mapExternalPorts(exposedPorts []types.ExposedPort) []networkingv1.NetworkPolicyPort {
 	networkPolicyPorts := make([]networkingv1.NetworkPolicyPort, 0, len(exposedPorts))
 
 	for _, e := range exposedPorts {
@@ -190,11 +194,11 @@ func (n NetworkPolicy) mapExternalPorts(exposedPorts []types.ExposedPort) []netw
 	return networkPolicyPorts
 }
 
-func (n NetworkPolicy) createNameForExternalPorts(expositionName string) string {
+func (n NetworkPolicies) createNameForExternalPorts(expositionName string) string {
 	return fmt.Sprintf("%s-exposed-ports", expositionName)
 }
 
-func (n NetworkPolicy) generateForHttpRoutes(ctx context.Context, exposition types.Exposition) ([]*networkingv1.NetworkPolicy, error) {
+func (n NetworkPolicies) generateForHttpRoutes(ctx context.Context, exposition types.Exposition) ([]*networkingv1.NetworkPolicy, error) {
 	var errs []error
 	netpols := make([]*networkingv1.NetworkPolicy, 0, len(exposition.HttpRoutes))
 	for _, route := range exposition.HttpRoutes {
@@ -218,7 +222,7 @@ func (n NetworkPolicy) generateForHttpRoutes(ctx context.Context, exposition typ
 	return netpols, nil
 }
 
-func (n NetworkPolicy) generateForHttpRoute(ctx context.Context, exposition types.Exposition, route types.HttpRoute) (*networkingv1.NetworkPolicy, error) {
+func (n NetworkPolicies) generateForHttpRoute(ctx context.Context, exposition types.Exposition, route types.HttpRoute) (*networkingv1.NetworkPolicy, error) {
 	service, err := n.getService(ctx, route.Service, exposition.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("generate for http route %q: %w", route.Name, err)
@@ -248,7 +252,7 @@ func (n NetworkPolicy) generateForHttpRoute(ctx context.Context, exposition type
 	}, nil
 }
 
-func (n NetworkPolicy) getService(ctx context.Context, svcName, namespace string) (*corev1.Service, error) {
+func (n NetworkPolicies) getService(ctx context.Context, svcName, namespace string) (*corev1.Service, error) {
 	svc := &corev1.Service{}
 	err := n.Client.Get(ctx, types2.NamespacedName{Name: svcName, Namespace: namespace}, svc)
 	if err != nil {
@@ -258,7 +262,7 @@ func (n NetworkPolicy) getService(ctx context.Context, svcName, namespace string
 	return svc, nil
 }
 
-func (n NetworkPolicy) generateForExposedPorts(ctx context.Context, protocol corev1.Protocol, exposition types.Exposition, routes types.ExposedPorts) ([]*networkingv1.NetworkPolicy, error) {
+func (n NetworkPolicies) generateForExposedPorts(ctx context.Context, protocol corev1.Protocol, exposition types.Exposition, routes types.ExposedPorts) ([]*networkingv1.NetworkPolicy, error) {
 	var errs []error
 	netpols := make([]*networkingv1.NetworkPolicy, 0, len(exposition.HttpRoutes))
 	for _, route := range routes {
@@ -282,7 +286,7 @@ func (n NetworkPolicy) generateForExposedPorts(ctx context.Context, protocol cor
 	return netpols, nil
 }
 
-func (n NetworkPolicy) generateForExposedPort(ctx context.Context, exposition types.Exposition, route types.ExposedPort) (*networkingv1.NetworkPolicy, error) {
+func (n NetworkPolicies) generateForExposedPort(ctx context.Context, exposition types.Exposition, route types.ExposedPort) (*networkingv1.NetworkPolicy, error) {
 	service, err := n.getService(ctx, route.ServiceName, exposition.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("generate for %s route %q: %w", route.Protocol, route.Name, err)
@@ -313,7 +317,7 @@ func (n NetworkPolicy) generateForExposedPort(ctx context.Context, exposition ty
 }
 
 //nolint:dupl
-func (n NetworkPolicy) upsertMultiple(ctx context.Context, exposition types.Exposition, desiredState []*networkingv1.NetworkPolicy) error {
+func (n NetworkPolicies) upsertMultiple(ctx context.Context, exposition types.Exposition, desiredState []*networkingv1.NetworkPolicy) error {
 	var errs []error
 	existing := &networkingv1.NetworkPolicyList{}
 	err := n.Client.List(ctx, existing, &client.ListOptions{Namespace: exposition.Namespace, LabelSelector: selectorFromExpositionName(exposition.Name)})
