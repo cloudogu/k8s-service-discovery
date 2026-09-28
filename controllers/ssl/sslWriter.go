@@ -8,7 +8,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	controllerruntime "sigs.k8s.io/controller-runtime"
 )
 
 type sslWriter struct {
@@ -46,11 +45,9 @@ func (sw *sslWriter) WriteCertificate(ctx context.Context, cert string, key stri
 
 func (sw *sslWriter) createCertificateSecret(cert string, key string) *v1.Secret {
 	return &v1.Secret{
-		ObjectMeta: controllerruntime.ObjectMeta{
-			Name:      certificateSecretName,
-			Namespace: sw.namespace,
-			Labels:    util.GetAppLabel(),
-		},
+		Name:      certificateSecretName,
+		Namespace: sw.namespace,
+		Labels:    util.GetAppLabel(),
 		Data: map[string][]byte{
 			v1.TLSCertKey:       []byte(cert),
 			v1.TLSPrivateKeyKey: []byte(key),

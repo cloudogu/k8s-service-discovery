@@ -13,7 +13,6 @@ import (
 	traefikapi "github.com/traefik/traefik/v3/pkg/provider/kubernetes/crd/traefikio/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -137,7 +136,7 @@ func (t *TraefikIngressController) exposeTCPRoutes(ctx context.Context, expositi
 			continue
 		}
 
-		updateRef := &traefikapi.IngressRouteTCP{ObjectMeta: metav1.ObjectMeta{Name: tcpRoute.Name, Namespace: tcpRoute.Namespace}}
+		updateRef := &traefikapi.IngressRouteTCP{Name: tcpRoute.Name, Namespace: tcpRoute.Namespace}
 		if _, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
 			updateRef.Annotations = tcpRoute.Annotations
 			updateRef.OwnerReferences = tcpRoute.OwnerReferences
@@ -203,7 +202,7 @@ func (t *TraefikIngressController) exposeUDPRoutes(ctx context.Context, expositi
 			continue
 		}
 
-		updateRef := &traefikapi.IngressRouteUDP{ObjectMeta: metav1.ObjectMeta{Name: udpRoute.Name, Namespace: udpRoute.Namespace}}
+		updateRef := &traefikapi.IngressRouteUDP{Name: udpRoute.Name, Namespace: udpRoute.Namespace}
 		if _, err := controllerutil.CreateOrUpdate(ctx, t.Client, updateRef, func() error {
 			updateRef.Annotations = udpRoute.Annotations
 			updateRef.OwnerReferences = udpRoute.OwnerReferences
@@ -289,30 +288,26 @@ func (t *TraefikIngressController) generateIngress(exposition types.Exposition, 
 	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
 	return &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        httpRoute.Name,
-			Namespace:   exposition.Namespace,
-			Annotations: annotations,
-			Labels:      selectionLabels,
-		},
+		Name:        httpRoute.Name,
+		Namespace:   exposition.Namespace,
+		Annotations: annotations,
+		Labels:      selectionLabels,
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &t.IngressClass,
 			Rules: []networkingv1.IngressRule{{
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: []networkingv1.HTTPIngressPath{{
-							Path:     httpRoute.Path,
-							PathType: new(networkingv1.PathTypePrefix),
-							Backend: networkingv1.IngressBackend{
-								Service: &networkingv1.IngressServiceBackend{
-									Name: httpRoute.Service,
-									Port: networkingv1.ServiceBackendPort{
-										Number: httpRoute.Port,
-									},
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: []networkingv1.HTTPIngressPath{{
+						Path:     httpRoute.Path,
+						PathType: new(networkingv1.PathTypePrefix),
+						Backend: networkingv1.IngressBackend{
+							Service: &networkingv1.IngressServiceBackend{
+								Name: httpRoute.Service,
+								Port: networkingv1.ServiceBackendPort{
+									Number: httpRoute.Port,
 								},
 							},
-						}},
-					},
+						},
+					}},
 				},
 			}},
 		},
@@ -338,11 +333,9 @@ func (t *TraefikIngressController) generateMiddleware(exposition types.Expositio
 	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
 	return &traefikapi.Middleware{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-rewrite", httpRoute.Name),
-			Namespace: exposition.Namespace,
-			Labels:    selectionLabels,
-		},
+		Name:      fmt.Sprintf("%s-rewrite", httpRoute.Name),
+		Namespace: exposition.Namespace,
+		Labels:    selectionLabels,
 		Spec: traefikapi.MiddlewareSpec{
 			ReplacePathRegex: replacePathRegex,
 			StripPrefix:      stripPrefix,
@@ -368,7 +361,7 @@ func (t *TraefikIngressController) upsertIngresses(ctx context.Context, expositi
 	}
 
 	for _, desiredObject := range desiredState {
-		updateRef := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: desiredObject.Name, Namespace: desiredObject.Namespace}}
+		updateRef := &networkingv1.Ingress{Name: desiredObject.Name, Namespace: desiredObject.Namespace}
 		// only keep track of those that are not in the desired state to delete later
 		delete(existingMap, desiredObject.Name)
 
@@ -413,7 +406,7 @@ func (t *TraefikIngressController) upsertMiddlewares(ctx context.Context, exposi
 	}
 
 	for _, desiredObject := range desiredState {
-		updateRef := &traefikapi.Middleware{ObjectMeta: metav1.ObjectMeta{Name: desiredObject.Name, Namespace: desiredObject.Namespace}}
+		updateRef := &traefikapi.Middleware{Name: desiredObject.Name, Namespace: desiredObject.Namespace}
 		// only keep track of those that are not in the desired state to delete later
 		delete(existingMap, desiredObject.Name)
 
@@ -453,11 +446,9 @@ func createIngressRouteTCP(name string, namespace string, port types.ExposedPort
 	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
 	route := &traefikapi.IngressRouteTCP{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-tcp", port.ServiceName, externalPortStr),
-			Namespace: namespace,
-			Labels:    selectionLabels,
-		},
+		Name:      fmt.Sprintf("%s-%s-tcp", port.ServiceName, externalPortStr),
+		Namespace: namespace,
+		Labels:    selectionLabels,
 		Spec: traefikapi.IngressRouteTCPSpec{
 			EntryPoints: []string{fmt.Sprintf("tcp-%s", externalPortStr)},
 			Routes: []traefikapi.RouteTCP{
@@ -487,11 +478,9 @@ func createIngressRouteUDP(name string, namespace string, port types.ExposedPort
 	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
 	route := &traefikapi.IngressRouteUDP{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-udp", port.ServiceName, externalPortStr),
-			Namespace: namespace,
-			Labels:    selectionLabels,
-		},
+		Name:      fmt.Sprintf("%s-%s-udp", port.ServiceName, externalPortStr),
+		Namespace: namespace,
+		Labels:    selectionLabels,
 		Spec: traefikapi.IngressRouteUDPSpec{
 			EntryPoints: []string{fmt.Sprintf("udp-%s", externalPortStr)},
 			Routes: []traefikapi.RouteUDP{

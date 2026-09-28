@@ -42,11 +42,9 @@ func (m *MiddlewareManager) CreateOrUpdateAlternativeFQDNRedirectMiddleware(ctx 
 	replacement := fmt.Sprintf("https://%s${2}", primaryFQDN)
 
 	middleware := &traefikapi.Middleware{
-		ObjectMeta: v1.ObjectMeta{
-			Name:            middlewareName,
-			Namespace:       m.namespace,
-			OwnerReferences: ownerReferences,
-		},
+		Name:            middlewareName,
+		Namespace:       m.namespace,
+		OwnerReferences: ownerReferences,
 		Spec: traefikapi.MiddlewareSpec{
 			RedirectRegex: &dynamic.RedirectRegex{
 				Regex:       regexPattern,
