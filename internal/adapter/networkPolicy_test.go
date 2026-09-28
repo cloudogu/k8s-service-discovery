@@ -43,9 +43,13 @@ func newFakeClientWithInterceptor(t *testing.T, ic interceptor.Funcs, objs ...cl
 func okOwner(_ client.Object) error  { return nil }
 func errOwner(_ client.Object) error { return assert.AnError }
 
-func fixedNetworkPolicy(t *testing.T, c client.Client) NetworkPolicies {
+func fixedNetworkPolicy(t *testing.T, c client.Client, networkPoliciesEnabled *bool) NetworkPolicies {
 	t.Helper()
-	return NetworkPolicies{Client: c, GatewayLabelSelector: testLabelSelector, ExposedAllowedCIDR: testCIDR}
+	var netpolsEnabled bool
+	if networkPoliciesEnabled == nil {
+		netpolsEnabled = true
+	}
+	return NetworkPolicies{Client: c, GatewayLabelSelector: testLabelSelector, ExposedAllowedCIDR: testCIDR, NetworkPoliciesEnabled: netpolsEnabled}
 }
 
 func TestNetworkPolicy_GetOwnableTypes(t *testing.T) {
@@ -202,7 +206,7 @@ func Test_NetworkPolicy_createNetworkPolicy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n := fixedNetworkPolicy(t, nil)
+			n := fixedNetworkPolicy(t, nil, nil)
 			exposition := types.Exposition{
 				Name:      "ldap",
 				Namespace: testNamespace,
@@ -227,14 +231,15 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 	policyKey := client.ObjectKey{Namespace: testNamespace, Name: "ldap-exposed-ports"}
 
 	tests := []struct {
-		name          string
-		clientFn      func(t *testing.T) client.Client
-		tcp           []types.ExposedPort
-		udp           []types.ExposedPort
-		setOwner      types.SetOwnerFunc
-		wantErr       assert.ErrorAssertionFunc
-		wantCondition *conditionCall
-		postCheck     func(t *testing.T, c client.Client)
+		name                   string
+		clientFn               func(t *testing.T) client.Client
+		networkPoliciesEnabled *bool
+		tcp                    []types.ExposedPort
+		udp                    []types.ExposedPort
+		setOwner               types.SetOwnerFunc
+		wantErr                assert.ErrorAssertionFunc
+		wantCondition          *conditionCall
+		postCheck              func(t *testing.T, c client.Client)
 	}{
 		{
 			name:     "no ports, no existing policy => no-op",
@@ -257,6 +262,22 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 			},
 			tcp:      nil,
 			udp:      nil,
+			setOwner: okOwner,
+			wantErr:  assert.NoError,
+			postCheck: func(t *testing.T, c client.Client) {
+				err := c.Get(t.Context(), policyKey, &networkingv1.NetworkPolicy{})
+				assert.True(t, apierrors.IsNotFound(err), "expected NotFound after delete, got %v", err)
+			},
+		},
+		{
+			name:                   "netpols disabled, existing policy => policy deleted",
+			networkPoliciesEnabled: new(false),
+			clientFn: func(t *testing.T) client.Client {
+				return newFakeClient(t, &networkingv1.NetworkPolicy{
+					Name: "ldap-exposed-ports", Namespace: testNamespace,
+				})
+			},
+			tcp:      tcpPorts,
 			setOwner: okOwner,
 			wantErr:  assert.NoError,
 			postCheck: func(t *testing.T, c client.Client) {
@@ -304,17 +325,12 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 			},
 		},
 		{
-			name:     "ports present, no existing policy => policy created with desired spec",
-			clientFn: func(t *testing.T) client.Client { return newFakeClient(t) },
-			tcp:      tcpPorts,
-			setOwner: okOwner,
-			wantErr:  assert.NoError,
-			wantCondition: &conditionCall{
-				conditionType: NetworkPoliciesConditionType,
-				status:        true,
-				reason:        networkPoliciesCreatedConditionReason,
-				message:       networkPoliciesCreatedConditionMessage,
-			},
+			name:          "ports present, no existing policy => policy created with desired spec",
+			clientFn:      func(t *testing.T) client.Client { return newFakeClient(t) },
+			tcp:           tcpPorts,
+			setOwner:      okOwner,
+			wantErr:       assert.NoError,
+			wantCondition: nil,
 			postCheck: func(t *testing.T, c client.Client) {
 				got := &networkingv1.NetworkPolicy{}
 				require.NoError(t, c.Get(t.Context(), policyKey, got))
@@ -337,15 +353,10 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 					Spec: networkingv1.NetworkPolicySpec{},
 				})
 			},
-			tcp:      tcpPorts,
-			setOwner: okOwner,
-			wantErr:  assert.NoError,
-			wantCondition: &conditionCall{
-				conditionType: NetworkPoliciesConditionType,
-				status:        true,
-				reason:        networkPoliciesCreatedConditionReason,
-				message:       networkPoliciesCreatedConditionMessage,
-			},
+			tcp:           tcpPorts,
+			setOwner:      okOwner,
+			wantErr:       assert.NoError,
+			wantCondition: nil,
 			postCheck: func(t *testing.T, c client.Client) {
 				got := &networkingv1.NetworkPolicy{}
 				require.NoError(t, c.Get(t.Context(), policyKey, got))
@@ -380,7 +391,7 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := tt.clientFn(t)
-			n := fixedNetworkPolicy(t, c)
+			n := fixedNetworkPolicy(t, c, tt.networkPoliciesEnabled)
 			gotCondition := conditionCall{}
 			conditionSet := false
 			exposition := types.Exposition{
