@@ -42,8 +42,8 @@ func (n NetworkPolicies) GetOwnableTypes() []client.Object {
 }
 
 func (n NetworkPolicies) ProcessExposition(ctx context.Context, exposition types.Exposition) error {
-	err, done := n.processExternalPortsNetworkPolicy(ctx, exposition)
-	if done {
+	err := n.processExternalPortsNetworkPolicy(ctx, exposition)
+	if err != nil {
 		return err
 	}
 
@@ -56,29 +56,28 @@ func (n NetworkPolicies) ProcessExposition(ctx context.Context, exposition types
 		networkPoliciesCreatedConditionReason, networkPoliciesCreatedConditionMessage)
 }
 
-func (n NetworkPolicies) processExternalPortsNetworkPolicy(ctx context.Context, exposition types.Exposition) (error, bool) {
+func (n NetworkPolicies) processExternalPortsNetworkPolicy(ctx context.Context, exposition types.Exposition) error {
 	name := n.createNameForExternalPorts(exposition.Name)
 
 	if len(exposition.TcpRoutes)+len(exposition.UdpRoutes) == 0 || !n.NetworkPoliciesEnabled {
-		err := n.deleteByNameIfExists(ctx, exposition, name)
-		return err, err != nil
+		return n.deleteByNameIfExists(ctx, exposition, name)
 	}
 
 	desired, err := n.generateForExternalPorts(exposition)
 	if err != nil {
 		return handleErrorCondition(ctx, exposition,
 			NetworkPoliciesConditionType, networkPoliciesGenerationFailedConditionReason,
-			fmt.Errorf("failed to generate network policy %q: %w", name, err)), true
+			fmt.Errorf("failed to generate network policy %q: %w", name, err))
 	}
 
 	err = n.upsertSingle(ctx, exposition, name, desired)
 	if err != nil {
 		return handleErrorCondition(ctx, exposition,
 			NetworkPoliciesConditionType, networkPoliciesCreateOrUpdateFailedConditionReason,
-			fmt.Errorf("failed to create or update network policy %q: %w", name, err)), true
+			fmt.Errorf("failed to create or update network policy %q: %w", name, err))
 	}
 
-	return nil, false
+	return nil
 }
 
 func (n NetworkPolicies) processInternalRoutesNetworkPolicies(ctx context.Context, exposition types.Exposition) error {

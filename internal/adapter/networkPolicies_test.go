@@ -412,7 +412,7 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 					return nil
 				},
 			}
-			err, _ := n.processExternalPortsNetworkPolicy(t.Context(), exposition)
+			err := n.processExternalPortsNetworkPolicy(t.Context(), exposition)
 			if !tt.wantErr(t, err) {
 				return
 			}
