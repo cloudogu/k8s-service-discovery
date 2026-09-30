@@ -50,7 +50,7 @@ func fixedNetworkPolicy(t *testing.T, c client.Client, networkPoliciesEnabled *b
 	if networkPoliciesEnabled == nil {
 		netpolsEnabled = true
 	}
-	return NetworkPolicies{Client: c, GatewayLabelSelector: testLabelSelector, ExposedAllowedCIDR: testCIDR, NetworkPoliciesEnabled: netpolsEnabled}
+	return NetworkPolicies{Client: c, CesGatewayLabelSelector: testLabelSelector, AllowedExternalCIDR: testCIDR, NetworkPoliciesEnabled: netpolsEnabled}
 }
 
 func TestNetworkPolicy_GetOwnableTypes(t *testing.T) {
@@ -429,12 +429,12 @@ func TestNetworkPolicy_processExternalPortsNetworkPolicy(t *testing.T) {
 	}
 }
 
-func networkPolicyService(name string, protocol corev1.Protocol, targetPort intstr.IntOrString) *corev1.Service {
+func networkPolicyService(name string, protocol corev1.Protocol, servicePort int32, targetPort intstr.IntOrString) *corev1.Service {
 	return &corev1.Service{
 		Name: name, Namespace: testNamespace,
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": name},
-			Ports:    []corev1.ServicePort{{Protocol: protocol, Port: 80, TargetPort: targetPort}},
+			Ports:    []corev1.ServicePort{{Protocol: protocol, Port: servicePort, TargetPort: targetPort}},
 		},
 	}
 }
@@ -465,9 +465,9 @@ func TestNetworkPolicy_ProcessExposition_ReconcilesRoutes(t *testing.T) {
 	oldHTTP := &networkingv1.NetworkPolicy{
 		Name: "ldap-ui-http-route", Namespace: testNamespace, Labels: map[string]string{ownedByLabelKey: "ldap"}}
 	c := newFakeClient(t,
-		networkPolicyService("ui", corev1.ProtocolTCP, intstr.FromString("http")),
-		networkPolicyService("socket", corev1.ProtocolTCP, intstr.FromInt32(9090)),
-		networkPolicyService("dns", corev1.ProtocolUDP, intstr.FromInt32(5353)),
+		networkPolicyService("ui", corev1.ProtocolTCP, 8080, intstr.FromString("http")),
+		networkPolicyService("socket", corev1.ProtocolTCP, 8090, intstr.FromInt32(9090)),
+		networkPolicyService("dns", corev1.ProtocolUDP, 8053, intstr.FromInt32(5353)),
 		stale, foreign, oldHTTP,
 	)
 	n := fixedNetworkPolicy(t, c, nil)
@@ -475,9 +475,9 @@ func TestNetworkPolicy_ProcessExposition_ReconcilesRoutes(t *testing.T) {
 	ownerCalls := 0
 	exposition := types.Exposition{
 		Name: "ldap", Namespace: testNamespace,
-		HttpRoutes: []types.HttpRoute{{Name: "ui", Service: "ui"}},
-		TcpRoutes:  types.ExposedPorts{{Name: "socket", ServiceName: "socket", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 9000}},
-		UdpRoutes:  types.ExposedPorts{{Name: "dns", ServiceName: "dns", Protocol: corev1.ProtocolUDP, RequestedExternalPort: 53}},
+		HttpRoutes: []types.HttpRoute{{Name: "ui", Service: "ui", Port: int32(8080)}},
+		TcpRoutes:  types.ExposedPorts{{Name: "socket", ServiceName: "socket", ServicePort: int32(8090), Protocol: corev1.ProtocolTCP, RequestedExternalPort: 9000}},
+		UdpRoutes:  types.ExposedPorts{{Name: "dns", ServiceName: "dns", ServicePort: int32(8053), Protocol: corev1.ProtocolUDP, RequestedExternalPort: 53}},
 		SetOwner: func(obj client.Object) error {
 			ownerCalls++
 			obj.SetAnnotations(map[string]string{"owner-tested": "yes"})
@@ -547,7 +547,7 @@ func TestNetworkPolicy_ProcessExposition_InternalRouteErrors(t *testing.T) {
 		{
 			name: "HTTP owner failure",
 			makeClient: func(t *testing.T) client.Client {
-				return newFakeClient(t, networkPolicyService("ui", corev1.ProtocolTCP, intstr.FromInt32(8080)))
+				return newFakeClient(t, networkPolicyService("ui", corev1.ProtocolTCP, 8000, intstr.FromInt32(8080)))
 			},
 			setOwner: errOwner,
 			want:     "generate network policies for http routes",
@@ -559,7 +559,7 @@ func TestNetworkPolicy_ProcessExposition_InternalRouteErrors(t *testing.T) {
 					List: func(_ context.Context, _ client.WithWatch, _ client.ObjectList, _ ...client.ListOption) error {
 						return assert.AnError
 					},
-				}, networkPolicyService("ui", corev1.ProtocolTCP, intstr.FromInt32(8080)))
+				}, networkPolicyService("ui", corev1.ProtocolTCP, 8000, intstr.FromInt32(8080)))
 			},
 			setOwner: okOwner,
 			want:     "failed to list existing network policies",
@@ -571,7 +571,7 @@ func TestNetworkPolicy_ProcessExposition_InternalRouteErrors(t *testing.T) {
 					Create: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.CreateOption) error {
 						return assert.AnError
 					},
-				}, networkPolicyService("ui", corev1.ProtocolTCP, intstr.FromInt32(8080)))
+				}, networkPolicyService("ui", corev1.ProtocolTCP, 8000, intstr.FromInt32(8080)))
 			},
 			setOwner: okOwner,
 			want:     "failed to create or update network policy \"ldap-ui-http-route\"",
@@ -583,7 +583,8 @@ func TestNetworkPolicy_ProcessExposition_InternalRouteErrors(t *testing.T) {
 					Delete: func(_ context.Context, _ client.WithWatch, _ client.Object, _ ...client.DeleteOption) error {
 						return assert.AnError
 					},
-				}, networkPolicyService("ui", corev1.ProtocolTCP, intstr.FromInt32(8080)),
+				}, networkPolicyService("ui", corev1.ProtocolTCP, 8000, intstr.FromInt32(8080)),
+					networkPolicyService("socket", corev1.ProtocolTCP, 8090, intstr.FromInt32(9090)),
 					&networkingv1.NetworkPolicy{Name: "ldap-old-http-route", Namespace: testNamespace, Labels: map[string]string{ownedByLabelKey: "ldap"}})
 			},
 			setOwner: okOwner,
@@ -596,7 +597,7 @@ func TestNetworkPolicy_ProcessExposition_InternalRouteErrors(t *testing.T) {
 			n := fixedNetworkPolicy(t, c, nil)
 			exposition := types.Exposition{
 				Name: "ldap", Namespace: testNamespace,
-				HttpRoutes: []types.HttpRoute{{Name: "ui", Service: "ui"}},
+				HttpRoutes: []types.HttpRoute{{Name: "ui", Service: "ui", Port: int32(8000)}},
 				SetOwner:   tt.setOwner,
 				SetCondition: func(_ context.Context, _ string, _ bool, reason, _ string) error {
 					if tt.name == "missing HTTP service" || tt.name == "HTTP owner failure" {
@@ -606,7 +607,7 @@ func TestNetworkPolicy_ProcessExposition_InternalRouteErrors(t *testing.T) {
 				},
 			}
 			if tt.name == "delete stale failure" {
-				exposition.TcpRoutes = types.ExposedPorts{{Name: "socket", ServiceName: "ui", Protocol: corev1.ProtocolTCP, RequestedExternalPort: 9000}}
+				exposition.TcpRoutes = types.ExposedPorts{{Name: "socket", ServiceName: "socket", ServicePort: int32(8090), Protocol: corev1.ProtocolTCP, RequestedExternalPort: 9000}}
 			}
 			err := n.ProcessExposition(t.Context(), exposition)
 			require.Error(t, err)
@@ -625,8 +626,8 @@ func TestNetworkPolicy_ProcessExposition_ExposedRouteErrors(t *testing.T) {
 	}{
 		{name: "TCP service missing", protocol: corev1.ProtocolTCP, want: `generate for TCP route "socket"`},
 		{name: "UDP service missing", protocol: corev1.ProtocolUDP, want: `generate for UDP route "socket"`},
-		{name: "TCP owner failure", protocol: corev1.ProtocolTCP, service: networkPolicyService("socket", corev1.ProtocolTCP, intstr.FromInt32(9000)), ownerErr: true, want: "generate network policies for TCP routes"},
-		{name: "UDP owner failure", protocol: corev1.ProtocolUDP, service: networkPolicyService("socket", corev1.ProtocolUDP, intstr.FromInt32(9000)), ownerErr: true, want: "generate network policies for UDP routes"},
+		{name: "TCP owner failure", protocol: corev1.ProtocolTCP, service: networkPolicyService("socket", corev1.ProtocolTCP, 8090, intstr.FromInt32(9000)), ownerErr: true, want: "generate network policies for TCP routes"},
+		{name: "UDP owner failure", protocol: corev1.ProtocolUDP, service: networkPolicyService("socket", corev1.ProtocolUDP, 8090, intstr.FromInt32(9000)), ownerErr: true, want: "generate network policies for UDP routes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -636,7 +637,7 @@ func TestNetworkPolicy_ProcessExposition_ExposedRouteErrors(t *testing.T) {
 			}
 			c := newFakeClient(t, objects...)
 			n := fixedNetworkPolicy(t, c, nil)
-			route := types.ExposedPort{Name: "socket", ServiceName: "socket", Protocol: tt.protocol, RequestedExternalPort: 9000}
+			route := types.ExposedPort{Name: "socket", ServiceName: "socket", ServicePort: int32(8090), Protocol: tt.protocol, RequestedExternalPort: 9000}
 			exposition := types.Exposition{
 				Name: "ldap", Namespace: testNamespace,
 				SetOwner: func(obj client.Object) error {

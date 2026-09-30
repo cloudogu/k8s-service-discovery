@@ -31,10 +31,10 @@ const (
 )
 
 type NetworkPolicies struct {
-	Client                 client.Client
-	GatewayLabelSelector   metav1.LabelSelector
-	ExposedAllowedCIDR     string
-	NetworkPoliciesEnabled bool
+	Client                  client.Client
+	CesGatewayLabelSelector metav1.LabelSelector
+	AllowedExternalCIDR     string
+	NetworkPoliciesEnabled  bool
 }
 
 func (n NetworkPolicies) GetOwnableTypes() []client.Object {
@@ -112,12 +112,7 @@ func (n NetworkPolicies) processInternalRoutesNetworkPolicies(ctx context.Contex
 		desired = append(desired, desiredForUdpPorts...)
 	}
 
-	err := n.upsertMultiple(ctx, exposition, desired)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return n.upsertMultiple(ctx, exposition, desired)
 }
 
 func (n NetworkPolicies) upsertSingle(ctx context.Context, exposition types.Exposition, name string, desired *networkingv1.NetworkPolicy) error {
@@ -158,7 +153,7 @@ func (n NetworkPolicies) generateForExternalPorts(exposition types.Exposition) (
 		Namespace: exposition.Namespace,
 		Labels:    util.K8sCesServiceDiscoveryLabels,
 		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: n.GatewayLabelSelector,
+			PodSelector: n.CesGatewayLabelSelector,
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
@@ -166,7 +161,7 @@ func (n NetworkPolicies) generateForExternalPorts(exposition types.Exposition) (
 					From: []networkingv1.NetworkPolicyPeer{
 						{
 							IPBlock: &networkingv1.IPBlock{
-								CIDR: n.ExposedAllowedCIDR,
+								CIDR: n.AllowedExternalCIDR,
 							},
 						},
 					},
@@ -229,6 +224,11 @@ func (n NetworkPolicies) generateForHttpRoute(ctx context.Context, exposition ty
 		return nil, fmt.Errorf("generate for http route %q: %w", route.Name, err)
 	}
 
+	targetPort, err := getNetworkPolicyTargetPort(corev1.ProtocolTCP, service, route.Port)
+	if err != nil {
+		return nil, fmt.Errorf("generate for http route %q: %w", route.Name, err)
+	}
+
 	selectionLabels := map[string]string{ownedByLabelKey: exposition.Name}
 	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
@@ -241,10 +241,10 @@ func (n NetworkPolicies) generateForHttpRoute(ctx context.Context, exposition ty
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
-					Ports: mapServiceTargetPortsToNetworkPolicyPorts(corev1.ProtocolTCP, service.Spec.Ports),
+					Ports: []networkingv1.NetworkPolicyPort{targetPort},
 					From: []networkingv1.NetworkPolicyPeer{
 						{
-							PodSelector: &n.GatewayLabelSelector,
+							PodSelector: &n.CesGatewayLabelSelector,
 						},
 					},
 				},
@@ -265,7 +265,7 @@ func (n NetworkPolicies) getService(ctx context.Context, svcName, namespace stri
 
 func (n NetworkPolicies) generateForExposedPorts(ctx context.Context, protocol corev1.Protocol, exposition types.Exposition, routes types.ExposedPorts) ([]*networkingv1.NetworkPolicy, error) {
 	var errs []error
-	netpols := make([]*networkingv1.NetworkPolicy, 0, len(exposition.HttpRoutes))
+	netpols := make([]*networkingv1.NetworkPolicy, 0, len(routes))
 	for _, route := range routes {
 		netpol, err := n.generateForExposedPort(ctx, exposition, route)
 		if err != nil {
@@ -293,6 +293,11 @@ func (n NetworkPolicies) generateForExposedPort(ctx context.Context, exposition 
 		return nil, fmt.Errorf("generate for %s route %q: %w", route.Protocol, route.Name, err)
 	}
 
+	targetPort, err := getNetworkPolicyTargetPort(route.Protocol, service, route.ServicePort)
+	if err != nil {
+		return nil, fmt.Errorf("generate for %s route %q: %w", route.Protocol, route.Name, err)
+	}
+
 	selectionLabels := map[string]string{ownedByLabelKey: exposition.Name}
 	maps.Insert(selectionLabels, maps.All(util.K8sCesServiceDiscoveryLabels))
 
@@ -305,10 +310,10 @@ func (n NetworkPolicies) generateForExposedPort(ctx context.Context, exposition 
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
-					Ports: mapServiceTargetPortsToNetworkPolicyPorts(route.Protocol, service.Spec.Ports),
+					Ports: []networkingv1.NetworkPolicyPort{targetPort},
 					From: []networkingv1.NetworkPolicyPeer{
 						{
-							PodSelector: &n.GatewayLabelSelector,
+							PodSelector: &n.CesGatewayLabelSelector,
 						},
 					},
 				},
@@ -359,13 +364,15 @@ func (n NetworkPolicies) upsertMultiple(ctx context.Context, exposition types.Ex
 	return errors.Join(errs...)
 }
 
-func mapServiceTargetPortsToNetworkPolicyPorts(protocol corev1.Protocol, ports []corev1.ServicePort) []networkingv1.NetworkPolicyPort {
-	var result []networkingv1.NetworkPolicyPort
-	for _, port := range ports {
-		result = append(result, networkingv1.NetworkPolicyPort{
-			Protocol: &protocol,
-			Port:     &port.TargetPort,
-		})
+func getNetworkPolicyTargetPort(protocol corev1.Protocol, service *corev1.Service, servicePort int32) (networkingv1.NetworkPolicyPort, error) {
+	for _, port := range service.Spec.Ports {
+		if port.Port == servicePort {
+			return networkingv1.NetworkPolicyPort{
+				Protocol: &protocol,
+				Port:     &port.TargetPort,
+			}, nil
+		}
 	}
-	return result
+
+	return networkingv1.NetworkPolicyPort{}, fmt.Errorf("no matching port found in service %q", service.Name)
 }
