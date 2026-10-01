@@ -61,7 +61,7 @@ func Test_exposedPortServicePredicate(t *testing.T) {
 		assert.True(t, expPortServicePredicate.CreateFunc(event.CreateEvent{Object: &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					k8sv2.DoguLabelName: "testDogu",
+					PortExposerLabel: "testDogu",
 				},
 				Annotations: map[string]string{
 					exposedPortServiceAnnotation: `[{"protocol":"tcp","port":50000,"targetPort":50000}]`,
