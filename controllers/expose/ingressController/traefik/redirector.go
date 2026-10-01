@@ -81,12 +81,10 @@ func (i IngressRedirector) createRedirectIngress(namespace string, objectName st
 	}
 
 	return &networking.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        objectName,
-			Namespace:   namespace,
-			Annotations: annotations,
-			Labels:      util.K8sCesServiceDiscoveryLabels,
-		},
+		Name:        objectName,
+		Namespace:   namespace,
+		Annotations: annotations,
+		Labels:      util.K8sCesServiceDiscoveryLabels,
 		Spec: networking.IngressSpec{
 			IngressClassName: &i.ingressClassName,
 			TLS:              tlsList,
@@ -120,21 +118,19 @@ func createIngressRules(hostList []string) []networking.IngressRule {
 	for _, host := range hostList {
 		ingressRule := networking.IngressRule{
 			Host: host,
-			IngressRuleValue: networking.IngressRuleValue{
-				HTTP: &networking.HTTPIngressRuleValue{
-					Paths: []networking.HTTPIngressPath{
-						{
-							Path:     redirectIngressPath,
-							PathType: &pathTypePrefix,
-							Backend: networking.IngressBackend{
-								Service: &networking.IngressServiceBackend{
-									Name: redirectEndpointName,
-									Port: networking.ServiceBackendPort{
-										Number: redirectEndpointPort,
-									},
+			HTTP: &networking.HTTPIngressRuleValue{
+				Paths: []networking.HTTPIngressPath{
+					{
+						Path:     redirectIngressPath,
+						PathType: &pathTypePrefix,
+						Backend: networking.IngressBackend{
+							Service: &networking.IngressServiceBackend{
+								Name: redirectEndpointName,
+								Port: networking.ServiceBackendPort{
+									Number: redirectEndpointPort,
 								},
-								Resource: nil,
 							},
+							Resource: nil,
 						},
 					},
 				},

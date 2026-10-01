@@ -146,14 +146,14 @@ func startManager() error {
 		return err
 	}
 
-	if networkPoliciesEnabled {
-		networkPolicyAdapter := adapter.NetworkPolicy{
-			Client:        serviceDiscManager.GetClient(),
-			LabelSelector: metav1.LabelSelector{MatchLabels: controller.GetSelector()},
-			AllowedCIDR:   cidr,
-		}
-		processors = append(processors, networkPolicyAdapter)
+	networkPolicyAdapter := adapter.NetworkPolicies{
+		Client:                  serviceDiscManager.GetClient(),
+		CesGatewayLabelSelector: metav1.LabelSelector{MatchLabels: controller.GetSelector()},
+		AllowedExternalCIDR:     cidr,
+		NetworkPoliciesEnabled:  networkPoliciesEnabled,
 	}
+	processors = append(processors, networkPolicyAdapter)
+
 	expositionService := services.NewExpositionService(processors...)
 
 	expositionConfig, err := config.ReadExpositionConfig()
