@@ -238,11 +238,9 @@ func ParseLoadBalancer(obj metav1.Object) (LoadBalancer, bool) {
 // CreateLoadBalancer create a LoadBalancer with the config provided.
 func CreateLoadBalancer(namespace string, cfg LoadbalancerConfig, expositions []Exposition, selector map[string]string) LoadBalancer {
 	loadbalancerService := corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      LoadbalancerName,
-			Namespace: namespace,
-			Labels:    util.GetAppLabel(),
-		},
+		Name:      LoadbalancerName,
+		Namespace: namespace,
+		Labels:    util.GetAppLabel(),
 		Spec: corev1.ServiceSpec{
 			Type:           corev1.ServiceTypeLoadBalancer,
 			IPFamilyPolicy: new(corev1.IPFamilyPolicySingleStack),

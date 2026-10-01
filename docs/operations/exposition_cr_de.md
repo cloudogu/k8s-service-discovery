@@ -20,3 +20,7 @@ Der Operator passt das HTTP-Routing automatisch an den Zustand des zugehörigen 
 Alle vom Operator erstellten Ressourcen (Ingress-Objekte, Middleware, IngressRouteTCP, IngressRouteUDP) gehören der Exposition-CR.
 Das Löschen einer Exposition entfernt automatisch alle von ihr erstellten Ressourcen.
 
+## NetworkPolicies
+
+Die von der Exposition benötigten NetworkPolicies werden automatisch erstellt, aktualisiert und gelöscht, wenn die Exposition-CR erstellt, aktualisiert oder gelöscht wird.
+Dies umfasst die NetworkPolicies für die HTTP-Routen, TCP- und UDP-Routen zwischen Gateway und Pods sowie die NetworkPolicies für das Gateway mit den offenen Ports bei TCP- und UDP-Routen.

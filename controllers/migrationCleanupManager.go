@@ -39,7 +39,7 @@ func (m *MigrationCleanupManager) migrateFrom6_0_2(ctx context.Context) error {
 		&traefikv1alpha1.IngressRouteTCP{}, &traefikv1alpha1.IngressRouteUDP{}, &networkingv1.NetworkPolicy{}}
 	for _, t := range typesToCleanup {
 		err := m.Client.DeleteAllOf(ctx, t,
-			&client.DeleteAllOfOptions{ListOptions: client.ListOptions{LabelSelector: selector, Namespace: m.Namespace}})
+			&client.DeleteAllOfOptions{LabelSelector: selector, Namespace: m.Namespace})
 		errs = append(errs, err)
 	}
 

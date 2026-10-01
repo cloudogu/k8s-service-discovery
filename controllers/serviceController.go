@@ -141,10 +141,8 @@ func mapRequestsFromDoguCR(_ context.Context, obj client.Object) []reconcile.Req
 
 	return []reconcile.Request{
 		{
-			NamespacedName: client.ObjectKey{
-				Name:      dogu.Name,
-				Namespace: dogu.Namespace,
-			},
+			Name:      dogu.Name,
+			Namespace: dogu.Namespace,
 		},
 	}
 }

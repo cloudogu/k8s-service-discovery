@@ -91,7 +91,7 @@ func assertInitializedConditions(t *testing.T, obj client.Object, observedGenera
 
 	assertReadyCondition(t, obj, validConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
 	assertReadyCondition(t, obj, adapter.IngressesConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
-	assertReadyCondition(t, obj, adapter.NetworkPolicyConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
+	assertReadyCondition(t, obj, adapter.NetworkPoliciesConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
 }
 
 func TestExpositionReconciler_Reconcile(t *testing.T) {

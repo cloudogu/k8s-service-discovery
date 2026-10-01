@@ -19,3 +19,7 @@ The operator adjusts HTTP routing automatically based on the state of the associ
 All resources created by the operator (Ingress objects, Middleware, IngressRouteTCP, IngressRouteUDP) are owned by the Exposition CR.
 Deleting an Exposition automatically removes all resources it created.
 
+## NetworkPolicies
+
+The NetworkPolicies required by an Exposition are automatically created, updated and deleted when the Exposition CR is created, updated or deleted.
+This includes NetworkPolicies for HTTP, TCP and UDP routes between the gateway and pods, as well as NetworkPolicies for the gateway that allow traffic on the open ports for TCP and UDP routes.

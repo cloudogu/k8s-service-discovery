@@ -80,10 +80,9 @@ func mapRequestsFromMaintenanceConfigMap(
 			if !ok {
 				continue
 			}
-			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
+			requests = append(requests, reconcile.Request{
 				Namespace: mo.GetNamespace(),
-				Name:      mo.GetName(),
-			}})
+				Name:      mo.GetName()})
 		}
 		return requests
 	}
