@@ -19,7 +19,7 @@ import (
 
 // ServiceReconciler watches Dogu Services, maps each one to a domain Exposition
 // and delegates processing to an ExpositionService. It also re-enqueues Services
-// on Dogu health-condition changes and on maintenance ConfigMap updates.
+// on Dogu stopped status and health-condition changes and on maintenance ConfigMap updates.
 type ServiceReconciler struct {
 	Client            client.Client
 	ExpositionService ExpositionService
@@ -57,8 +57,8 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // SetupWithManager registers the reconciler with the Manager. It watches Dogu
-// Services (filtered to annotation changes), Dogu CRs (filtered to healthy
-// condition changes), and the maintenance ConfigMap, plus any resource types
+// Services (filtered to annotation changes), Dogu CRs (filtered to stopped
+// status and healthy condition changes), and the maintenance ConfigMap, plus any resource types
 // reported by ExpositionService.GetOwnableTypes() as Owns sources.
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
@@ -73,7 +73,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&doguv2.Dogu{},
 			handler.EnqueueRequestsFromMapFunc(mapRequestsFromDoguCR),
-			builder.WithPredicates(doguHealthyConditionChangedPredicate()),
+			builder.WithPredicates(doguStateChangedPredicate()),
 		).
 		Watches(
 			&corev1.ConfigMap{},
@@ -92,9 +92,10 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrlBuilder.Complete(r)
 }
 
-// doguHealthyConditionChangedPredicate triggers reconciliation only when the
-// Dogu's healthy status condition is added, removed, or changes value.
-func doguHealthyConditionChangedPredicate() predicate.Predicate {
+// doguStateChangedPredicate triggers reconciliation only when the Dogu's stopped status changes or its healthy status
+// condition is added, removed, or changes value. Both feed the derived application state,
+// and the dogu operator does not change them at the same time.
+func doguStateChangedPredicate() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldDogu, okOld := e.ObjectOld.(*doguv2.Dogu)
@@ -102,6 +103,10 @@ func doguHealthyConditionChangedPredicate() predicate.Predicate {
 
 			if !okOld || !okNew {
 				return false
+			}
+
+			if oldDogu.Status.Stopped != newDogu.Status.Stopped {
+				return true
 			}
 
 			oldHealthy := apimeta.FindStatusCondition(oldDogu.Status.Conditions, doguv2.ConditionHealthy)

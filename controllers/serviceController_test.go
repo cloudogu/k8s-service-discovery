@@ -224,7 +224,13 @@ func doguWithoutConditions() *doguv2.Dogu {
 	return &doguv2.Dogu{}
 }
 
-func TestDoguHealthyConditionChangedPredicate_Update(t *testing.T) {
+func stoppedDoguWithHealthy(status metav1.ConditionStatus) *doguv2.Dogu {
+	dogu := doguWithHealthy(status)
+	dogu.Status.Stopped = true
+	return dogu
+}
+
+func TestDoguStateChangedPredicate_Update(t *testing.T) {
 	tests := []struct {
 		name   string
 		oldObj client.Object
@@ -279,22 +285,46 @@ func TestDoguHealthyConditionChangedPredicate_Update(t *testing.T) {
 			newObj: doguWithHealthy(metav1.ConditionUnknown),
 			want:   true,
 		},
+		{
+			name:   "stopped set while healthy stays False",
+			oldObj: doguWithHealthy(metav1.ConditionFalse),
+			newObj: stoppedDoguWithHealthy(metav1.ConditionFalse),
+			want:   true,
+		},
+		{
+			name:   "stopped cleared while healthy stays True",
+			oldObj: stoppedDoguWithHealthy(metav1.ConditionTrue),
+			newObj: doguWithHealthy(metav1.ConditionTrue),
+			want:   true,
+		},
+		{
+			name:   "stopped cleared without healthy condition",
+			oldObj: &doguv2.Dogu{Status: doguv2.DoguStatus{Stopped: true}},
+			newObj: doguWithoutConditions(),
+			want:   true,
+		},
+		{
+			name:   "stopped unchanged",
+			oldObj: stoppedDoguWithHealthy(metav1.ConditionFalse),
+			newObj: stoppedDoguWithHealthy(metav1.ConditionFalse),
+			want:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := doguHealthyConditionChangedPredicate()
+			p := doguStateChangedPredicate()
 			got := p.Update(event.UpdateEvent{ObjectOld: tt.oldObj, ObjectNew: tt.newObj})
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestDoguHealthyConditionChangedPredicate_Create(t *testing.T) {
-	p := doguHealthyConditionChangedPredicate()
+func TestDoguStateChangedPredicate_Create(t *testing.T) {
+	p := doguStateChangedPredicate()
 	assert.False(t, p.Create(event.CreateEvent{Object: doguWithHealthy(metav1.ConditionTrue)}))
 }
 
-func TestDoguHealthyConditionChangedPredicate_Delete(t *testing.T) {
-	p := doguHealthyConditionChangedPredicate()
+func TestDoguStateChangedPredicate_Delete(t *testing.T) {
+	p := doguStateChangedPredicate()
 	assert.False(t, p.Delete(event.DeleteEvent{Object: doguWithHealthy(metav1.ConditionTrue)}))
 }
