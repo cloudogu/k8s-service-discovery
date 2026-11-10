@@ -18,9 +18,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -35,6 +38,32 @@ func getScheme(t *testing.T) *runtime.Scheme {
 	)).AddToScheme(scheme)
 	require.NoError(t, err)
 	return scheme
+}
+
+// newTestManager creates a manager that is never started, so it needs no reachable cluster.
+func newTestManager(t *testing.T) controllerruntime.Manager {
+	t.Helper()
+	scheme := getScheme(t)
+	require.NoError(t, doguv2.AddToScheme(scheme))
+	skipNameValidation := true
+	mgr, err := controllerruntime.NewManager(&rest.Config{Host: "http://127.0.0.1:1"}, controllerruntime.Options{
+		Scheme:     scheme,
+		Metrics:    metricsserver.Options{BindAddress: "0"},
+		Controller: config.Controller{SkipNameValidation: &skipNameValidation},
+	})
+	require.NoError(t, err)
+	return mgr
+}
+
+func TestServiceReconciler_SetupWithManager(t *testing.T) {
+	mgr := newTestManager(t)
+	expositionService := NewMockExpositionService(t)
+	expositionService.EXPECT().GetOwnableTypes().Return([]client.Object{&networkingv1.Ingress{}})
+	sut := &ServiceReconciler{Client: mgr.GetClient(), ExpositionService: expositionService}
+
+	err := sut.SetupWithManager(mgr)
+
+	require.NoError(t, err)
 }
 
 func TestServiceReconciler_Reconcile(t *testing.T) {
