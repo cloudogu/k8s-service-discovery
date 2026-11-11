@@ -30,7 +30,7 @@ const (
 
 // ExpositionReconciler watches Exposition CRs, maps each one to a domain
 // Exposition and delegates processing to an ExpositionService. It also
-// re-enqueues Expositions on Dogu health-condition changes and on
+// re-enqueues Expositions on Dogu stopped-status and health-condition changes and on
 // maintenance ConfigMap updates.
 type ExpositionReconciler struct {
 	Client            client.Client
@@ -113,7 +113,7 @@ func (r *ExpositionReconciler) initializeUnknownConditions(ctx context.Context, 
 
 // SetupWithManager registers the reconciler with the Manager. It watches
 // Exposition CRs (filtered to generation changes), Dogu CRs (filtered to
-// healthy-condition changes), and the maintenance ConfigMap, plus any
+// stopped-status and healthy-condition changes), and the maintenance ConfigMap, plus any
 // resource types reported by ExpositionService.GetOwnableTypes as Owns
 // sources.
 func (r *ExpositionReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -125,7 +125,7 @@ func (r *ExpositionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&doguv2.Dogu{},
 			handler.EnqueueRequestsFromMapFunc(mapRequestsFromDoguCR),
-			builder.WithPredicates(doguHealthyConditionChangedPredicate()),
+			builder.WithPredicates(doguStateChangedPredicate()),
 		).
 		Watches(
 			&corev1.ConfigMap{},

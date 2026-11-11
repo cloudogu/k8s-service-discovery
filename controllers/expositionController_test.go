@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,6 +93,17 @@ func assertInitializedConditions(t *testing.T, obj client.Object, observedGenera
 	assertReadyCondition(t, obj, validConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
 	assertReadyCondition(t, obj, adapter.IngressesConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
 	assertReadyCondition(t, obj, adapter.NetworkPoliciesConditionType, metav1.ConditionUnknown, "Initializing", "", observedGeneration)
+}
+
+func TestExpositionReconciler_SetupWithManager(t *testing.T) {
+	mgr := newTestManager(t)
+	expositionService := NewMockExpositionService(t)
+	expositionService.EXPECT().GetOwnableTypes().Return([]client.Object{&networkingv1.Ingress{}})
+	sut := &ExpositionReconciler{Client: mgr.GetClient(), ExpositionService: expositionService}
+
+	err := sut.SetupWithManager(mgr)
+
+	require.NoError(t, err)
 }
 
 func TestExpositionReconciler_Reconcile(t *testing.T) {

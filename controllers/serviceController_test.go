@@ -18,9 +18,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -35,6 +38,32 @@ func getScheme(t *testing.T) *runtime.Scheme {
 	)).AddToScheme(scheme)
 	require.NoError(t, err)
 	return scheme
+}
+
+// newTestManager creates a manager that is never started, so it needs no reachable cluster.
+func newTestManager(t *testing.T) controllerruntime.Manager {
+	t.Helper()
+	scheme := getScheme(t)
+	require.NoError(t, doguv2.AddToScheme(scheme))
+	skipNameValidation := true
+	mgr, err := controllerruntime.NewManager(&rest.Config{Host: "http://127.0.0.1:1"}, controllerruntime.Options{
+		Scheme:     scheme,
+		Metrics:    metricsserver.Options{BindAddress: "0"},
+		Controller: config.Controller{SkipNameValidation: &skipNameValidation},
+	})
+	require.NoError(t, err)
+	return mgr
+}
+
+func TestServiceReconciler_SetupWithManager(t *testing.T) {
+	mgr := newTestManager(t)
+	expositionService := NewMockExpositionService(t)
+	expositionService.EXPECT().GetOwnableTypes().Return([]client.Object{&networkingv1.Ingress{}})
+	sut := &ServiceReconciler{Client: mgr.GetClient(), ExpositionService: expositionService}
+
+	err := sut.SetupWithManager(mgr)
+
+	require.NoError(t, err)
 }
 
 func TestServiceReconciler_Reconcile(t *testing.T) {
@@ -224,7 +253,13 @@ func doguWithoutConditions() *doguv2.Dogu {
 	return &doguv2.Dogu{}
 }
 
-func TestDoguHealthyConditionChangedPredicate_Update(t *testing.T) {
+func stoppedDoguWithHealthy(status metav1.ConditionStatus) *doguv2.Dogu {
+	dogu := doguWithHealthy(status)
+	dogu.Status.Stopped = true
+	return dogu
+}
+
+func TestDoguStateChangedPredicate_Update(t *testing.T) {
 	tests := []struct {
 		name   string
 		oldObj client.Object
@@ -279,22 +314,46 @@ func TestDoguHealthyConditionChangedPredicate_Update(t *testing.T) {
 			newObj: doguWithHealthy(metav1.ConditionUnknown),
 			want:   true,
 		},
+		{
+			name:   "stopped set while healthy stays False",
+			oldObj: doguWithHealthy(metav1.ConditionFalse),
+			newObj: stoppedDoguWithHealthy(metav1.ConditionFalse),
+			want:   true,
+		},
+		{
+			name:   "stopped cleared while healthy stays True",
+			oldObj: stoppedDoguWithHealthy(metav1.ConditionTrue),
+			newObj: doguWithHealthy(metav1.ConditionTrue),
+			want:   true,
+		},
+		{
+			name:   "stopped cleared without healthy condition",
+			oldObj: &doguv2.Dogu{Status: doguv2.DoguStatus{Stopped: true}},
+			newObj: doguWithoutConditions(),
+			want:   true,
+		},
+		{
+			name:   "stopped unchanged",
+			oldObj: stoppedDoguWithHealthy(metav1.ConditionFalse),
+			newObj: stoppedDoguWithHealthy(metav1.ConditionFalse),
+			want:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := doguHealthyConditionChangedPredicate()
+			p := doguStateChangedPredicate()
 			got := p.Update(event.UpdateEvent{ObjectOld: tt.oldObj, ObjectNew: tt.newObj})
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestDoguHealthyConditionChangedPredicate_Create(t *testing.T) {
-	p := doguHealthyConditionChangedPredicate()
+func TestDoguStateChangedPredicate_Create(t *testing.T) {
+	p := doguStateChangedPredicate()
 	assert.False(t, p.Create(event.CreateEvent{Object: doguWithHealthy(metav1.ConditionTrue)}))
 }
 
-func TestDoguHealthyConditionChangedPredicate_Delete(t *testing.T) {
-	p := doguHealthyConditionChangedPredicate()
+func TestDoguStateChangedPredicate_Delete(t *testing.T) {
+	p := doguStateChangedPredicate()
 	assert.False(t, p.Delete(event.DeleteEvent{Object: doguWithHealthy(metav1.ConditionTrue)}))
 }
