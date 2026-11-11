@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.1.5] - 2026-11-11
+### Fixed
+- [#123] Reconcile expositions when the stopped status of a dogu changes, so that a stopped or restarted dogu gets the right ingresses.
+
+### Security
+- [#13] Update Go to 1.27.3 to fix various CVEs.
+
 ## [v6.1.4] - 2026-10-01
 ### Added
 - [#121] Generate network policies for traffic between gateway and dogus
