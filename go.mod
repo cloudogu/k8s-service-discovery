@@ -1,6 +1,6 @@
 module github.com/cloudogu/k8s-service-discovery/v2
 
-go 1.27.3
+go 1.27.4
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.79.3
 

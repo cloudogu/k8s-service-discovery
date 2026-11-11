@@ -1,3 +1,3 @@
 module github.com/traefik/traefik/dynamic/ext
 
-go 1.27.3
+go 1.27.4
