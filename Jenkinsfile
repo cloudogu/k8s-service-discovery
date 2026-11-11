@@ -1,6 +1,6 @@
 #!groovy
 
-@Library(['github.com/cloudogu/ces-build-lib@3.0.0'])
+@Library(['github.com/cloudogu/ces-build-lib@6.1.0'])
 import com.cloudogu.ces.cesbuildlib.*
 
 // Creating necessary git objects
@@ -80,6 +80,8 @@ node('docker') {
 
         try {
             stage('Set up k3d cluster') {
+                k3d.installKubectlManually()
+                k3d.installHelmManually()
                 k3d.startK3d()
             }
 
