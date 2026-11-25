@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v6.1.6] - 2026-11-25
+### Added
+- [#127] exposition-crd as component dependency
+
 ## [v6.1.5] - 2026-11-11
 ### Fixed
 - [#123] Reconcile expositions when the stopped status of a dogu changes, so that a stopped or restarted dogu gets the right ingresses.
